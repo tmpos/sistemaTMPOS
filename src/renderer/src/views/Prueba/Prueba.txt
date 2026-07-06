@@ -1,0 +1,56 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Prueba",
+"to": "/prueba",
+"permiso": "Administrador,Soporte",
+"icon": "pi pi-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/prueba',
+        name: 'prueba',
+        component: () => import('../views/Prueba/Prueba.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/crearprueba',
+        name: 'crearprueba',
+        component: () => import('@/views/Prueba/CrearPrueba.vue'),
+    },
+    {
+        path: '/editarprueba/:id',
+        name: 'editarprueba',
+        component: () => import('@/views/Prueba/EditarPrueba.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'nombre', 'telefono', 'email', 'direccion'"
+******************************************************
+{
+        
+      "nombre": "nombre",
+      "NOMBRE": "NOMBRE",
+      "Nombre": "Nombre",
+     
+      "telefono": "telefono",
+      "TELEFONO": "TELEFONO",
+      "Telefono": "Telefono",
+     
+      "email": "email",
+      "EMAIL": "EMAIL",
+      "Email": "Email",
+     
+      "direccion": "direccion",
+      "DIRECCION": "DIRECCION",
+      "Direccion": "Direccion",
+}
+

@@ -1,0 +1,22 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Recibirequipo",
+"to": "/recibirequipo",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/recibirequipo',
+        name: 'recibirequipo',
+        component: () => import('../views/Recibirequipo/Recibirequipo.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********
+**********************|-CAMPOS-|******************
+"id, imei, estado, fecha, equipo, marca, modelo, preciocompra, precioventa, detalles, vendedor, cedula, telefono, direccion, nota, created_at, updated_at, usuario"
+******************************************************

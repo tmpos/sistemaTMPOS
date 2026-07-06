@@ -1,0 +1,22 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Mensajeria",
+"to": "/mensajeria",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/mensajeria',
+        name: 'mensajeria',
+        component: () => import('../views/Mensajeria/Mensajeria.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********
+**********************|-CAMPOS-|******************
+"id, mensajeria, mensaje, created_at, updated_at, usuario"
+******************************************************

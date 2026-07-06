@@ -1,0 +1,1084 @@
+<script setup>
+import { ref, onMounted, nextTick, watchEffect } from 'vue';
+import { useToast } from "primevue/usetoast";
+import { useRouter, useRoute } from 'vue-router';
+const router = useRouter();
+const route = useRoute(); 
+import {enviarDatosPorPost,
+  eliminarDatos, 
+  obtenerIdsSeleccionados,
+  borrarTodoslosDatos,
+  lenguajeDataTable,
+  nfecha,
+  arrayToObjetoFromTabla,
+  peticionesFetch,
+  encryptarPassword,
+  envioElectron,
+  generadorCodigo,
+  generarCodigoUnico,
+  peticiones,
+  generarCodigoAlfaNumerico,
+  cajeroACtivo,
+  generarTablaFromStringJSON,
+  mensajetoast,
+  lasMayusculas} from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+/************************************************************************/
+/************************************************************************/
+import Awesomplete from '../../components/Awesomplete.vue';
+import LoadingOverlay from '../../Loading/LoadingOverlay.vue';
+import OptionButtonTM from '../../components/OptionButtomTM.vue';
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const tokenCorto = ref('');
+/************************************************************************/
+const loading = ref(false)
+const tipoProducto = ref('Producto Normal')
+const agregarNoCompra = ref('Nombre Normal')
+const visibleAgregarCategoria = ref(false)
+const agregarCategoria = ref('')
+const formattedInput = ref('');
+/************************************************************************/
+const datosConfiguracion = ref({})
+/************************************************************************/
+const proveedoresArray = ref([]);
+const proveedoresNombres = ref([]);
+/************************************************************************/
+const productosArray = ref([])
+const productosNombres = ref([])
+/************************************************************************/
+const categoriasArray = ref([])
+const categoriasNombres = ref([])
+const categoria = ref('')
+/************************************************************************/
+const optionsImpuestos = ref(['Sin Imp','Incluido','Agregado'])
+const addImpuestos = ref('Sin Imp')
+const marca = ref('GENERICO')
+/************************************************************************/
+const datoscamposCompras = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+const position = "top";
+/************************************************************************/
+const fetchAndSetupData = async () => {
+    const jsonData = await arrayToObjetoFromTabla(link.value+api.value,tokenCifrado.value,'compras');
+    datoscamposCompras.value = jsonData;
+    datoscamposCompras.value.estado = datoscamposCompras.value.estado || 'PENDIENTE'
+    datoscamposCompras.value.no_factura = generarCodigoAlfaNumerico(5,'C');
+    datoscamposCompras.value.fecha = nfecha('fecha')
+    datoscamposCompras.value.estado = 'PENDIENTE'
+    datoscamposCompras.value.metodo_pago = 'EFECTIVO'
+    datoscamposCompras.value.subtotal = '0.00'
+    datoscamposCompras.value.descuento = '0.00'
+    datoscamposCompras.value.impuesto = '0.00'
+    datoscamposCompras.value.total = '0.00'
+    datoscamposCompras.value.abono = '0.00'
+    datoscamposCompras.value.saldo = '0.00'
+    datoscamposCompras.value.productos = '[]'
+    //tipoProducto.value = false
+};
+/************************************************************************/
+const fetchProveedores = async () => {
+const response = await peticionesFetch(`${link.value}${api.value}`, `datosarray/proveedores`, {}, tokenCifrado.value, 'GET');
+    const jsonData = response;
+    proveedoresArray.value = jsonData;
+    proveedoresNombres.value = jsonData.map(proveedor=>proveedor.nombre);
+};
+/************************************************************************/
+const fetchCategorias = async () => {
+const response = await peticionesFetch(`${link.value}${api.value}`, `datosarray/categorias`, {}, tokenCifrado.value, 'GET');
+    const jsonData = response;
+    categoriasArray.value = jsonData;
+    categoriasNombres.value = jsonData.map(categoria=>categoria.nombre);
+};
+/************************************************************************/
+const fetchProductos = async () => {
+const response = await peticionesFetch(`${link.value}${api.value}`, `datosarray/productos`, {}, tokenCifrado.value, 'GET');
+    const jsonData = response;
+    productosArray.value = jsonData;
+    productosNombres.value = jsonData.map(proveedor=>proveedor.nombre);
+};
+/************************************************************************/
+const datosCajero = ref({})
+/************************************************************************/
+onMounted(async() => {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCorto.value = datosJSON.VITE_TOKEN_CORTO;
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+
+datosConfiguracion.value = JSON.parse(window.localStorage.getItem('configuracion'))
+
+await fetchAndSetupData()
+await fetchProveedores()
+await fetchCategorias()
+await fetchProductos()
+datosCajero.value = await cajeroACtivo(link.value+api.value)
+categoria.value = categoriasNombres.value[0]
+
+});
+/************************************************************************/
+const agregarLosProductos = async () => {
+  try {
+    const datosIMEI = await arrayToObjetoFromTabla(link.value + api.value, tokenCifrado.value, 'imei');
+    const productosArray = JSON.parse(datoscamposCompras.value.productos);
+
+    const baseURL = `${link.value}${api.value}`;
+    const urlInsertarProducto = `${baseURL}/insertar/productos`;
+    const urlActualizarProducto = `${baseURL}/actualizarcampos/productos`;
+    const urlInsertarIMEI = `${baseURL}/insertar/imei`;
+
+    // Función para procesar un producto
+    const procesarProducto = async (producto) => {
+      try {
+        const verificaExistenciaProducto = await peticionesFetch(
+          `${baseURL}`,
+          `datoscampo/productos/codigo/${producto.codigo}`,
+          {},
+          tokenCifrado.value,
+          'GET'
+        );
+
+        if (verificaExistenciaProducto) {
+          // Producto ya existe, actualizar stock
+          verificaExistenciaProducto.no_compra = producto.no_compra;
+          if (verificaExistenciaProducto.categoria === 'CELULARES') {
+            const response = await enviarDatosPorPost(
+              `${baseURL}/datosarraydoblecondicion/imei`,
+              { campo1: 'id_equi', valor1: verificaExistenciaProducto.id, campo2: 'estado', valor2: 'DISPONIBLE' },
+              tokenCifrado.value
+            );
+            verificaExistenciaProducto.stock = response.length;
+          } else {
+            verificaExistenciaProducto.stock = Number(verificaExistenciaProducto.stock) + Number(producto.stock);
+          }
+
+          await enviarDatosPorPost(urlActualizarProducto, verificaExistenciaProducto, tokenCifrado.value);
+        } else {
+          // Producto no existe, insertar nuevo producto
+          producto.almacen = datosEmpresa.empresa.nombre
+          const envioDatos = await enviarDatosPorPost(urlInsertarProducto, producto, tokenCifrado.value);
+
+          // Si es categoría CELULARES, insertar IMEIs asociados
+          if (envioDatos[0] === 'ok' && producto.categoria === 'CELULARES' && producto.otro) {
+            await agregarIMEIs(urlInsertarIMEI, producto, datosIMEI);
+          }
+        }
+      } catch (productoError) {
+        console.error(`Error al procesar el producto con código ${producto.codigo}:`, productoError);
+      }
+    };
+
+    // Procesar cada producto en paralelo con limitación de concurrencia
+    const maxConcurrentRequests = 5; // Ajusta este valor según sea necesario
+    const promisesProductos = [];
+
+    for (let i = 0; i < productosArray.length; i += maxConcurrentRequests) {
+      const batch = productosArray.slice(i, i + maxConcurrentRequests);
+      const batchPromises = batch.map(procesarProducto);
+      await Promise.all(batchPromises);
+    }
+
+    console.log('Todos los productos y sus IMEIs han sido agregados correctamente.');
+  } catch (error) {
+    console.error('Error al agregar productos e IMEIs:', error);
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo completar la operación.', life: 3000 });
+  }
+};
+
+
+// Función auxiliar para agregar IMEIs
+const agregarIMEIs = async (urlInsertarIMEI, producto, datosIMEI) => {
+  try {
+    const datosImei = await peticionesFetch(
+      `${link.value}${api.value}`,
+      `datoscampo/productos/codigo/${producto.codigo}`,
+      {},
+      tokenCifrado.value,
+      'GET'
+    );
+
+    if (datosImei) {
+      const listImei = producto.otro.split(',').map((imei) => imei.trim()).filter((imei) => imei);
+
+      const promisesIMEI = listImei.map(async (imei) => {
+        const nuevoIMEI = {
+          ...datosIMEI,
+          imei,
+          estado: 'DISPONIBLE',
+          fecha: nfecha('fecha'),
+          equipo: producto.nombre,
+          proveedor: producto.proveedor,
+          id_equi: datosImei.id,
+          costo: producto.precio_compra,
+          precio_venta: producto.precio_venta,
+          no_compra: producto.no_compra,
+          fecha_venta: '',
+          hora_venta: '',
+          comprador: '',
+          detalles: '',
+          usuario: '',
+        };
+        return enviarDatosPorPost(urlInsertarIMEI, nuevoIMEI, tokenCifrado.value);
+      });
+
+      await Promise.all(promisesIMEI);
+    }
+  } catch (imeiError) {
+    console.error(`Error al agregar IMEIs para el producto ${producto.nombre}:`, imeiError);
+  }
+};
+
+/************************************************************************/
+async function enviarDatos(event) {
+    event.preventDefault();
+  const url = link.value+api.value+"/insertar/compras";
+  if (!datoscamposCompras.value) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Datos incompletos, no se puede Enviar.', life: 3000 });
+    return;
+  }
+  if (datoscamposCompras.value.hasOwnProperty('created_at')) {
+     datoscamposCompras.value.created_at = nfecha('timestamp')
+     datoscamposCompras.value.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await enviarDatosPorPost(url, datoscamposCompras.value,tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Agregados con éxito.', life: 3000 });
+
+
+  if (datoscamposCompras.value.estado === 'PENDIENTE') {
+    const jsonDataPagar = await arrayToObjetoFromTabla(link.value+api.value,tokenCifrado.value,'cuentasxpagar');
+    
+      const ultimaFactura = await peticiones(`${link.value}${api.value}/datosmax`, {"tabla":'cuentasxpagar',"campo":'no_emision'},'POST',tokenCifrado.value);
+
+    jsonDataPagar.no_emision = generadorCodigo(ultimaFactura[0], 'CXP', 7);
+
+
+    jsonDataPagar.proveedor = datoscamposCompras.value.proveedor
+    jsonDataPagar.rnc = datoscamposCompras.value.rnc_proveedor
+    jsonDataPagar.estado = datoscamposCompras.value.estado
+
+    jsonDataPagar.fecha = nfecha('fecha')
+    jsonDataPagar.hora = nfecha('hora')
+    jsonDataPagar.productos = datoscamposCompras.value.productos
+    jsonDataPagar.total = datoscamposCompras.value.total
+    jsonDataPagar.subtotal = datoscamposCompras.value.subtotal
+    jsonDataPagar.saldo = datoscamposCompras.value.saldo
+    jsonDataPagar.abono = datoscamposCompras.value.abono
+    jsonDataPagar.impuestos = datoscamposCompras.value.impuesto
+    jsonDataPagar.nota = datoscamposCompras.value.nota
+    jsonDataPagar.no_factura = datoscamposCompras.value.no_factura
+
+
+   const npago = [{
+    "nopago": 1,
+    "cantidad": datoscamposCompras.value.abono,
+    "metodo": 'EFECTIVO',
+    "fecha": nfecha('fecha'),
+    "hora": nfecha('hora'),
+    "turno":datosCajero.value.turno,
+    "cajero":datosCajero.value.username,
+    "saldo": datoscamposCompras.value.saldo
+  }];
+
+  jsonDataPagar.pagos = JSON.stringify(npago);
+
+  const urlPAGAR = link.value+api.value+"/insertar/cuentasxpagar";
+  if (!jsonDataPagar) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Datos incompletos, no se puede Enviar.', life: 3000 });
+    return;
+  }
+  if (jsonDataPagar.hasOwnProperty('created_at')) {
+     jsonDataPagar.created_at = nfecha('timestamp')
+     jsonDataPagar.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await enviarDatosPorPost(urlPAGAR, jsonDataPagar,tokenCifrado.value);
+  
+
+  }
+
+await agregarLosProductos();
+
+
+Swal.fire({
+  title: "Datos Agregados",
+  text: "Que hacemos ahora?",
+  icon: "warning",
+  showCancelButton: true,
+  confirmButtonText: "Agregar Otro!",
+  cancelButtonText: "No, Regresar al Inicio!",
+ }).then(async(result) => {
+  if (result.isConfirmed) {
+      fetchAndSetupData()
+} else if (result.dismiss === Swal.DismissReason.cancel) {
+    router.push({ path: `/compras` });
+  }
+})
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+const fnAwesomplete = ()=>{
+
+}
+/************************************************************************/
+const handleSelectComplete = (selected)=>{
+const datosProveedor = proveedoresArray.value.find(prov=>prov.nombre === selected.value)
+datoscamposCompras.value.proveedor = datosProveedor.nombre
+datoscamposCompras.value.rnc_proveedor = datosProveedor.rnc
+
+
+}
+/************************************************************************/
+const calcularPrecios = () => {
+  // Convertir los valores a números
+  const precioCompra = parseFloat(productoPrecio.value) || 0;
+  const ganancia = parseFloat(productoGanancia.value) || 0;
+  const impuesto = parseFloat(productoImpuesto.value) || 0;
+
+  // Calcular la ganancia en base al porcentaje de ganancia
+  const gananciaCalculada = precioCompra * (ganancia / 100);
+
+  // Calcular el precio base de venta antes de impuesto
+  let precioVenta = precioCompra + gananciaCalculada;
+  let precioVentaSolo = precioCompra + gananciaCalculada;
+
+  // Si hay impuesto, aplicarlo sobre el precio base de venta
+  if (impuesto > 0) {
+    const impuestoCalculado = precioVenta * (impuesto / 100);
+    precioVenta += impuestoCalculado;
+    productoImpuestoVenta.value = impuestoCalculado.toFixed(2); // Guardar el impuesto calculado
+  } else {
+    productoImpuestoVenta.value = '0.00';
+  }
+
+  // Asignar el precio de venta y el precio final a los campos correspondientes
+  productoPrecioVenta.value = precioVentaSolo.toFixed(2);
+  productoPrecioFinal.value = precioVenta.toFixed(2);
+  productoPrecioMinimo.value = (precioCompra + (gananciaCalculada * 0.8)).toFixed(2); // Precio mínimo con 20% de ganancia
+  productoPrecioXmayor.value = (precioCompra + (gananciaCalculada * 0.6)).toFixed(2); // Precio por mayor con 40% de ganancia
+};
+
+/************************************************************************/
+const recalcularPventa = () => {
+    // Convertir los valores a números
+    const precioCompra = Number(productoPrecio.value);
+    const precioVenta = Number(productoPrecioVenta.value);
+    console.log("precioVenta", precioVenta);
+
+    // Calcular la ganancia
+    let gananciaCalculada = 0;
+    if (!isNaN(precioCompra) && !isNaN(precioVenta) && precioCompra !== 0) {
+        // Calcula la ganancia en términos absolutos
+        gananciaCalculada = precioVenta - precioCompra;
+
+        // Calcula el porcentaje de ganancia
+        const gananciaPorcentaje = (gananciaCalculada / precioCompra) * 100;
+        productoGanancia.value = gananciaPorcentaje.toFixed(2);
+    } else {
+        productoGanancia.value = '0.00';
+    }
+
+    // Calcular el precio mínimo y precio por mayor basado en la ganancia calculada
+    productoPrecioMinimo.value = (precioCompra + (gananciaCalculada * 0.8)).toFixed(2); // Precio mínimo con 80% de ganancia
+    productoPrecioXmayor.value = (precioCompra + (gananciaCalculada * 0.6)).toFixed(2);  // Precio por mayor con 60% de ganancia
+};
+
+
+/************************************************************************/
+const fnBuscarRNC = async () => {
+  loading.value = true;
+  const rnc = datoscamposCompras.value.rnc_proveedor;
+
+  try {
+    // Realiza la consulta a través de ipcRenderer
+    const response = await window.electron.ipcRenderer.invoke('consultarRNC', rnc);
+
+    // Si se obtiene una respuesta válida
+    if (response) {
+      loading.value = false;
+
+      // Formatear los datos en una lista HTML
+      const formattedData = Object.entries(response)
+        .map(([key, value]) => `<li><strong>${key}:</strong> ${value}</li>`)
+        .join('');
+
+      // Mostrar la información con SweetAlert2
+      Swal.fire({
+        title: 'Datos de la Empresa',
+        html: `<ul style="text-align: left; margin: 0; padding: 0;">${formattedData}</ul>`,
+        icon: 'success',
+        confirmButtonText: 'Cerrar'
+      });
+
+      // Notificación de éxito
+      toast.add({
+        severity: 'success',
+        summary: 'Encontrado',
+        detail: 'Datos Encontrados',
+        life: 3000
+      });
+
+      // Asignar el nombre del proveedor
+      datoscamposCompras.value.proveedor = response.nombrerazon_social;
+    } else {
+      // Caso cuando no se encuentran datos
+      loading.value = false;
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Error, No se encuentran los Datos.',
+        life: 3000
+      });
+    }
+  } catch (error) {
+    // Manejo de errores en caso de fallo en la solicitud
+    loading.value = false;
+    console.error('Error en la solicitud:', error);
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Error, No se encuentran los Datos.',
+      life: 3000
+    });
+  }
+};
+
+/************************************************************************/
+/************************************************************************/
+const calcularSaldoPendiente = () => {
+  const total = parseFloat(datoscamposCompras.value.total) || 0;
+  const abono = parseFloat(datoscamposCompras.value.abono) || 0;
+
+  const saldo = total - abono;
+  datoscamposCompras.value.saldo = saldo.toFixed(2);
+};
+/************************************************************************/
+
+/************************************************************************/
+watchEffect(() => {
+  calcularSaldoPendiente();
+    if (tipoProducto.value) {
+       categoria.value = 'CELULARES';
+  }
+
+});
+
+/************************************************************************/
+const productoNombre = ref('')
+const productoImpuesto = ref('0')
+const productoImpuestoVenta = ref('0')
+const productoGanancia = ref('0')
+const productoPrecioFinal = ref('0')
+const productoPrecioMinimo = ref('0')
+const productoPrecioXmayor = ref('0')
+const productoCatgoria = ref('GENERICO')
+const productoCantidad = ref('1')
+const productoCodigo = ref(generarCodigoUnico())
+const productoCodigoBarra = ref(generarCodigoUnico())
+const productoPrecio = ref('0.00')
+const productoPrecioVenta = ref('0.00')
+const tipoImpuesto = ref('0.00')
+/************************************************************************/
+const fnGenerarCodigo = ()=>{
+  productoCodigoBarra.value = generarCodigoUnico()
+}
+/************************************************************************/
+const handleSelectCompleteProducto = (selected)=>{
+  const datosProducto = productosArray.value.find(prod=>prod.nombre === selected.value)
+  if (datosProducto) {
+
+
+    productoCodigo.value = datosProducto.codigo
+    productoCodigoBarra.value = datosProducto.codigo_barra
+
+    if (agregarNoCompra.value == 'Agregar No. Compra') {
+        productoCodigo.value = generarCodigoUnico()
+        productoCodigoBarra.value = generarCodigoUnico()
+        delete datosProducto.id
+    }
+
+
+    productoNombre.value = datosProducto.nombre
+
+    productoPrecio.value = datosProducto.precio_compra
+    productoPrecioVenta.value = datosProducto.precio_venta
+    productoImpuestoVenta.value = datosProducto.impuesto_venta
+    productoGanancia.value = datosProducto.ganancia
+    productoPrecioFinal.value = datosProducto.precio_final
+    productoPrecioMinimo.value = datosProducto.precio_min
+    productoPrecioXmayor.value = datosProducto.precio_xmayor
+    categoria.value = datosProducto.categoria
+    marca.value = datosProducto.marca
+  }
+
+}
+/************************************************************************/
+const fnLimpiarCampos = (limpiarProducto = true)=>{
+    productoCodigo.value = generarCodigoUnico()
+    productoCodigoBarra.value = generarCodigoUnico()
+    productoNombre.value = ''
+    productoPrecio.value = '0.00'
+    productoPrecioVenta.value = '0.00'
+    productoImpuestoVenta.value = '0.00'
+    productoGanancia.value = '0.00'
+    productoPrecioFinal.value = '0.00'
+    productoPrecioMinimo.value = '0.00'
+    productoPrecioXmayor.value = '0.00'
+    productoCatgoria.value = 'GENERICO'
+    formattedInput.value = ''
+    if (limpiarProducto) {
+    datoscamposCompras.value.productos = '[]'
+  }
+}
+/************************************************************************/
+const fnCambioImpuesto = ()=>{
+productoImpuesto.value = tipoImpuesto.value
+calcularPrecios()
+}
+/************************************************************************/
+const listaProductos = ref([]);
+const nuevoProducto = ref('');
+/************************************************************************/
+/************************************************************************/
+const fnAgregarProducto = async () => {
+  let camposProducto;
+  let existe = false;
+  const datosProducto = productosArray.value.find(prod => prod.nombre === productoNombre.value);
+  
+  if (datosProducto) {
+    camposProducto = datosProducto;
+    existe = true;
+  } else {
+    camposProducto = await arrayToObjetoFromTabla(link.value + api.value, tokenCifrado.value, 'productos');
+    camposProducto.stock = 0;
+  }
+
+  camposProducto.stock = productoCantidad.value;
+  camposProducto.codigo = productoCodigo.value;
+  camposProducto.codigo_barra = productoCodigoBarra.value;
+  camposProducto.nombre = productoNombre.value.toUpperCase();
+  camposProducto.precio_compra = productoPrecio.value;
+  camposProducto.precio_venta = productoPrecioVenta.value;
+  camposProducto.oferta = productoPrecioVenta.value;
+  camposProducto.precio_final = productoPrecioFinal.value;
+  camposProducto.precio_min = productoPrecioMinimo.value;
+  camposProducto.precio_xmayor = productoPrecioXmayor.value;
+  camposProducto.no_compra = datoscamposCompras.value.no_factura;
+  camposProducto.categoria = categoria.value;
+  camposProducto.proveedor = datoscamposCompras.value.proveedor;
+  camposProducto.impuestos = productoImpuesto.value;
+  camposProducto.tipo_impuesto = addImpuestos.value
+  camposProducto.created_at = nfecha('timestamp')
+  camposProducto.updated_at = nfecha('timestamp')
+  camposProducto.empaque = 'UNIDAD'
+  camposProducto.alerta = '3'
+  camposProducto.marca = marca.value
+  camposProducto.ganancia = productoGanancia.value
+
+if (agregarNoCompra.value == 'Agregar No. Compra') {
+    camposProducto.nombre = productoNombre.value.toUpperCase() + ' (' + datoscamposCompras.value.no_factura + ')';
+    camposProducto.descripcion = productoNombre.value.toUpperCase() + ' (' + datoscamposCompras.value.no_factura + ')';
+}
+
+  if (tipoProducto.value) {
+    camposProducto.otro = formattedInput.value
+  }
+
+  const productosAgregados = JSON.parse(datoscamposCompras.value.productos);
+  productosAgregados.push(camposProducto);
+
+  datoscamposCompras.value.productos = JSON.stringify(productosAgregados);
+
+  // Llamar a calcularTotales después de agregar el producto
+  calcularTotales();
+
+  fnLimpiarCampos(false);
+};
+/************************************************************************/
+
+/************************************************************************/
+const agregarProducto = () => {
+  if (nuevoProducto.value.trim() !== '') {
+    listaProductos.value.push(nuevoProducto.value);
+    nuevoProducto.value = '';
+    actualizarProductosTextarea();
+  }
+};
+
+const actualizarProductosTextarea = () => {
+  datoscamposCompras.value.productos = JSON.stringify(listaProductos.value);
+};
+/************************************************************************/
+/************************************************************************/
+const calcularTotales = () => {
+  let subtotal = 0;
+  let impuestoTotal = 0;
+
+  const productosAgregados = JSON.parse(datoscamposCompras.value.productos);
+
+  productosAgregados.forEach((producto) => {
+    const precioCompra = parseFloat(producto.precio_compra) || 0;
+    const cantidad = parseFloat(producto.stock) || 0;
+    const impuesto = parseFloat(producto.impuesto_venta) || 0;
+
+    // Calcular el subtotal (precio de compra por cantidad)
+    subtotal += precioCompra * cantidad;
+
+    // Calcular los impuestos
+    impuestoTotal += (precioCompra * cantidad) * (impuesto / 100);
+  });
+
+  datoscamposCompras.value.subtotal = subtotal.toFixed(2);
+  datoscamposCompras.value.impuesto = impuestoTotal.toFixed(2);
+  datoscamposCompras.value.total = (subtotal + impuestoTotal).toFixed(2);
+};
+
+/************************************************************************/
+const fnEdit = (index)=>{
+
+}
+
+const fnDel = async(index) => {
+  const pagosArray = JSON.parse(datoscamposCompras.value.productos);
+
+  Swal.fire({
+    title: 'Introduce la contraseña',
+    input: 'password',
+    inputPlaceholder: 'Contraseña',
+    showCancelButton: true,
+    confirmButtonText: 'Eliminar',
+    cancelButtonText: 'Cancelar'
+  }).then(async(result) => {
+    if (result.isConfirmed) {
+
+      const contrasenaIngresada = result.value;
+
+      if (contrasenaIngresada === token.value || contrasenaIngresada === tokenCorto.value ) {
+
+        const filtrado = pagosArray.filter((_, i) => i !== index);
+        datoscamposCompras.value.productos = JSON.stringify(filtrado);
+
+        } else {
+         toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+        }
+      
+    }
+  })
+
+
+}
+/************************************************************************/
+
+const onInput = () => {
+  formattedInput.value = formatWithCommas(formattedInput.value);
+};
+/************************************************************************/
+function formatWithCommas(value) {
+  // Eliminar todas las comas y espacios en blanco existentes
+  value = value.replace(/[, ]/g, ''); // Remueve comas y espacios
+
+  // Dividir el valor en grupos de 15 caracteres y unirlos con comas
+  const regex = /.{1,15}/g;
+  const formattedValue = value.match(regex)?.join(',') || value;
+
+  if (tipoProducto.value) {
+    productoCantidad.value = formattedValue.split(',').length;
+  }
+
+  return formattedValue;
+}
+/************************************************************************/
+const fnGeneraOtroCodigoCompra = ()=>{
+  datoscamposCompras.value.no_factura = generarCodigoAlfaNumerico(5,'C');
+}
+/************************************************************************/
+const fnAgregarCategoria = async ()=>{
+  //agregarCategoria.value
+  const datoscamposCategorias = await arrayToObjetoFromTabla(link.value+api.value,tokenCifrado.value,'categorias');
+  datoscamposCategorias.nombre = agregarCategoria.value;
+  const url = link.value+api.value+"/insertar/categorias";
+  if (datoscamposCategorias.hasOwnProperty('created_at')) {
+     datoscamposCategorias.created_at = nfecha('timestamp')
+     datoscamposCategorias.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await enviarDatosPorPost(url, datoscamposCategorias,tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+    await fetchCategorias();
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Categoria Agregada exitosamente', life: 3000 });
+     visibleAgregarCategoria.value = false
+     categoria.value = agregarCategoria.value;
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar la categoria.', life: 3000 });
+ }
+}
+/************************************************************************/
+const verificaImpuestos = ()=>{
+   if (addImpuestos.value === 'Incluido' || addImpuestos.value === 'Agregado') {
+      productoImpuesto.value = datosConfiguracion.value.impuesto;
+   }else{
+      productoImpuesto.value = '0.00'
+   }
+}
+/************************************************************************/
+</script>
+<template>
+
+<main class="content-wrapper">
+  <Card>
+    <template #content>
+  <div class="container-fluid mt-5">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Compras</legend>
+    <div class="row">
+      <div class="col-sm-12 col-md-4 col-lg-2">
+       <Button as="router-link" icon="pi pi-home"  to="/compras" />
+       <Button icon="pi pi-eraser" severity="contrast" class="ml-2" @click="fnLimpiarCampos" aria-label="Save" />
+<!--        <ToggleButton v-model="tipoProducto" class="w-30 p-3" onIcon="pi pi-lock" offIcon="pi pi-lock-open" onLabel="Celular" offLabel="P.Normal" /> -->
+
+      </div>
+
+      <div class="col-sm-12 col-md-4 col-lg-3">
+    <OptionButtonTM v-model="tipoProducto"   :options="['Producto Normal','Celular']" aria-labelledby="basic" />
+        
+      </div>
+    
+      <div class="col-sm-12 col-md-4 col-lg-3">
+    <OptionButtonTM v-model="agregarNoCompra"   :options="['Agregar No. Compra','Nombre Normal']" aria-labelledby="basic" />
+<!--        <ToggleButton v-model="agregarNoCompra" class="w-30 p-3" onIcon="pi pi-lock" offIcon="pi pi-lock-open" onLabel="Agregar No. Compra" offLabel="Nombre Normal" /> -->
+        
+      </div>
+
+
+    </div>
+</fieldset>
+<section>
+<fieldset class="border p-3 rounded mb-2">
+  <legend class="float-none w-auto px-2">Campos</legend>
+    <form id="formularioActualizar" action="" method="">
+         <div class="box-body">
+          <div class="row" id="campos">
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="proveedorAgregarDatos">PROVEEDOR</label>
+
+           <awesomplete
+                    class="dropdown-input"
+                    v-model="datoscamposCompras.proveedor"
+                    @change="fnAwesomplete"
+                    @selectComplete="handleSelectComplete"
+                    :list="proveedoresNombres">
+            </awesomplete>
+
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="rnc_proveedorAgregarDatos">RNC_PROVEEDOR</label>
+
+<InputGroup>
+    <InputText placeholder="RNC" v-model="datoscamposCompras.rnc_proveedor" />
+    <Button icon="pi pi-search" @click="fnBuscarRNC" severity="warn" />
+</InputGroup>
+
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="fechaAgregarDatos">FECHA</label>
+<input type="input" v-model="datoscamposCompras.fecha" name="fecha"  class="form-control " id="fechaAgregarDatos"  placeholder="fecha" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="no_facturaAgregarDatos">NO_FACTURA</label>
+<InputGroup>
+    <InputText placeholder="NO_COMPRA" v-model="datoscamposCompras.no_factura" />
+    <Button icon="pi pi-sync" @click="fnGeneraOtroCodigoCompra" severity="warn" />
+</InputGroup>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="ncf_proveedorAgregarDatos">NCF_PROVEEDOR</label>
+<input type="input" v-model="datoscamposCompras.ncf_proveedor" name="ncf_proveedor"  class="form-control " id="ncf_proveedorAgregarDatos"  placeholder="ncf_proveedor" maxlength="250">
+</div>
+
+<div class="col-12 form-group">
+  <fieldset class="border p-2 ">
+  <legend  class="w-auto">Buscador de Productos</legend>
+  <div class="row">
+        <div class="col-4 col-sm-4 form-group">
+          <label for="elBuscador">N. Producto</label>
+
+           <awesomplete
+                    class="dropdown-input"
+                    v-model="productoNombre"
+                    v-mayuscula
+                    @selectComplete="handleSelectCompleteProducto"
+                    :list="productosNombres">
+            </awesomplete>
+
+       </div>
+
+
+        <div class="col-2 col-sm-4 col-md-2 col-lg-2 form-group">
+          <label for="codigo">Código</label>
+         <input type="text" id="codigo"  v-model="productoCodigo"  class="form-control awesomplete" nombre="codigo" db="productos">
+       </div>
+
+        <div class="col-2 col-sm-4 col-md-2 col-lg-2 form-group">
+          <label for="codbarra">Cod.Barra</label>
+        <div class="input-group">
+          <InputGroup>
+              <InputText placeholder="NO_COMPRA" v-model="productoCodigoBarra" />
+              <Button icon="pi pi-sync" @click="fnGenerarCodigo" severity="warn" />
+          </InputGroup>
+        </div>
+       </div>
+
+
+        <div class="col-2 col-sm-4 col-md-2 col-lg-2 form-group">
+          <label for="preciocompra">Costo</label>
+         <input type="text" id="preciocompra" v-solonumeros v-decimales v-numeroFocusinOut v-model="productoPrecio"  class="form-control soloNumero" @keyup="calcularPrecios" value="0.00">
+       </div>
+
+
+
+        <div class="col-2 col-sm-4 col-md-2 col-lg-2 form-group">
+          <label for="precioventacompra">P. Venta</label>
+         <input type="text" id="precioventacompra" v-solonumeros v-decimales v-numeroFocusinOut v-model="productoPrecioVenta"  class="form-control soloNumero" @blur="recalcularPventa" value="0.00">
+       </div>
+
+<div class="form-group col-6 col-sm-4 col-md-2 col-lg-2">
+<label for="impuestoAgregarDatos"> {{datosConfiguracion.nombre_impuesto}}</label>
+
+
+<div class="input-group">
+
+
+  <input type="text" name="impuestoAgregarDatos"  class="form-control decimales soloNumero" id="impuestoAgregarDatos" v-model="productoImpuesto" v-solonumeros v-decimales v-numeroFocusinOut aria-describedby="simboloporcentaje" >
+  <div class="input-group-append">
+      <select name="simboloporcentaje" class="form-control" v-model="tipoImpuesto" @change="fnCambioImpuesto" id="simboloporcentaje">
+      <option :value="datosConfiguracion.impuesto" selected>Sistema</option>
+      <option value="0.00">Cero</option>
+      <option value="1">Manual</option>
+    </select>
+  </div>
+</div>
+</div>
+
+<div class="form-group col-12  col-md-3" >
+  <label for="">Como va el Impuesto?</label>
+    <OptionButtonTM v-model="addImpuestos" @change="verificaImpuestos" :options="optionsImpuestos" aria-labelledby="basic" />
+
+</div>
+
+
+
+        <div class="col-2 col-sm-4 col-md-2 col-lg-1 form-group">
+          <label for="impuestoventa">I. Venta</label>
+         <input type="text" id="impuestoventa" v-solonumeros v-decimales v-numeroFocusinOut v-model="productoImpuestoVenta"   class="form-control soloNumero" value="0.00">
+       </div>
+
+        <div class="col-2 col-sm-4 col-md-2 col-lg-2 form-group">
+          <label for="gananciacompra">Ganancia</label>
+        <div class="input-group">
+          <input type="text" name="gananciacompra" v-solonumeros v-decimales v-numeroFocusinOut  v-model="productoGanancia" @keyup="calcularPrecios"  class="form-control soloNumero" id="gananciacompra"  value="20.00" aria-describedby="simbologanancia" >
+          <div class="input-group-append">
+            <span class="input-group-text" id="simbologanancia">%</span>
+          </div>
+        </div>
+       </div>
+
+
+        <div class="col-2 col-sm-4 col-md-2 col-lg-2 form-group">
+          <label for="preciominimocompra">P. Minimo</label>
+         <input type="text" id="preciominimocompra" v-solonumeros v-decimales v-numeroFocusinOut v-model="productoPrecioMinimo"  class="form-control soloNumero" value="0.00">
+       </div>
+
+        <div class="col-2 col-sm-4 col-md-2 form-group">
+          <label for="precioxmayorcompra">P. XMayor</label>
+         <input type="text" id="precioxmayorcompra" v-solonumeros v-decimales v-numeroFocusinOut v-model="productoPrecioXmayor"  class="form-control soloNumero" value="0.00">
+       </div>
+
+        <div class="col-2 col-sm-4 col-md-2 col-lg-2 form-group">
+          <label for="preciofinalcompra">P. Final</label>
+         <input type="text" id="preciofinalcompra" v-solonumeros v-decimales v-numeroFocusinOut  v-model="productoPrecioFinal"  class="form-control soloNumero" value="0.00">
+       </div>
+
+        <div class="col-8 col-sm-4 col-md-2 col-lg-2 form-group">
+          <label for="categoriacompra">Categoria</label>
+         <InputGroup>
+         <select name="categoria" v-model="categoria" id="categoria" class="form-control">
+           <option :value="item" v-for="item in categoriasNombres">{{item}}</option>
+         </select>
+            <Button icon="pi pi-plus" @click="visibleAgregarCategoria = true" severity="warn" />
+          </InputGroup>
+       </div>
+
+        <div class="col-4 col-md-2 form-group" >
+          <label for="marca">Marca</label><br>
+         <input type="text" id="marca"  v-model="marca"  class="form-control" >
+       </div>
+
+        <div class="col-4 col-md-1 form-group" id="cantidadS" >
+          <label for="cantidadcompra">cantidad</label><br>
+         <input type="number" id="cantidadcompra" min="1" v-solonumeros v-decimales v-numeroFocusinOut v-model="productoCantidad"  class="form-control soloNumero" value="1">
+       </div>
+
+
+        <div class="col-2 col-sm-4 col-md-2 col-lg-2 form-group">
+          <label for="precioxmayorcompra">Agregar</label><br>
+         <a href="#" class="btn btn-dark w-100 " @click="fnAgregarProducto" id="btnagregarProducto" ><i class="icon-plus"></i> Agregar Producto</a>
+       </div>
+
+        <div class="col-12 form-group" id="losimeis" v-if="tipoProducto == 'Celular'" >
+          <label for="imeiscompra">IMEIs</label><br>
+         <textarea class="form-control " v-model="formattedInput" @input="onInput" id="imeis" name="Imei" cols="30" rows="3" ></textarea>
+       </div>
+
+
+  </div>
+
+ </fieldset>
+
+</div>
+
+
+
+
+
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="productosAgregarDatos">PRODUCTOS</label>
+<div class="table-responsive">
+  <div v-html="generarTablaFromStringJSON(datoscamposCompras.productos,true,fnEdit,fnDel)" class="border p-3 rounded mb-2"></div>
+</div>
+
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="estadoAgregarDatos">ESTADO</label>
+<br>
+
+<select name="Estado" class="form-control" v-model="datoscamposCompras.estado">
+  <option value="PENDIENTE">PENDIENTE</option>
+  <option value="PAGADO">PAGADO</option>
+  <option value="OTRO">OTRO</option>
+</select>
+</div>
+
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="estadoAgregarDatos">METODO PAGO</label>
+<br>
+
+<select name="Estado" class="form-control" v-model="datoscamposCompras.metodo_pago">
+  <option value="EFECTIVO">EFECTIVO</option>
+  <option value="TRANSFERENCIA">TRANSFERENCIA</option>
+  <option value="TARJETA">TARJETA</option>
+  <option value="OTRO">OTRO</option>
+</select>
+</div>
+
+
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="subtotalAgregarDatos">SUBTOTAL</label>
+<input type="input" v-model="datoscamposCompras.subtotal" name="subtotal"  class="form-control v-solonumeros" id="subtotalAgregarDatos" v-solonumeros v-decimales v-numeroFocusinOut placeholder="subtotal" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="descuentoAgregarDatos">DESCUENTO</label>
+<input type="input" v-model="datoscamposCompras.descuento" name="descuento"  class="form-control v-solonumeros" id="descuentoAgregarDatos" v-solonumeros v-decimales v-numeroFocusinOut placeholder="descuento" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="impuestoAgregarDatos">IMPUESTO</label>
+<input type="input" v-model="datoscamposCompras.impuesto" name="impuesto"  class="form-control v-solonumeros" id="impuestoAgregarDatos"v-solonumeros v-decimales v-numeroFocusinOut  placeholder="impuesto" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="totalAgregarDatos">TOTAL</label>
+<input type="input" v-model="datoscamposCompras.total" name="total"  class="form-control v-solonumeros" id="totalAgregarDatos" v-solonumeros v-decimales v-numeroFocusinOut placeholder="total" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="abonoAgregarDatos">ABONO</label>
+<input type="input" v-model="datoscamposCompras.abono" name="abono"  class="form-control v-solonumeros" id="abonoAgregarDatos" v-solonumeros v-decimales v-numeroFocusinOut placeholder="abono" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="saldoAgregarDatos">SALDO</label>
+<input type="input" v-model="datoscamposCompras.saldo" name="saldo"  class="form-control v-solonumeros" id="saldoAgregarDatos" v-solonumeros v-decimales v-numeroFocusinOut  placeholder="saldo" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="notaAgregarDatos">NOTA</label>
+<textarea class="form-control " v-model="datoscamposCompras.nota" id="notaAgregarDatos" name="nota" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-6" hidden>
+<label for="created_atAgregarDatos">CREATED_AT</label>
+<input type="input" v-model="datoscamposCompras.created_at" name="created_at"  class="form-control " id="created_atAgregarDatos"  placeholder="created_at" maxlength="">
+</div>
+<div class="form-group col-6" hidden>
+<label for="updated_atAgregarDatos">UPDATED_AT</label>
+<input type="input" v-model="datoscamposCompras.updated_at" name="updated_at"  class="form-control " id="updated_atAgregarDatos"  placeholder="updated_at" maxlength="">
+</div>
+<div class="form-group col-12" hidden>
+<label for="usuarioAgregarDatos">USUARIO</label>
+<input type="input" v-model="datoscamposCompras.usuario" name="usuario"  class="form-control " id="usuarioAgregarDatos"  placeholder="usuario" maxlength="250">
+</div>
+<div class="form-group col-sm-12 mb-5 mt-5">
+<button type="submit" @click="enviarDatos" class="btn btn-primary elboton w-100">Enviar Datos</button>
+  </div>
+  </div>
+  </div>
+   </form>
+   </fieldset>
+</section>
+  </div>
+  </template>
+  </Card>
+   </main>
+     <LoadingOverlay :visible="loading" />
+<Toast />
+
+ <!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+
+    <Dialog v-model:visible="visibleAgregarCategoria" modal :position="position" header="Buscar Imei" :style="{ width: '30rem' }">
+    <template #header>
+      <div class="inline-flex align-items-center justify-content-center gap-2">
+        <span class="font-bold white-space-nowrap">Agregar Categoria</span>
+      </div>
+    </template>
+    <div class="row">
+  
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">CATEGORIA</legend>
+     <form id="formularioAgregarClientes" action="" method="">
+         <div  style="margin-top: 15px;color: #34AAB2;" class="row">
+
+            <div class="form-group col-12">
+            <label for="ingresenumeroModifcarfactura">CATEGORIA</label>
+             <input type="text" class="form-control" v-mayuscula v-model="agregarCategoria">
+           </div>
+
+
+        </div>
+        </form>
+</fieldset>
+
+    </div>
+    <template #footer>
+
+<ButtonGroup >
+    <Button label="Agregar" icon="pi pi-check" @click="fnAgregarCategoria" outlined />
+    <Button label="Cancel" icon="pi pi-times" severity="danger" @click="visibleAgregarCategoria = false" outlined />
+</ButtonGroup>
+
+
+    </template>
+  </Dialog>
+ <!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+
+</template>
+<style>
+</style>

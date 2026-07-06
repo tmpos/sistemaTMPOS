@@ -1,0 +1,32 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Cotizacion",
+"to": "/cotizacion",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/cotizacion',
+        name: 'cotizacion',
+        component: () => import('../views/Cotizacion/Cotizacion.vue'),
+    },
+    {
+        path: '/crearcotizacion',
+        name: 'crearcotizacion',
+        component: () => import('../views/Cotizacion/CrearCotizacion.vue'),
+    },
+    {
+        path: '/editarcotizacion/:id',
+        name: 'editarcotizacion',
+        component: () => import('../views/Cotizacion/EditarCotizacion.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********
+**********************|-CAMPOS-|******************
+"id, no_cotizacion, cod_cliente, nombre_cliente, telefono_cliente, whatsapp_cliente, email_cliente, direccion_cliente, rnc_cliente, nombre_comercial, productos, vendedor, metodo_pago, fecha_emision, impuesto, descuento, subtotal, total, estado_cotizacion, no_factura, fecha_cambio, entidad_financiera, vencimiento, nota, year, mes, hora, created_at, updated_at, usuario"
+******************************************************

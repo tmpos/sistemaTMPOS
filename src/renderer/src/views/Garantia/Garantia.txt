@@ -1,0 +1,22 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Garantia",
+"to": "/garantia",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/garantia',
+        name: 'garantia',
+        component: () => import('../views/Garantia/Garantia.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********
+**********************|-CAMPOS-|******************
+"id, referencia, garantia, created_at, updated_at, usuario"
+******************************************************

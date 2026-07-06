@@ -1,0 +1,187 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>TM POS SRL</title>
+    <link rel="icon" href="/favicon.ico">
+    <meta name="description" content="Sistema de Venta TMPOS RD">
+    <link href="https://fonts.cdnfonts.com/css/lato" rel="stylesheet">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+    <link rel="mask-icon" href="/mask-icon.svg" color="#FFFFFF">
+    <meta name="theme-color" content="#000000">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+        <script src="https://unpkg.com/primevue/umd/primevue.min.js"></script>
+        <script src="https://unpkg.com/@primeuix/themes/umd/aura.js"></script>
+    
+  </head>
+
+  <body>
+    <div id="tmpos-splash">
+      <div class="tmpos-splash__content">
+        <div class="tmpos-splash__logo">
+          <div class="tmpos-splash__logo-main">TM</div>
+          <div class="tmpos-splash__logo-sub">POS</div>
+        </div>
+        <div class="tmpos-splash__loader">
+          <div class="tmpos-splash__loader-bar"></div>
+        </div>
+        <div class="tmpos-splash__text">Cargando sistema...</div>
+      </div>
+    </div>
+
+    <div id="app"></div>
+    <script>
+      // Polyfill para process - necesario para módulos que dependen de Node.js
+      window.process = window.process || {
+        env: {},
+        platform: 'browser',
+        version: 'v18.0.0',
+        versions: {},
+        browser: true,
+        cwd: function() { return '/' }
+      };
+      window.global = window.global || window;
+    </script>
+    <script type="module" src="/src/main.js"></script>
+
+    <script>
+      window.addEventListener("load", () => {
+        const splash = document.getElementById("tmpos-splash");
+        splash.classList.add("tmpos-splash--hidden");
+        setTimeout(() => {
+          splash.style.display = "none";
+        }, 500);
+      });
+    </script>
+
+    <style>
+      #tmpos-splash,
+      #tmpos-splash * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      #tmpos-splash {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #0a0a0a 100%);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        transition: opacity 0.5s ease-out;
+      }
+
+      #tmpos-splash.tmpos-splash--hidden {
+        opacity: 0;
+      }
+
+      .tmpos-splash__content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 40px;
+      }
+
+      .tmpos-splash__logo {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        animation: tmpos-splash-pulse 2s ease-in-out infinite;
+      }
+
+      .tmpos-splash__logo-main {
+        font-family: 'Lato', sans-serif;
+        font-size: 72px;
+        font-weight: 900;
+        color: #ffffff;
+        text-shadow: 0 0 30px rgba(255, 255, 255, 0.5),
+                     0 0 60px rgba(255, 255, 255, 0.3),
+                     0 0 90px rgba(255, 255, 255, 0.1);
+        letter-spacing: 4px;
+      }
+
+      .tmpos-splash__logo-sub {
+        font-family: 'Lato', sans-serif;
+        font-size: 36px;
+        font-weight: 300;
+        color: rgba(255, 255, 255, 0.7);
+        letter-spacing: 8px;
+      }
+
+      .tmpos-splash__loader {
+        width: 200px;
+        height: 3px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 3px;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .tmpos-splash__loader-bar {
+        width: 40%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, #ffffff, transparent);
+        border-radius: 3px;
+        animation: tmpos-splash-slide 1.5s ease-in-out infinite;
+      }
+
+      .tmpos-splash__text {
+        font-family: 'Lato', sans-serif;
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.5);
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        animation: tmpos-splash-fade 2s ease-in-out infinite;
+      }
+
+      @keyframes tmpos-splash-slide {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(350%); }
+      }
+
+      @keyframes tmpos-splash-pulse {
+        0%, 100% { filter: brightness(1); }
+        50% { filter: brightness(1.2); }
+      }
+
+      @keyframes tmpos-splash-fade {
+        0%, 100% { opacity: 0.5; }
+        50% { opacity: 1; }
+      }
+
+      .tmpos-splash__content::before,
+      .tmpos-splash__content::after {
+        content: '';
+        position: absolute;
+        width: 300px;
+        height: 300px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 70%);
+        animation: tmpos-splash-float 6s ease-in-out infinite;
+      }
+
+      .tmpos-splash__content::before {
+        top: 10%;
+        left: 10%;
+        animation-delay: 0s;
+      }
+
+      .tmpos-splash__content::after {
+        bottom: 10%;
+        right: 10%;
+        animation-delay: 3s;
+      }
+
+      @keyframes tmpos-splash-float {
+        0%, 100% { transform: translateY(0) scale(1); }
+        50% { transform: translateY(-20px) scale(1.1); }
+      }
+    </style>
+  </body>
+</html>

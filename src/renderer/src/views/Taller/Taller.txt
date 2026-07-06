@@ -1,0 +1,29 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"name": "Taller",
+"link": "/taller",
+"icon": "fas icon-tools"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/taller',
+        name: 'taller',
+        component: () => import('../views/Taller/Taller.vue'),
+    },
+    {
+        path: '/creartaller',
+        name: 'creartaller',
+        component: () => import('../views/Taller/CrearTaller.vue'),
+    },
+    {
+        path: '/editartaller/:id',
+        name: 'editartaller',
+        component: () => import('../views/Taller/EditarTaller.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********

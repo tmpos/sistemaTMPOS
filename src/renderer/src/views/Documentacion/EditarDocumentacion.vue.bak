@@ -1,0 +1,223 @@
+
+<script setup>
+import { ref, onMounted, nextTick, watchEffect } from 'vue';
+import { useToast } from "primevue/usetoast";
+import { useRouter, useRoute } from 'vue-router';
+const router = useRouter();
+const route = useRoute(); 
+import {enviarDatosPorPost,
+  eliminarDatos, 
+  obtenerIdsSeleccionados,
+  borrarTodoslosDatos,
+  lenguajeDataTable,
+  nfecha,
+  arrayToObjetoFromTabla,
+  peticionesFetch,
+  encryptarPassword,
+  envioElectron,
+  generarCodigoUnico,
+  peticiones,
+  enviarSolicitudGet,
+  mensajetoast,
+  lasMayusculas} from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const tokenCorto = ref('');
+/************************************************************************/
+const datoscampos = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+const position = "top";
+const todosLosdocumentacion = ref([]);
+/************************************************************************/
+const fetchAllData = async () => {
+    const response = await enviarSolicitudGet(`${link.value+api.value}/datosarray/documentacion`, tokenCifrado.value);
+    todosLosdocumentacion.value = response;
+    
+    // Buscar el documento por ID
+    const documentoEncontrado = response.find(datos => datos.id == route.params.id);
+    
+    if (documentoEncontrado) {
+        // Decodificar el contenido antes de asignarlo
+        documentoEncontrado.uso = decodeURIComponent(documentoEncontrado.uso);
+        datoscampos.value = documentoEncontrado;
+    }
+
+    console.log("Documento cargado:", datoscampos.value);
+};
+
+/************************************************************************/
+function navigate(action) {
+    const currentIndex = todosLosdocumentacion.value.findIndex(notacredito => notacredito.id == route.params.id);
+    if (currentIndex === -1) return;
+    let newIndex;
+    switch (action) {
+        case 'primero':
+            newIndex = 0;
+            break;
+        case 'anterior':
+            newIndex = currentIndex > 0 ? currentIndex - 1 : 0;
+            break;
+        case 'siguiente':
+            newIndex = currentIndex + 1 < todosLosdocumentacion.value.length ? currentIndex + 1 : currentIndex;
+            break;
+        case 'ultimo':
+            newIndex = todosLosdocumentacion.value.length - 1;
+            break;
+        default:
+            return;
+    }
+    datoscampos.value = todosLosdocumentacion.value[newIndex];
+    router.push({ path: `/editardocumentacion/${todosLosdocumentacion.value[newIndex].id}` });
+}
+/************************************************************************/
+onMounted(async() => {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+await fetchAllData()
+});
+/************************************************************************/
+async function funcionActualizar(e) {
+  e.preventDefault();
+  const url = link.value+api.value+"/actualizarcampos/documentacion";
+  if (!datoscampos.value) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+  if (datoscampos.value.hasOwnProperty('created_at')) {
+      datoscampos.value.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await enviarDatosPorPost(url, datoscampos.value,tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="container-fluid mt-5 card">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Documentacion</legend>
+
+    <div class="flex space-x-2">
+      
+<Button as="router-link" icon="pi pi-home" to="/documentacion" />
+<Button as="router-link" class="ms-1" icon="pi pi-plus-circle" to="/creardocumentacion" />
+
+    <Button
+      icon="pi pi-trash"
+      class="p-button-danger ms-1"
+      title="Borrar Entrada"
+      @click="borrarEntrada"
+    />
+    <Button
+      icon="pi pi-step-backward"
+      class="p-button-secondary text-white ms-1"
+      title="Primero"
+      @click="navigate('primero')"
+    />
+    <Button
+      icon="pi pi-chevron-left"
+      class="p-button-secondary text-white ms-1"
+      title="Anterior"
+      @click="navigate('anterior')"
+    />
+    <Button
+      icon="pi pi-chevron-right"
+      class="p-button-secondary text-white ms-1"
+      title="Siguiente"
+      @click="navigate('siguiente')"
+    />
+    <Button
+      icon="pi pi-step-forward"
+      class="p-button-secondary text-white ms-1"
+      title="Ultimo"
+      @click="navigate('ultimo')"
+    />
+
+    <Button
+      icon="pi pi-save"
+      class="ms-1"
+      severity="contrast"
+      @click="funcionActualizar"
+    />
+
+
+    </div>
+
+
+</fieldset>
+<section>
+<fieldset class="border p-3 rounded mb-2">
+  <legend class="float-none w-auto px-2">Campos</legend>
+    <form id="formularioGenerar" action="" method="">
+         <div class="box-body">
+          <div class="grid grid-cols-12 gap-4 mt-4 text-blue-600" id="campos">
+
+<div class="col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12 2xl:col-span-12">
+                <label for="nombre" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Nombre</label>
+                <InputText type="text"  v-mayuscula class="form-input w-full " v-model="datoscampos.nombre" name="nombre" placeholder="nombre" id="actualizarnombre" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12 2xl:col-span-12">
+                    <label for="uso" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Uso</label>
+  <!--                  <Textarea id="actualizaruso"  v-model="datoscampos.uso" name="uso" rows="3" class="form-textarea w-full " placeholder="Enter Uso"></textarea> -->
+
+<QuillEditor 
+  v-model="datoscampos.uso"
+  theme="snow"
+  toolbar="minimal"
+  editorStyle="height: 320px" 
+/>
+
+
+                </div>
+
+        <div class="hidden col-span-12">
+          <label for="created_at-Actualizador" class="block text-sm font-medium text-gray-700">CREATED_AT</label>
+          <InputText v-model="datoscampos.created_at" name="created_at" id="created_at-Actualizador" placeholder="created_at" class="w-full" />
+        </div>
+        <div class="hidden col-span-12">
+          <label for="updated_at-Actualizador" class="block text-sm font-medium text-gray-700">UPDATED_AT</label>
+          <InputText v-model="datoscampos.updated_at" name="updated_at" id="updated_at-Actualizador" placeholder="updated_at" class="w-full" />
+        </div>
+        <div class="hidden col-span-12">
+          <label for="usuario-Actualizador" class="block text-sm font-medium text-gray-700">USUARIO</label>
+          <InputText v-model="datoscampos.usuario" name="usuario" id="usuario-Actualizador" placeholder="usuario" maxlength="250" class="w-full" />
+        </div>
+
+<div class="form-group col-span-12 mb-5 mt-5">
+  <Button label="Actualizar" fluid  @click="funcionActualizar" autofocus />
+</div>
+
+
+  </div>
+  </div>
+   </form>
+   </fieldset>
+</section>
+  </div>
+   </main>
+<Toast />
+</template>
+<style scoped>
+</style>
+

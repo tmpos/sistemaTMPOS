@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS `cuentasxpagar` (
+  `id` int(11) AUTO_INCREMENT PRIMARY KEY,
+  `no_emision` TEXT(250) NOT NULL,
+  `no_factura` TEXT(250) NOT NULL,
+  `fecha` TEXT(250) NOT NULL,
+  `hora` TEXT(250) NOT NULL,
+  `ncf` TEXT(250) NOT NULL,
+  `rnc` TEXT(250) NOT NULL,
+  `proveedor` TEXT(250) NOT NULL,
+  `productos` TEXT(250) NOT NULL,
+  `estado` TEXT(250) NOT NULL,
+  `fecha_pago` TEXT(250) NOT NULL,
+  `hora_pago` TEXT(250) NOT NULL,
+  `subtotal` TEXT(250) NOT NULL,
+  `impuestos` TEXT(250) NOT NULL,
+  `total` TEXT(250) NOT NULL,
+  `saldo` TEXT(250) NOT NULL,
+  `abono` TEXT(250) NOT NULL,
+  `nota` TEXT(250) NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `usuario` text(250) COLLATE utf8_spanish_ci NOT NULL
+);

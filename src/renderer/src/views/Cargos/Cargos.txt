@@ -1,0 +1,52 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Cargos",
+"to": "/cargos",
+"permiso": "Administrador,Soporte",
+"icon": "pi pi-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/cargos',
+        name: 'cargos',
+        component: () => import('../views/Cargos/Cargos.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/crearcargos',
+        name: 'crearcargos',
+        component: () => import('@/views/Cargos/CrearCargos.vue'),
+    },
+    {
+        path: '/editarcargos/:id',
+        name: 'editarcargos',
+        component: () => import('@/views/Cargos/EditarCargos.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'nombre', 'departamento', 'descripcion'"
+******************************************************
+{
+        
+      "nombre": "nombre",
+      "NOMBRE": "NOMBRE",
+      "Nombre": "Nombre",
+     
+      "departamento": "departamento",
+      "DEPARTAMENTO": "DEPARTAMENTO",
+      "Departamento": "Departamento",
+     
+      "descripcion": "descripcion",
+      "DESCRIPCION": "DESCRIPCION",
+      "Descripcion": "Descripcion",
+}
+

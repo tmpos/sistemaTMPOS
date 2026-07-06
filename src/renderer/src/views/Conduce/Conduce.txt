@@ -1,0 +1,92 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Conduce",
+"to": "/conduce",
+"permiso": "Administrador,Soporte",
+"icon": "pi pi-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/conduce',
+        name: 'conduce',
+        component: () => import('../views/Conduce/Conduce.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/crearconduce',
+        name: 'crearconduce',
+        component: () => import('@/views/Conduce/CrearConduce.vue'),
+    },
+    {
+        path: '/editarconduce/:id',
+        name: 'editarconduce',
+        component: () => import('@/views/Conduce/EditarConduce.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'no_conduce', 'no_factura', 'cod_cliente', 'cliente', 'telefono', 'direccion', 'fecha', 'vencimiento', 'chofer', 'placa', 'entrega', 'total', 'productos'"
+******************************************************
+{
+        
+      "no_conduce": "no_conduce",
+      "NO_CONDUCE": "NO_CONDUCE",
+      "No_conduce": "No_conduce",
+     
+      "no_factura": "no_factura",
+      "NO_FACTURA": "NO_FACTURA",
+      "No_factura": "No_factura",
+     
+      "cod_cliente": "cod_cliente",
+      "COD_CLIENTE": "COD_CLIENTE",
+      "Cod_cliente": "Cod_cliente",
+     
+      "cliente": "cliente",
+      "CLIENTE": "CLIENTE",
+      "Cliente": "Cliente",
+     
+      "telefono": "telefono",
+      "TELEFONO": "TELEFONO",
+      "Telefono": "Telefono",
+     
+      "direccion": "direccion",
+      "DIRECCION": "DIRECCION",
+      "Direccion": "Direccion",
+     
+      "fecha": "fecha",
+      "FECHA": "FECHA",
+      "Fecha": "Fecha",
+     
+      "vencimiento": "vencimiento",
+      "VENCIMIENTO": "VENCIMIENTO",
+      "Vencimiento": "Vencimiento",
+     
+      "chofer": "chofer",
+      "CHOFER": "CHOFER",
+      "Chofer": "Chofer",
+     
+      "placa": "placa",
+      "PLACA": "PLACA",
+      "Placa": "Placa",
+     
+      "entrega": "entrega",
+      "ENTREGA": "ENTREGA",
+      "Entrega": "Entrega",
+     
+      "total": "total",
+      "TOTAL": "TOTAL",
+      "Total": "Total",
+     
+      "productos": "productos",
+      "PRODUCTOS": "PRODUCTOS",
+      "Productos": "Productos",
+}
+

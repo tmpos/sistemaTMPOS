@@ -1,0 +1,22 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Proveedores",
+"to": "/proveedores",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/proveedores',
+        name: 'proveedores',
+        component: () => import('../views/Proveedores/Proveedores.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********
+**********************|-CAMPOS-|******************
+"id, nombre, rnc, telefono, email, encargado, cuenta_bancaria, direccion, created_at, updated_at, usuario"
+******************************************************

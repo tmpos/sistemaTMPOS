@@ -1,0 +1,113 @@
+{
+  "title": "ordenes",
+  "entityName": "Ordenes",
+  "entityNamePlural": "Ordeness",
+  "actions": {
+    "new": "New Ordenes",
+    "create": "Create",
+    "edit": "Edit",
+    "update": "Update",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "save": "Save",
+    "search": "Search",
+    "back": "Back",
+    "view": "View",
+    "viewDetails": "View Details",
+    "confirmDelete": "Confirm deletion",
+    "actions": "Actions",
+    "first": "First",
+    "previous": "Previous",
+    "next": "Next",
+    "last": "Last"
+  },
+  "list": {
+    "title": "ordenes",
+    "subtitle": "Complete management of ordenes",
+    "empty": "No records available",
+    "createFirst": "Create First",
+    "total": "Total Ordeness",
+    "active": "Active Records",
+    "lastUpdate": "Last Update"
+  },
+  "create": {
+    "title": "Create Ordenes",
+    "subtitle": "Complete the form to add a new record",
+    "generalInfo": "General Information",
+    "successTitle": "Data Added",
+    "successMessage": "What do we do now?",
+    "addAnother": "Add Another!",
+    "backToList": "No, Back to List!"
+  },
+  "edit": {
+    "title": "Edit Ordenes",
+    "subtitle": "Modify the fields you want to update",
+    "loading": "Loading data...",
+    "notFound": "Record not found"
+  },
+  "detail": {
+    "title": "Ordenes Details",
+    "subtitle": "Complete record information"
+  },
+  "messages": {
+    "createSuccess": "Ordenes created successfully",
+    "updateSuccess": "Ordenes updated successfully",
+    "deleteSuccess": "Ordenes deleted successfully",
+    "createError": "Error creating record",
+    "updateError": "Error updating record",
+    "deleteError": "Error deleting record",
+    "loadError": "Error loading data",
+    "deleteConfirm": "Are you sure you want to delete this record?",
+    "deleteWarning": "This action cannot be undone"
+  },
+  "fields": {
+    "no_orden": {
+      "label": "No_orden",
+      "placeholder": "Enter no_orden"
+    },
+    "fecha": {
+      "label": "Fecha",
+      "placeholder": "Enter fecha"
+    },
+    "estado": {
+      "label": "Estado",
+      "placeholder": "Enter estado"
+    },
+    "total": {
+      "label": "Total",
+      "placeholder": "Enter total"
+    },
+    "no_factura": {
+      "label": "No_factura",
+      "placeholder": "Enter no_factura"
+    },
+    "cod_cliente": {
+      "label": "Cod_cliente",
+      "placeholder": "Enter cod_cliente"
+    },
+    "cliente": {
+      "label": "Cliente",
+      "placeholder": "Enter cliente"
+    },
+    "productos": {
+      "label": "Productos",
+      "placeholder": "Enter productos"
+    },
+    "materiales": {
+      "label": "Materiales",
+      "placeholder": "Enter materiales"
+    },
+    "nota": {
+      "label": "Nota",
+      "placeholder": "Enter nota"
+    },
+    "created_at": {
+      "label": "Created_at",
+      "placeholder": "Enter created_at"
+    },
+    "updated_at": {
+      "label": "Updated_at",
+      "placeholder": "Enter updated_at"
+    }
+  }
+}

@@ -1,0 +1,48 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Documentacion",
+"to": "/documentacion",
+"permiso": "Administrador,Soporte",
+"icon": "pi pi-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/documentacion',
+        name: 'documentacion',
+        component: () => import('../views/Documentacion/Documentacion.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/creardocumentacion',
+        name: 'creardocumentacion',
+        component: () => import('@/views/Documentacion/CrearDocumentacion.vue'),
+    },
+    {
+        path: '/editardocumentacion/:id',
+        name: 'editardocumentacion',
+        component: () => import('@/views/Documentacion/EditarDocumentacion.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'nombre', 'uso'"
+******************************************************
+{
+        
+      "nombre": "nombre",
+      "NOMBRE": "NOMBRE",
+      "Nombre": "Nombre",
+     
+      "uso": "uso",
+      "USO": "USO",
+      "Uso": "Uso",
+}
+

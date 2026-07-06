@@ -1,0 +1,276 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                    VUE ROUTER - CONFIGURACIÓN DE RUTAS                     ║
+║                                                                            ║
+║  Copia y pega estas rutas en tu archivo de configuración de Vue Router    ║
+║  Archivo típico: src/router/index.js                                      ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 RUTAS PARA: PreFacturas
+Tabla: pre_facturas
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+OPCIÓN 1: Rutas sin Layout (Rutas Independientes)
+────────────────────────────────────────────────────────────────────────────
+
+Copia esto dentro del array 'routes' en tu router:
+
+{
+  path: '/pre_facturas',
+  name: 'PreFacturasList',
+  component: () => import('@/views/pre_facturas/PreFacturasList.vue'),
+  meta: {
+    title: 'pre_facturas',
+    requiresAuth: true  // Cambia a false si no requiere autenticación
+  }
+},
+{
+  path: '/crearPreFacturas',
+  name: 'PreFacturasCreate',
+  component: () => import('@/views/pre_facturas/PreFacturasCreate.vue'),
+  meta: {
+    title: 'Nuevo PreFacturas',
+    requiresAuth: true
+  }
+},
+{
+  path: '/editarPreFacturas/:id',
+  name: 'PreFacturasEdit',
+  component: () => import('@/views/pre_facturas/PreFacturasEdit.vue'),
+  meta: {
+    title: 'Editar PreFacturas',
+    requiresAuth: true
+  }
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+OPCIÓN 2: Rutas con Layout (Agrupadas bajo un layout)
+────────────────────────────────────────────────────────────────────────────
+
+Si tienes un componente de Layout (ej: DashboardLayout.vue):
+
+{
+  path: '/',
+  component: () => import('@/layouts/DashboardLayout.vue'),
+  children: [
+    {
+      path: 'pre_facturas',
+      name: 'PreFacturasList',
+      component: () => import('@/views/pre_facturas/PreFacturasList.vue'),
+      meta: {
+        title: 'pre_facturas',
+        requiresAuth: true
+      }
+    },
+    {
+      path: 'crearPreFacturas',
+      name: 'PreFacturasCreate',
+      component: () => import('@/views/pre_facturas/PreFacturasCreate.vue'),
+      meta: {
+        title: 'Nuevo PreFacturas',
+        requiresAuth: true
+      }
+    },
+    {
+      path: 'editarPreFacturas/:id',
+      name: 'PreFacturasEdit',
+      component: () => import('@/views/pre_facturas/PreFacturasEdit.vue'),
+      meta: {
+        title: 'Editar PreFacturas',
+        requiresAuth: true
+      }
+    }
+  ]
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+OPCIÓN 3: Ejemplo Completo de router/index.js
+────────────────────────────────────────────────────────────────────────────
+
+import { createRouter, createWebHistory } from 'vue-router'
+
+const routes = [
+  // Otras rutas...
+
+  // Rutas de PreFacturas
+  {
+    path: '/pre_facturas',
+    name: 'PreFacturasList',
+    component: () => import('@/views/pre_facturas/PreFacturasList.vue'),
+    meta: {
+      title: 'pre_facturas',
+      requiresAuth: true
+    }
+  },
+  {
+    path: '/crearPreFacturas',
+    name: 'PreFacturasCreate',
+    component: () => import('@/views/pre_facturas/PreFacturasCreate.vue'),
+    meta: {
+      title: 'Nuevo PreFacturas',
+      requiresAuth: true
+    }
+  },
+  {
+    path: '/editarPreFacturas/:id',
+    name: 'PreFacturasEdit',
+    component: () => import('@/views/pre_facturas/PreFacturasEdit.vue'),
+    meta: {
+      title: 'Editar PreFacturas',
+      requiresAuth: true
+    }
+  }
+]
+
+const router = createRouter({
+  history: createWebHistory(import.meta.env.BASE_URL),
+  routes
+})
+
+// Guard de navegación (opcional)
+router.beforeEach((to, from, next) => {
+  // Cambiar título de la página
+  if (to.meta.title) {
+    document.title = to.meta.title
+  }
+
+  // Verificar autenticación
+  if (to.meta.requiresAuth) {
+    // TODO: Implementar lógica de autenticación
+    // const isAuthenticated = checkAuth()
+    // if (!isAuthenticated) {
+    //   next({ name: 'Login' })
+    //   return
+    // }
+  }
+
+  next()
+})
+
+export default router
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📝 RUTAS DISPONIBLES
+────────────────────────────────────────────────────────────────────────────
+
+1. Lista de pre_facturas:
+   URL: /pre_facturas
+   Nombre: PreFacturasList
+   Componente: pre_facturas/PreFacturasList.vue
+
+2. Crear PreFacturas:
+   URL: /crearPreFacturas
+   Nombre: PreFacturasCreate
+   Componente: pre_facturas/PreFacturasCreate.vue
+
+3. Editar PreFacturas:
+   URL: /editarPreFacturas/:id
+   Nombre: PreFacturasEdit
+   Componente: pre_facturas/PreFacturasEdit.vue
+   Parámetro: id (ID del registro a editar)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔗 NAVEGACIÓN PROGRAMÁTICA
+────────────────────────────────────────────────────────────────────────────
+
+Desde cualquier componente, puedes navegar usando:
+
+// Ir a la lista
+router.push({ name: 'PreFacturasList' })
+
+// Ir a crear
+router.push({ name: 'PreFacturasCreate' })
+
+// Ir a editar (con ID)
+router.push({ name: 'PreFacturasEdit', params: { id: '123' } })
+
+// Ir a editar (con objeto completo)
+const PreFacturas = { id: 123, nombre: 'Juan' }
+router.push({ name: 'PreFacturasEdit', params: { id: PreFacturas.id } })
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎨 MENÚ DE NAVEGACIÓN (Ejemplo)
+────────────────────────────────────────────────────────────────────────────
+
+Agrega esto a tu menú de navegación:
+
+<template>
+  <nav>
+    <!-- Opción 1: Con router-link -->
+    <router-link :to="{ name: 'PreFacturasList' }">
+      <i class="pi pi-list"></i>
+      pre_facturas
+    </router-link>
+
+    <!-- Opción 2: Con botón y @click -->
+    <Button
+      label="pre_facturas"
+      icon="pi pi-list"
+      @click="router.push({ name: 'PreFacturasList' })"
+    />
+  </nav>
+</template>
+
+<script setup>
+import { useRouter } from 'vue-router'
+const router = useRouter()
+</script>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚙️ CONFIGURACIÓN ADICIONAL
+────────────────────────────────────────────────────────────────────────────
+
+1. Alias de importación:
+   Si usas '@/views/...', asegúrate de tener configurado el alias en:
+   - vite.config.js (Vite)
+   - tsconfig.json (TypeScript)
+
+2. Meta fields:
+   - title: Título de la página (para <title>)
+   - requiresAuth: Si requiere autenticación
+   - breadcrumb: Breadcrumb personalizado
+   - permissions: Permisos necesarios
+
+3. Guards de navegación:
+   - beforeEach: Se ejecuta antes de cada navegación
+   - afterEach: Se ejecuta después de cada navegación
+   - beforeEnter: Se ejecuta solo para estas rutas
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ CHECKLIST DE INTEGRACIÓN
+────────────────────────────────────────────────────────────────────────────
+
+[ ] 1. Copiar las rutas al archivo router/index.js
+[ ] 2. Verificar que los paths de importación sean correctos
+[ ] 3. Ajustar meta.requiresAuth según tus necesidades
+[ ] 4. Implementar guard de autenticación si es necesario
+[ ] 5. Agregar enlaces en el menú de navegación
+[ ] 6. Probar la navegación entre las vistas
+[ ] 7. Verificar que los parámetros de ruta funcionen (/:id)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 RECURSOS ADICIONALES
+────────────────────────────────────────────────────────────────────────────
+
+- Documentación de Vue Router: https://router.vuejs.org/
+- Navegación programática: https://router.vuejs.org/guide/essentials/navigation.html
+- Guards de navegación: https://router.vuejs.org/guide/advanced/navigation-guards.html
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎉 ¡Listo! Copia la configuración que necesites y pégala en tu router.
+
+Generado por: Generador CRUD - Modo Página
+Fecha: 22/11/2025, 11:10:01
+
+╚════════════════════════════════════════════════════════════════════════════╝

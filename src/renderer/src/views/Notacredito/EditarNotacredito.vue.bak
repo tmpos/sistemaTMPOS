@@ -1,0 +1,467 @@
+<script setup>
+import { ref, onMounted, nextTick, watchEffect } from 'vue';
+import { useRoute} from 'vue-router';
+import { useToast } from "primevue/usetoast";
+import router from '../../router';
+const route = useRoute(); 
+import {enviarDatosPorPost,
+  eliminarDatos, 
+  obtenerIdsSeleccionados,
+  borrarTodoslosDatos,
+  lenguajeDataTable,
+  nfecha,
+  arrayToObjetoFromTabla,
+  peticionesFetch,
+  encryptarPassword,
+  envioElectron,
+  enviarSolicitudGet,
+  generarCodigoUnico,
+  mensajetoast,
+  lasMayusculas} from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+/************************************************************************/
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import QRCode from 'qrcode';
+import JsBarcode from "jsbarcode";
+//import config from '../../../../../resources/config.json';
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+//const production = config.VITE_PRODUCTION;
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref(null);
+/************************************************************************/
+document.body.classList.add('sidebar-close');
+/************************************************************************/
+const datoscampos = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+const todosLosNotacredito = ref([]);
+/************************************************************************/
+/************************************************************************/
+const fetchAllData = async () => {
+    const response = await enviarSolicitudGet(`${link.value+api.value}/datosarray/notacredito`,tokenCifrado.value);
+    const jsonData = response;
+    todosLosNotacredito.value = jsonData;
+    datoscampos.value = jsonData.find(datos=>datos.id == route.params.id)
+};
+/************************************************************************/
+function navigate(action) {
+    const currentIndex = todosLosNotacredito.value.findIndex(notacredito => notacredito.id == route.params.id);
+    if (currentIndex === -1) return;
+    let newIndex;
+    switch (action) {
+        case 'primero':
+            newIndex = 0;
+            break;
+        case 'anterior':
+            newIndex = currentIndex > 0 ? currentIndex - 1 : 0;
+            break;
+        case 'siguiente':
+            newIndex = currentIndex + 1 < todosLosNotacredito.value.length ? currentIndex + 1 : currentIndex;
+            break;
+        case 'ultimo':
+            newIndex = todosLosNotacredito.value.length - 1;
+            break;
+        default:
+            return;
+    }
+    datoscampos.value = todosLosNotacredito.value[newIndex];
+    router.push({ path: `/editarnotacredito/${todosLosNotacredito.value[newIndex].id}` });
+}
+/************************************************************************/
+onMounted(async() => {
+
+
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+
+
+fetchAllData()
+});
+/************************************************************************/
+async function funcionActualizar(e) {
+  e.preventDefault();
+  const url = link.value+api.value+"/actualizarcampos/notacredito";
+  if (!datoscampos.value) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+  if (datoscampos.value.hasOwnProperty('created_at')) {
+      datoscampos.value.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await enviarDatosPorPost(url, datoscampos.value,tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+const fnPrint = async () => {
+  const { isConfirmed } = await Swal.fire({
+    title: 'Seleccionar formato de impresión',
+    text: "Elige el formato en que deseas imprimir la Nota de Crédito",
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Grande (A4)',
+    cancelButtonText: 'Ticket (80mm)'
+  });
+
+  if (isConfirmed) {
+    generarPDF('grande');
+  } else {
+    generarPDF('ticket');
+  }
+};
+
+/************************************************************************/
+const getBase64ImageFromURL = async (url, maxWidth, maxHeight) => {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  const img = await createImageBitmap(blob);
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  // Calculate the new dimensions while preserving the aspect ratio
+  let width = img.width;
+  let height = img.height;
+
+  if (width > maxWidth) {
+    height *= maxWidth / width;
+    width = maxWidth;
+  }
+
+  if (height > maxHeight) {
+    width *= maxHeight / height;
+    height = maxHeight;
+  }
+
+  canvas.width = width;
+  canvas.height = height;
+
+  // Enable image smoothing
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  // Draw the image onto the canvas
+  ctx.drawImage(img, 0, 0, width, height);
+
+  // Convert the canvas content to a Base64 string
+  return new Promise((resolve) => {
+    resolve(canvas.toDataURL());
+  });
+};
+
+
+/************************************************************************/
+// 📌 Función para generar código de barras en Base64
+const generateBarcode = async (text) => {
+  return new Promise((resolve) => {
+    const canvas = document.createElement("canvas");
+    JsBarcode(canvas, text, {
+      format: "CODE128",
+      height: 40
+    });
+    resolve(canvas.toDataURL("image/png"));
+  });
+};
+/************************************************************************/
+const generarPDF = async (tipo) => {
+  if (!datoscampos.value) {
+    Swal.fire('Error', 'No hay datos para generar el PDF', 'error');
+    return;
+  }
+
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: tipo === 'ticket' ? [80, 250] : 'a4'
+  });
+
+  let marginX = 15;
+  if(tipo === 'ticket'){
+     marginX = 5;
+  }
+
+  doc.setFont("helvetica", "bold");
+ // 📌 Configurar datos de la empresa
+const empresa = datosEmpresa.empresa || {};
+const nombreEmpresa = empresa.nombre || "TMPOS SRL";
+const legalEmpresa = empresa.legal || "RNC: 123456789";
+const telefonoEmpresa = empresa.telefono || "+1 (829) 784-2912";
+const emailEmpresa = empresa.email || "demo@tmposrd.com";
+const direccionEmpresa = empresa.direccion || "57-19 Cooper Ave, Queens";
+
+let startY = 10;
+const pageWidth = doc.internal.pageSize.getWidth(); // 📌 Ancho de la página
+
+  // Dibujar rectángulos redondeados
+  const drawRoundedRect = (x, y, width, height, radius) => {
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(x, y, width, height, radius, radius);
+  };
+
+
+// 📌 Agregar logo centrado si está disponible
+if (empresa.logoprinter) {
+  const logoBase64 = await getBase64ImageFromURL(empresa.logoprinter, 60, 60);
+  if (logoBase64) {
+    const logoWidth = 30; // 📌 Tamaño del logo
+    const logoX = (pageWidth - logoWidth) / 2; // 📌 Calcular centro
+    doc.addImage(logoBase64, "PNG", logoX, startY, logoWidth, 25);
+    startY += 30; // 📌 Espacio después del logo
+  }
+}
+
+// 📌 Agregar datos de la empresa centrados
+doc.setFontSize(12);
+doc.text(nombreEmpresa, pageWidth / 2, startY, { align: "center" });
+doc.setFontSize(10);
+doc.text(legalEmpresa, pageWidth / 2, startY + 5, { align: "center" });
+doc.text(telefonoEmpresa, pageWidth / 2, startY + 10, { align: "center" });
+doc.text(emailEmpresa, pageWidth / 2, startY + 15, { align: "center" });
+doc.text(direccionEmpresa, pageWidth / 2, startY + 20, { align: "center" });
+
+startY += 30; // 📌 Espacio antes del título
+
+
+  // 📌 Agregar título
+/*  doc.setFontSize(14);
+  doc.text("NOTA DE CRÉDITO", tipo === 'ticket' ? 20 : 105, startY, { align: "center" });
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");*/
+
+
+  // 📌 Contenido principal
+  startY += 10;
+
+
+  let tamX = doc.internal.pageSize.getWidth();
+
+    if(tipo != 'ticket'){
+      tamX = tamX - 30; 
+    }else{
+      tamX = 70; 
+    }
+
+  drawRoundedRect(marginX, 70, tamX, 50, 1);
+  doc.text(`No. Crédito: ${datoscampos.value.no_credito}`, marginX + 2, startY - 5);
+  doc.text(`No. Factura: ${datoscampos.value.no_factura}`, marginX + 2, startY);
+  doc.text(`Cliente: ${datoscampos.value.cliente}`, marginX + 2, startY + 5);
+  doc.text(`Código Cliente: ${datoscampos.value.cod_cliente}`, marginX + 2, startY + 10);
+  doc.text(`Fecha: ${datoscampos.value.fecha} - Hora: ${datoscampos.value.hora}`, marginX + 2, startY + 15);
+  doc.text(`NCF: ${datoscampos.value.ncf}`, marginX + 2, startY + 20);
+
+  doc.setFillColor(0, 0, 0);
+  doc.rect(marginX, 105, tamX, 10, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(12);
+  doc.text("NOTA DE CRÉDITO", tamX / 2 - 15, 112);
+  doc.setTextColor(0, 0, 0);
+
+  startY += 35;
+
+  // 📌 Generar tabla con `jspdf-autotable`
+autoTable(doc, {
+  startY,
+  margin: { left: marginX, right: marginX },
+  head: [['Concepto', 'Total']],
+  body: [[datoscampos.value.concepto, `RD$ ${datoscampos.value.total}`]],
+  theme: 'plain', // 📌 Usa un diseño sin bordes ni fondo
+  styles: {
+    fontSize: tipo === 'ticket' ? 8 : 10,
+    fillColor: false, // 📌 Elimina cualquier color de fondo
+  },
+  headStyles: {
+    fillColor: [255, 255, 255], // 📌 Asegura que el encabezado no tenga fondo
+    textColor: [0, 0, 0], // 📌 Color del texto en negro
+  },
+  bodyStyles: {
+    fillColor: false, // 📌 Asegura que el cuerpo no tenga fondo
+  },
+  alternateRowStyles: {
+    fillColor: false, // 📌 Evita que las filas alternas tengan fondo
+  }
+});
+
+   startY += 35;
+//aqui se debe agregar la Nota datoscampos.value.nota
+if (datoscampos.value.nota) {
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+
+  // 📌 Definir ancho de texto (sin pasarse del margen)
+  const textWidth = pageWidth - 30;
+  
+  // 📌 Dividir la nota en líneas manejables dentro del ancho definido
+  const notaLines = doc.splitTextToSize(datoscampos.value.nota, textWidth);
+  
+  // 📌 Agregar título "Nota" centrado
+  doc.setFont("helvetica", "bold");
+  doc.text("Nota:", pageWidth / 2, startY, { align: "center" });
+
+  // 📌 Agregar la nota debajo
+  doc.setFont("helvetica", "normal");
+  doc.text(notaLines, marginX, startY + 5);
+  
+  // 📌 Ajustar startY después de la nota
+  startY += notaLines.length * 5 + 10;
+}
+
+   //startY += 35;
+
+const lineWidth = 60; // 📌 Define el ancho de la línea
+const lineXStart = (pageWidth - lineWidth) / 2; // 📌 Calcula el punto inicial centrado
+const lineXEnd = lineXStart + lineWidth; // 📌 Calcula el punto final centrado
+
+doc.line(lineXStart, startY + 30, lineXEnd, startY + 30);
+
+    doc.text("Firma de "+datoscampos.value.cliente, pageWidth / 2, startY + 35 , { align: "center" });
+
+    startY += 40;
+
+   //aqui quiero creau un codigo de barra que quede centrada
+
+ // 📌 Generar código de barras centrado
+  const barcodeData = await generateBarcode(datoscampos.value.no_credito);
+  if (barcodeData) {
+    const barcodeWidth = 60;
+    const barcodeX = (pageWidth - barcodeWidth) / 2;
+    doc.addImage(barcodeData, "PNG", barcodeX, startY, barcodeWidth, 20);
+  }
+
+
+
+  // 📌 Mostrar PDF en un Swal con `<embed>`
+  const pdfData = doc.output('datauristring');
+  Swal.fire({
+    title: 'Vista previa de la Nota de Crédito',
+    width: '80%',
+    html: `<embed src="${pdfData}" type="application/pdf" width="100%" height="500px" />`,
+    showCloseButton: true,
+    showCancelButton: true,
+    cancelButtonText: 'Cerrar',
+    confirmButtonText: 'Imprimir',
+    preConfirm: () => {
+      doc.autoPrint();
+      window.open(doc.output('bloburl'), '_blank');
+    }
+  });
+};
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper card">
+  <div class="container-fluid mt-5">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Notacredito</legend>
+    <div class="row">
+      <div class="col-sm-12">
+       <router-link to="/notacredito" class="btn btn-dark text-white "><i class="icon-home"></i></router-link>
+<router-link to="/crearnotacredito" class="btn btn-success text-white ms-1"><i class="icon-plus"></i></router-link>
+<a href="#" class="btn btn-danger btnaccion cartelito ms-1" data-toggle="tooltip" title="Borrar Entrada" id="borrador"><i class="icon-trash-4"></i></a>
+<a href="#" @click="navigate('primero')" class="btn btn-dark text-white ms-1" title="Primero"><i class="icon-to-start-alt"></i></a>
+<a href="#" @click="navigate('anterior')" class="btn btn-dark text-white ms-1" title="Anterior"><i class="icon-left-dir"></i></a>
+<a href="#" @click="navigate('siguiente')" class="btn btn-dark text-white ms-1" title="Siguiente"><i class="icon-right-dir"></i></a>
+<a href="#" @click="navigate('ultimo')" class="btn btn-dark text-white ms-1" title="Ultimo"><i class="icon-to-end-alt"></i></a>
+<a href="#" @click="fnPrint" class="btn btn-dark text-white ms-1" title="Ultimo"><i class="pi pi-print"></i></a>
+      </div>
+    </div>
+</fieldset>
+<section>
+    <form id="formularioActualizar" action="" method="">
+         <div class="box-body">
+          <div class="row" id="campos">
+<div class="form-group col-12" hidden>
+<label for="id-Actualizador">ID</label>
+<input type="input" v-model="datoscampos.id" name="id"  class="form-control" id="id-Actualizador" readonly placeholder="id"  maxlength="11">
+</div>
+
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="no_credito-Actualizador">NO_CREDITO</label>
+<input type="input" v-model="datoscampos.no_credito" name="no_credito"  class="form-control" id="no_credito-Actualizador"  placeholder="no_credito"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="no_factura-Actualizador">NO_FACTURA</label>
+<input type="input" v-model="datoscampos.no_factura" name="no_factura"  class="form-control" id="no_factura-Actualizador"  placeholder="no_factura"  maxlength="250">
+</div>
+
+<div class="form-group col-12 col-md-3" >
+<label for="b04-Actualizador">B04</label>
+<input type="input" v-model="datoscampos.b04" name="b04"  class="form-control" id="b04-Actualizador"  placeholder="b04"  maxlength="">
+</div>
+<div class="form-group col-12 col-md-3" >
+<label for="ncf-Actualizador">NCF</label>
+<input type="input" v-model="datoscampos.ncf" name="ncf"  class="form-control" id="ncf-Actualizador"  placeholder="ncf"  maxlength="">
+</div>
+
+<div class="form-group col-12 col-sm-8 col-md-8 col-lg-8 col-xl-8" >
+<label for="cliente-Actualizador">CLIENTE</label>
+<input type="input" v-model="datoscampos.cliente" name="cliente"  class="form-control" id="cliente-Actualizador"  placeholder="cliente" v-mayuscula maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="cod_cliente-Actualizador">COD_CLIENTE</label>
+<input type="input" v-model="datoscampos.cod_cliente" name="cod_cliente"  class="form-control" id="cod_cliente-Actualizador"  placeholder="cod_cliente"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="concepto-Actualizador">CONCEPTO</label>
+<textarea class="form-control " id="concepto-Actualizador" name="concepto" v-model="datoscampos.concepto" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="total-Actualizador">TOTAL</label>
+<input type="input" v-model="datoscampos.total" name="total"  class="form-control" id="total-Actualizador"  placeholder="total"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="fecha-Actualizador">FECHA</label>
+<input type="input" v-model="datoscampos.fecha" name="fecha"  class="form-control" id="fecha-Actualizador"  placeholder="fecha"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="hora-Actualizador">HORA</label>
+<input type="input" v-model="datoscampos.hora" name="hora"  class="form-control" id="hora-Actualizador"  placeholder="hora"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="nota-Actualizador">NOTA</label>
+<textarea class="form-control " id="nota-Actualizador" name="nota" v-model="datoscampos.nota" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-6" hidden>
+<label for="created_at-Actualizador">CREATED_AT</label>
+<input type="input" v-model="datoscampos.created_at" name="created_at"  class="form-control" id="created_at-Actualizador"  placeholder="created_at"  maxlength="">
+</div>
+<div class="form-group col-6" hidden>
+<label for="updated_at-Actualizador">UPDATED_AT</label>
+<input type="input" v-model="datoscampos.updated_at" name="updated_at"  class="form-control" id="updated_at-Actualizador"  placeholder="updated_at"  maxlength="">
+</div>
+<div class="form-group col-12" hidden>
+<label for="usuario-Actualizador">USUARIO</label>
+<input type="input" v-model="datoscampos.usuario" name="usuario"  class="form-control" id="usuario-Actualizador"  placeholder="usuario"  maxlength="250">
+</div>
+<div class="form-group col-sm-12 mb-5 mt-5">
+<button type="submit" @click="funcionActualizar" class="btn btn-primary elboton w-100">Actualizar Datos</button>
+  </div>
+  </div>
+  </div>
+   </form>
+</section>
+  </div>
+   </main>
+<Toast />
+</template>
+<style scoped>
+</style>

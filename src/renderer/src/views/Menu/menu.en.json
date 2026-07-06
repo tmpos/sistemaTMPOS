@@ -1,0 +1,73 @@
+{
+  "title": "menu",
+  "entityName": "Menu",
+  "entityNamePlural": "Menus",
+  "actions": {
+    "new": "New Menu",
+    "create": "Create",
+    "edit": "Edit",
+    "update": "Update",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "save": "Save",
+    "search": "Search",
+    "back": "Back",
+    "view": "View",
+    "viewDetails": "View Details",
+    "confirmDelete": "Confirm deletion",
+    "actions": "Actions",
+    "first": "First",
+    "previous": "Previous",
+    "next": "Next",
+    "last": "Last"
+  },
+  "list": {
+    "title": "menu",
+    "subtitle": "Complete management of menu",
+    "empty": "No records available",
+    "createFirst": "Create First",
+    "total": "Total Menus",
+    "active": "Active Records",
+    "lastUpdate": "Last Update"
+  },
+  "create": {
+    "title": "Create Menu",
+    "subtitle": "Complete the form to add a new record",
+    "generalInfo": "General Information",
+    "successTitle": "Data Added",
+    "successMessage": "What do we do now?",
+    "addAnother": "Add Another!",
+    "backToList": "No, Back to List!"
+  },
+  "edit": {
+    "title": "Edit Menu",
+    "subtitle": "Modify the fields you want to update",
+    "loading": "Loading data...",
+    "notFound": "Record not found"
+  },
+  "detail": {
+    "title": "Menu Details",
+    "subtitle": "Complete record information"
+  },
+  "messages": {
+    "createSuccess": "Menu created successfully",
+    "updateSuccess": "Menu updated successfully",
+    "deleteSuccess": "Menu deleted successfully",
+    "createError": "Error creating record",
+    "updateError": "Error updating record",
+    "deleteError": "Error deleting record",
+    "loadError": "Error loading data",
+    "deleteConfirm": "Are you sure you want to delete this record?",
+    "deleteWarning": "This action cannot be undone"
+  },
+  "fields": {
+    "nombre": {
+      "label": "Nombre",
+      "placeholder": "Enter nombre"
+    },
+    "tipo": {
+      "label": "Tipo",
+      "placeholder": "Enter tipo"
+    }
+  }
+}

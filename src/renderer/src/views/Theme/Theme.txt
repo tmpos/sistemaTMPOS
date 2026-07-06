@@ -1,0 +1,22 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Theme",
+"to": "/theme",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/theme',
+        name: 'theme',
+        component: () => import('../views/Theme/Theme.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********
+**********************|-CAMPOS-|******************
+"id, preset, primary, surface, darktheme, menumode, tipo, created_at, updated_at, usuario"
+******************************************************

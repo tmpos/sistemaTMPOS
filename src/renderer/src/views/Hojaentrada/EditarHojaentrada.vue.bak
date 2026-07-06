@@ -1,0 +1,417 @@
+<script setup>
+import { ref, onMounted, nextTick, watchEffect } from 'vue';
+import { useRoute} from 'vue-router';
+import { useToast } from "primevue/usetoast";
+import router from '../../router';
+const route = useRoute(); 
+import { enviarDatosPorPost, eliminarDatos, obtenerIdsSeleccionados, borrarTodoslosDatos, lenguajeDataTable, nfecha, arrayToObjetoFromTabla, peticionesFetch, encryptarPassword, envioElectron, enviarSolicitudGet, generarCodigoUnico, peticiones, mensajetoast, lasMayusculas, peticionesFetchOffline, arrayToObjetoFromTablaOffline, crearTablaSiNoExisteOffline } from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+/************************************************************************/
+import config from '../../../../../resources/config.json';
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const production = config.VITE_PRODUCTION;
+const link = ref(config.VITE_LINKURL);
+const api = ref(config.VITE_LINK_API);
+const token = ref(config.VITE_TOKEN);
+const patronTelefono = ref(config.VITE_PATRON_TELEFONO);
+const linkImpresora = ref(config.VITE_IMPRESORA_LOCAL);
+const patroncedula = ref(config.VITE_PATRON_CEDULA);
+const tokenCifrado = ref(null);
+/************************************************************************/
+const tecnicosArray = ref([])
+/************************************************************************/
+document.body.classList.add('sidebar-close');
+/************************************************************************/
+const datoscampos = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+const todosLosHojaentrada = ref([]);
+/************************************************************************/
+/************************************************************************/
+const fetchAllData = async () => {
+    const response = await peticionesFetchOffline('getDataAsArray', 'hojaentrada');
+    const jsonData = response;
+    todosLosHojaentrada.value = jsonData;
+    datoscampos.value = jsonData.find(datos=>datos.id == route.params.id)
+    datoscampos.value.fallas_electronicas_en_tablero = JSON.parse(datoscampos.value.fallas_electronicas_en_tablero)
+    datoscampos.value.abolladuras_rayaduras = JSON.parse(datoscampos.value.abolladuras_rayaduras)
+    datoscampos.value.rotura = JSON.parse(datoscampos.value.rotura)
+    datoscampos.value.no_funciona = JSON.parse(datoscampos.value.no_funciona)
+    datoscampos.value.equipos = JSON.parse(datoscampos.value.equipos)
+
+
+
+};
+/************************************************************************/
+function navigate(action) {
+    const currentIndex = todosLosHojaentrada.value.findIndex(hojaentrada => hojaentrada.id == route.params.id);
+    if (currentIndex === -1) return;
+    let newIndex;
+    switch (action) {
+        case 'primero':
+            newIndex = 0;
+            break;
+        case 'anterior':
+            newIndex = currentIndex > 0 ? currentIndex - 1 : 0;
+            break;
+        case 'siguiente':
+            newIndex = currentIndex + 1 < todosLosHojaentrada.value.length ? currentIndex + 1 : currentIndex;
+            break;
+        case 'ultimo':
+            newIndex = todosLosHojaentrada.value.length - 1;
+            break;
+        default:
+            return;
+    }
+    datoscampos.value = todosLosHojaentrada.value[newIndex];
+
+    datoscampos.value.fallas_electronicas_en_tablero = JSON.parse(datoscampos.value.fallas_electronicas_en_tablero)
+        datoscampos.value.abolladuras_rayaduras = JSON.parse(datoscampos.value.abolladuras_rayaduras)
+    datoscampos.value.rotura = JSON.parse(datoscampos.value.rotura)
+    datoscampos.value.no_funciona = JSON.parse(datoscampos.value.no_funciona)
+    datoscampos.value.equipos = JSON.parse(datoscampos.value.equipos)
+
+    router.push({ path: `/editarhojaentrada/${todosLosHojaentrada.value[newIndex].id}` });
+}
+/************************************************************************/
+const arrayTecnicos = async () => {
+  try {
+    const response = await peticionesFetch(`${link.value}${api.value}`,'datosarraypost',{'tabla':'instaladores'},tokenCifrado.value,'POST');
+     tecnicosArray.value = response.map(clientes=>clientes.nombre);
+     datoscampos.value.tecnico = datoscampos.value.tecnico || tecnicosArray.value[0]
+    /*********************************************/
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to fetch Clientes', life: 3000 });
+  }
+};
+/************************************************************************/
+onMounted(async() => {
+if (production == 'false') {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+}
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+if (!datosEmpresa.empresa.nombre) {
+    await datosEmpresa.inicializarDatosEmpresa(link.value+api.value);
+  }
+await arrayTecnicos();
+fetchAllData()
+});
+/************************************************************************/
+async function funcionActualizar(e) {
+  e.preventDefault();
+  const url = link.value+api.value+"/actualizarcampos/hojaentrada";
+  if (!datoscampos.value) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+  if (datoscampos.value.hasOwnProperty('created_at')) {
+      datoscampos.value.updated_at = nfecha('timestamp')
+    }
+
+  datoscampos.value.fallas_electronicas_en_tablero = JSON.stringify(datoscampos.value.fallas_electronicas_en_tablero)
+  datoscampos.value.abolladuras_rayaduras = JSON.stringify(datoscampos.value.abolladuras_rayaduras)
+  datoscampos.value.rotura = JSON.stringify(datoscampos.value.rotura)
+  datoscampos.value.no_funciona = JSON.stringify(datoscampos.value.no_funciona)
+  datoscampos.value.equipos = JSON.stringify(datoscampos.value.equipos)
+
+  const envioDatos = await peticionesFetchOffline('updateData', 'hojaentrada', JSON.stringify(datoscampos.value));
+  if (envioDatos[0] == 'ok') {
+    fetchAllData()
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+const fnprueba = ()=>{
+  console.log(datoscampos.value.fallas_electronicas_en_tablero)
+}
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="container-fluid mt-5">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Hojaentrada</legend>
+    <div class="row">
+      <div class="col-sm-12">
+       <router-link to="/hojaentrada" class="btn btn-dark text-white "><i class="icon-home"></i></router-link>
+<router-link to="/crearhojaentrada" class="btn btn-success text-white ms-1"><i class="icon-plus"></i></router-link>
+<a href="#" class="btn btn-danger btnaccion cartelito ms-1" data-toggle="tooltip" title="Borrar Entrada" id="borrador"><i class="icon-trash-4"></i></a>
+<a href="#" @click="navigate('primero')" class="btn btn-dark text-white ms-1" title="Primero"><i class="icon-to-start-alt"></i></a>
+<a href="#" @click="navigate('anterior')" class="btn btn-dark text-white ms-1" title="Anterior"><i class="icon-left-dir"></i></a>
+<a href="#" @click="navigate('siguiente')" class="btn btn-dark text-white ms-1" title="Siguiente"><i class="icon-right-dir"></i></a>
+<a href="#" @click="navigate('ultimo')" class="btn btn-dark text-white ms-1" title="Ultimo"><i class="icon-to-end-alt"></i></a>
+<a href="#"  class="btn btn-dark text-white ms-1" ><i class="icon-print"></i></a>
+<a href="#"  class="btn btn-success text-white ms-1" ><i class="icon-whatsapp"></i></a>
+      </div>
+    </div>
+</fieldset>
+<section>
+    <form id="formularioActualizar" action="" method="">
+         <div class="box-body">
+          <div class="row" id="campos">
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" hidden>
+<label for="id-Actualizador">ID</label>
+<input type="input" v-model="datoscampos.id" name="id"  class="form-control" id="id-Actualizador"  placeholder="id"  maxlength="11">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="fecha-Actualizador">FECHA</label>
+<input type="input" v-model="datoscampos.fecha" name="fecha"  class="form-control" id="fecha-Actualizador"  placeholder="fecha"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="no_orden-Actualizador">NO_ORDEN</label>
+<input type="input" v-model="datoscampos.no_orden" name="no_orden"  class="form-control" id="no_orden-Actualizador"  placeholder="no_orden" v-solonumeros maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-8 col-md-8 col-lg-8 col-xl-8" >
+<label for="cliente-Actualizador">CLIENTE</label>
+<input type="input" v-model="datoscampos.cliente" name="cliente"  class="form-control" id="cliente-Actualizador"  placeholder="cliente"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="telefono-Actualizador">TELEFONO</label>
+<InputMask id="telefono-Actualizador" class="form-control" v-model="datoscampos.telefono" :mask="patronTelefono" :placeholder="patronTelefono" />
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="whatsapp-Actualizador">WHATSAPP</label>
+<InputMask id="whatsapp-Actualizador" class="form-control" v-model="datoscampos.whatsapp" :mask="patronTelefono" :placeholder="patronTelefono" />
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="email-Actualizador">EMAIL</label>
+<input type="input" v-model="datoscampos.email" name="email"  class="form-control" id="email-Actualizador"  placeholder="email"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="direccion-Actualizador">DIRECCION</label>
+<textarea class="form-control " id="direccion-Actualizador" name="direccion" v-model="datoscampos.direccion" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="cia_seguro-Actualizador">CIA_SEGURO</label>
+<input type="input" v-model="datoscampos.cia_seguro" name="cia_seguro"  class="form-control" id="cia_seguro-Actualizador"  placeholder="cia_seguro" v-mayuscula maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="no_poliza-Actualizador">NO_POLIZA</label>
+<input type="input" v-model="datoscampos.no_poliza" name="no_poliza"  class="form-control" id="no_poliza-Actualizador"  placeholder="no_poliza"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="no_ficha-Actualizador">NO_FICHA</label>
+<input type="input" v-model="datoscampos.no_ficha" name="no_ficha"  class="form-control" id="no_ficha-Actualizador"  placeholder="no_ficha"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="marca_vehiculo-Actualizador">MARCA_VEHICULO</label>
+<input type="input" v-model="datoscampos.marca_vehiculo" name="marca_vehiculo"  class="form-control" id="marca_vehiculo-Actualizador"  placeholder="marca_vehiculo" v-mayuscula maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="modelo-Actualizador">MODELO</label>
+<input type="input" v-model="datoscampos.modelo" name="modelo"  class="form-control" id="modelo-Actualizador"  placeholder="modelo" v-mayuscula maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="year-Actualizador">YEAR</label>
+<input type="input" v-model="datoscampos.year" name="year"  class="form-control" id="year-Actualizador"  placeholder="year" v-solonumeros maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="color-Actualizador">COLOR</label>
+
+  <div class="input-group">
+    <input
+      type="text"
+      v-model="datoscampos.color"
+      class="form-control"
+      id="colorAgregarDatos"
+    />
+    <div class="input-group-append">
+      <color-picker  v-model="datoscampos.color" />
+    </div>
+  </div>
+
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="placa-Actualizador">PLACA</label>
+<input type="input" v-model="datoscampos.placa" name="placa"  class="form-control" id="placa-Actualizador"  placeholder="placa"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="km-Actualizador">KM</label>
+<input type="input" v-model="datoscampos.km" name="km"  class="form-control" id="km-Actualizador"  placeholder="km"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="combustible-Actualizador">COMBUSTIBLE</label>
+
+<div class="row">
+  <div class="col-6 col-md-8"><select name="combustible" id="combustibleAgregarDatos" class="form-control " v-model="datoscampos.combustible">
+  <option value="0">0</option>
+  <option value="10">10</option>
+  <option value="25">25</option>
+  <option value="40">40</option>
+  <option value="50">50</option>
+  <option value="75">75</option>
+  <option value="90">90</option>
+  <option value="90">90</option>
+  <option value="100">100</option>
+</select></div>
+  <div class="col-6 col-md-4"><Knob v-model="datoscampos.combustible" valueTemplate="{value}%" /></div>
+</div>
+
+
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="bateria-Actualizador">BATERIA</label>
+<input type="input" v-model="datoscampos.bateria" name="bateria"  class="form-control" id="bateria-Actualizador"  placeholder="bateria" v-mayuscula maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="tipo_combustible-Actualizador">TIPO_COMBUSTIBLE</label>
+<select class="form-control " id="tipo_combustible-Actualizador" v-model="datoscampos.tipo_combustible" name="tipo_combustible" >
+  <option value="GASOLINA">GASOLINA</option>
+<option value="DIESEL">DIESEL</option>
+<option value="GAS">GAS</option>
+<option value="ELECTRICO">ELECTRICO</option>
+</select></div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="chasis-Actualizador">CHASIS</label>
+<input type="input" v-model="datoscampos.chasis" name="chasis"  class="form-control" id="chasis-Actualizador"  placeholder="chasis"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="grua-Actualizador">GRUA</label>
+<select class="form-control " id="grua-Actualizador" v-model="datoscampos.grua" name="grua" >
+  <option value="NO">NO</option>
+<option value="SI">SI</option>
+</select></div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="hora-Actualizador">HORA</label>
+<input type="input" v-model="datoscampos.hora" name="hora"  class="form-control" id="hora-Actualizador"  placeholder="hora"  maxlength="250">
+</div>
+
+
+
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">FALLAS ELECTRONICAS EN TABLERO</legend>
+<div class="row">
+  <div class="col-12 col-md-6 row">
+<div class="col-3 " v-for="(value, key) in datoscampos.fallas_electronicas_en_tablero" :key="key">
+    <div>{{ key }}</div>
+    <InputSwitch v-model="datoscampos.fallas_electronicas_en_tablero[key]"  :id="'switch-' + key" @change="fnprueba"  />
+</div>
+    
+  </div>
+  <div class="col-12 col-md-6">
+        <div class="card flex justify-content-center">
+        <img src="../../assets/img/carrito.png" alt="carrito">
+
+    </div>
+  </div>
+</div>
+</fieldset>
+</div>
+
+
+
+
+
+<div class="form-group col-12" >
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">OTRO</legend>
+
+<div class="row">
+      <div class="card col-12 col-md-3">
+        <Fieldset legend="ABOLLADURAS & RAYADURAS">
+         <div class="row">
+          <div class="col-12 row">
+        <div class="col-6 " v-for="(value, key) in datoscampos.abolladuras_rayaduras" :key="key">
+            <div>{{ key }}</div>
+            <InputSwitch v-model="datoscampos.abolladuras_rayaduras[key]"  :id="'switch-' + key" @change="fnprueba"  />
+        </div>
+            
+          </div>
+         </div>
+        </Fieldset>
+    </div>
+      <div class="card col-12 col-md-3">
+        <Fieldset legend="ROTURA">
+         <div class="row">
+          <div class="col-12 row">
+        <div class="col-6 " v-for="(value, key) in datoscampos.rotura" :key="key">
+            <div>{{ key }}</div>
+            <InputSwitch v-model="datoscampos.rotura[key]"  :id="'switch-' + key" @change="fnprueba"  />
+        </div>
+            
+          </div>
+         </div>
+        </Fieldset>
+    </div>
+
+
+      <div class="card col-12 col-md-3">
+        <Fieldset legend="NO FUNCIONA">
+         <div class="row">
+          <div class="col-12 row">
+        <div class="col-6 " v-for="(value, key) in datoscampos.no_funciona" :key="key">
+            <div>{{ key }}</div>
+            <InputSwitch v-model="datoscampos.no_funciona[key]"  :id="'switch-' + key" @change="fnprueba"  />
+        </div>
+            
+          </div>
+         </div>
+        </Fieldset>
+    </div>
+
+      <div class="card col-12 col-md-3">
+        <Fieldset legend="EQUIPO">
+         <div class="row">
+          <div class="col-12 row">
+        <div class="col-6 " v-for="(value, key) in datoscampos.equipos" :key="key">
+            <div>{{ key }}</div>
+            <InputSwitch v-model="datoscampos.equipos[key]"  :id="'switch-' + key" @change="fnprueba"  />
+        </div>
+            
+          </div>
+         </div>
+        </Fieldset>
+    </div>
+
+
+</div>
+</fieldset>
+</div>
+
+
+
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="tecnico-Actualizador">TECNICO</label>
+<select name="tecnico" id="tecnico" v-model="datoscampos.tecnico" class="form-control ">
+  <option :value="tecnico" v-for="tecnico in tecnicosArray">{{tecnico}}</option>
+</select>
+
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="costo_reparacion-Actualizador">COSTO_REPARACION</label>
+<input type="input" v-model="datoscampos.costo_reparacion" name="costo_reparacion"  class="form-control" id="costo_reparacion-Actualizador" v-solonumeros v-decimales v-numeroFocusinOut placeholder="costo_reparacion"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="observaciones-Actualizador">OBSERVACIONES</label>
+<textarea class="form-control " id="observaciones-Actualizador" name="observaciones" v-model="datoscampos.observaciones" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="trabajos_realizar-Actualizador">TRABAJOS_REALIZAR</label>
+<textarea class="form-control " id="trabajos_realizar-Actualizador" name="trabajos_realizar" v-model="datoscampos.trabajos_realizar" cols="30" rows="3" ></textarea>
+</div>
+
+<div class="form-group col-sm-12 mb-5 mt-5">
+<button type="submit" @click="funcionActualizar" class="btn btn-primary elboton w-100">Actualizar Datos</button>
+  </div>
+  </div>
+  </div>
+   </form>
+</section>
+  </div>
+   </main>
+<Toast />
+</template>
+<style>
+</style>

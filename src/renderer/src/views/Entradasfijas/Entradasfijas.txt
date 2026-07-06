@@ -1,0 +1,22 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Entradasfijas",
+"to": "/entradasfijas",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/entradasfijas',
+        name: 'entradasfijas',
+        component: () => import('../views/Entradasfijas/Entradasfijas.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********
+**********************|-CAMPOS-|******************
+"id, descripcion, valor, fecha_pago, ultimo_pago, created_at, updated_at, usuario"
+******************************************************

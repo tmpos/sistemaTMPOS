@@ -1,0 +1,794 @@
+<script setup>
+import { ref, onMounted, nextTick, watchEffect,computed } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
+const router = useRouter();
+import axios from 'axios';
+import { enviarDatosPorPost, eliminarDatos, obtenerIdsSeleccionados, borrarTodoslosDatos, lenguajeDataTable, nfecha, arrayToObjetoFromTabla, peticionesFetch, encryptarPassword, envioElectron, mensajetoast, crearTablaSiNoExiste,buscarDatosIMEI,crearGasto,crearNotaCredito,generarCodigoUnico, peticiones, lasMayusculas } from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+import { useToast } from "primevue/usetoast";
+const toast = useToast();
+/************************************************************************/
+import LoadingOverlay from '../../Loading/LoadingOverlay.vue';
+import { useLoading } from 'vue-loading-overlay';
+const $loading = useLoading();
+let loader = null;
+/************************************************************************/
+const usuarioLocal = ref({})
+/************************************************************************/
+const camposArray = ["imei","estado","fecha","equipo","marca","modelo","preciocompra","precioventa","detalles","vendedor","cedula","telefono","direccion","nota","usuario"];
+/************************************************************************/
+import { useDatosEmpresa } from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const tokenCorto = ref('');
+const codigoUnico = ref('')
+/************************************************************************/
+const selectedItems = ref([]);
+/************************************************************************/
+const position = ref('top');
+const openPosition = (pos) => {
+    position.value = pos;
+    visible.value = true;
+}
+/************************************************************************/
+const datoscamposRecibirequipo = ref({})
+/************************************************************************/
+const isLoading = ref(false)
+/************************************************************************/
+const visible = ref(false);
+const visiblecrear = ref(false);
+const value = ref(null);
+const id = ref(null);
+const datoscampos = ref({});
+const data = ref([]);
+const searchQuery = ref('');
+const RecibirequipoEditar = ref(null);
+/************************************************************************/
+async function limpiarCamposCrear() {
+datoscamposRecibirequipo.value = {}
+await campos();
+}
+/************************************************************************/
+watchEffect(() => {
+  if (visiblecrear.value) {
+
+    datoscamposRecibirequipo.value.estado = 'DISPONIBLE';
+    datoscamposRecibirequipo.value.fecha = nfecha('fecha');
+    datoscamposRecibirequipo.value.preciocompra = '0.00';
+    datoscamposRecibirequipo.value.precioventa = '0.00';
+       datoscamposRecibirequipo.value.detalles = `ALMACENAMIENTO: 
+BATERIA TESTEADA: si
+BATERIA QUE MARCA: original
+DETALLES ESTETICOS: Ninguno
+DETALLES INTERNOS: Ninguno
+BATERIA MARCA: 100%`
+  }
+});
+/************************************************************************/
+const fetchAndSetupData = async () => {
+const response = await peticionesFetch(`${link.value}${api.value}`, `datosarray/recibirequipo`, {}, tokenCifrado.value, 'GET');
+    const jsonData = response.reverse();
+    data.value = jsonData;
+};
+/************************************************************************/
+async function campos() {
+  const campos = await arrayToObjetoFromTabla(link.value+api.value, tokenCifrado.value, 'recibirequipo', true,camposArray,'usuario');
+  datoscamposRecibirequipo.value = campos;
+}
+/************************************************************************/
+onMounted(async () => {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCorto.value = datosJSON.VITE_TOKEN_CORTO;
+
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+await crearTablaSiNoExiste(link.value, api.value, 'recibirequipo', camposArray, tokenCifrado.value,toast);
+usuarioLocal.value = JSON.parse(window.localStorage.getItem('usuarioLocal'))[0] || {};
+await campos();
+codigoUnico.value = generarCodigoUnico()
+await fetchAndSetupData();
+});
+/************************************************************************/
+const agregarImei = async()=>{
+    const datosProducto = await peticionesFetch(`${link.value}${api.value}`,`datoscampo/productos/codigo/${codigoUnico.value}`,{},tokenCifrado.value,'GET');
+    const camposImei = await arrayToObjetoFromTabla(link.value+api.value,tokenCifrado.value,'imei',true);
+    const url = link.value+api.value+"/insertar/imei";
+    camposImei.imei = datoscamposRecibirequipo.value.imei
+    camposImei.equipo = datoscamposRecibirequipo.value.equipo
+    camposImei.id_equi = datosProducto.id
+    camposImei.detalles = datoscamposRecibirequipo.value.detalles
+    camposImei.fecha = datoscamposRecibirequipo.value.fecha
+    camposImei.proveedor = datoscamposRecibirequipo.value.vendedor
+    camposImei.estado = 'DISPONIBLE'
+    camposImei.almacen = datosEmpresa.empresa.nombre
+    camposImei.costo = datoscamposRecibirequipo.value.preciocompra
+   const envioDatos = await enviarDatosPorPost(url, camposImei,tokenCifrado.value);
+}
+/************************************************************************/
+const agregarProducto = async()=>{
+    const camposProductos = await arrayToObjetoFromTabla(link.value+api.value,tokenCifrado.value,'productos',true);
+    const url = link.value+api.value+"/insertar/productos";
+   camposProductos.codigo = codigoUnico.value
+   camposProductos.codigo_barra = codigoUnico.value
+   camposProductos.nombre = datoscamposRecibirequipo.value.equipo
+   camposProductos.descripcion = datoscamposRecibirequipo.value.equipo
+   camposProductos.categoria = 'CELULARES';
+   camposProductos.stock = 1;
+   camposProductos.alerta = 1;
+   camposProductos.marca = datoscamposRecibirequipo.value.marca
+   camposProductos.modelo = datoscamposRecibirequipo.value.modelo
+   camposProductos.precio_compra = datoscamposRecibirequipo.value.preciocompra
+   camposProductos.precio_venta = datoscamposRecibirequipo.value.precioventa
+   camposProductos.precio_final = datoscamposRecibirequipo.value.precioventa
+   camposProductos.precio_min = datoscamposRecibirequipo.value.precioventa
+   camposProductos.precio_xmayor = datoscamposRecibirequipo.value.precioventa
+   camposProductos.empaque = 'UNIDAD'
+   camposProductos.impuestos = '0.00'
+   camposProductos.impuesto_venta = '0.00'
+   camposProductos.otro = datoscamposRecibirequipo.value.nota
+   camposProductos.proveedor = datoscamposRecibirequipo.value.vendedor
+   camposProductos.almacen = datosEmpresa.empresa.nombre
+   const envioDatos = await enviarDatosPorPost(url, camposProductos,tokenCifrado.value);
+
+}
+/************************************************************************/
+  async function borrarTodo() {
+    Swal.fire({
+        title: "¿Estás seguro?",
+        text: "¡Se borrarán los datos!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, de acuerdo",
+        cancelButtonText: "No, cancelar"
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            const { value: password } = await Swal.fire({
+                title: 'Introduce la contraseña',
+                input: 'password',
+                inputPlaceholder: 'Contraseña',
+                showCancelButton: true,
+                confirmButtonText: 'Confirmar',
+                cancelButtonText: 'Cancelar'
+            });
+            if (password) {
+               if (password === token.value || password === tokenCorto.value) {
+                    const envioDatos = await borrarTodoslosDatos(link.value + api.value + '/borrartodo', 'recibirequipo', tokenCifrado.value);
+                    if (envioDatos[0] == 'ok') {
+                        fetchAndSetupData();
+                        toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos borrados', life: 3000 });
+                    } else {
+                        toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al borrar datos.', life: 3000 });
+                   }
+                } else {
+                    toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+                }
+            }
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+            toast.add({ severity: 'success', summary: 'No te preocupes', detail: 'Datos seguros', life: 3000 });
+        }
+    });
+}
+/************************************************************************/
+async function funcionActualizar() {
+  const url = link.value+api.value+"/actualizarcampos/recibirequipo";
+  if (!datoscampos.value) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+  if (datoscampos.value.hasOwnProperty('created_at')) {
+    datoscampos.value.updated_at = nfecha('timestamp');
+  }
+  const envioDatos = await enviarDatosPorPost(url, datoscampos.value, tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+    visible.value = false;
+    fetchAndSetupData();
+    toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+async function funcionCrear() {
+  const url = link.value + api.value + "/insertar/recibirequipo";
+  
+  if (datoscamposRecibirequipo.value.hasOwnProperty('created_at')) {
+    datoscamposRecibirequipo.value.created_at = nfecha('timestamp');
+    datoscamposRecibirequipo.value.updated_at = nfecha('timestamp');
+  }
+    datoscamposRecibirequipo.value.almacen = datosEmpresa.empresa.nombre
+
+  const envioDatos = await enviarDatosPorPost(url, datoscamposRecibirequipo.value, tokenCifrado.value);
+
+  if (envioDatos[0] == 'ok') {
+    visiblecrear.value = false;
+    
+    while (true) { // Bucle hasta que el usuario elija una opción válida
+      const result = await Swal.fire({
+        title: "Selecciona una opción",
+        text: "Debes elegir entre crear una Nota de Crédito o un Gasto.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Nota de Crédito",
+        cancelButtonText: "Gasto",
+        allowOutsideClick: false, // Evita que se cierre haciendo clic fuera
+        allowEscapeKey: false, // Evita que se cierre con la tecla Escape
+        allowEnterKey: false // Evita que se cierre con Enter sin elegir
+      });
+
+      if (result.isConfirmed) {
+        await crearNotaCredito(
+          link.value, api.value, '', datoscamposRecibirequipo.value.vendedor,
+          datoscamposRecibirequipo.value.preciocompra,
+          `COMPRA DE EQUIPO (${datoscamposRecibirequipo.value.equipo}, ${datoscamposRecibirequipo.value.imei} a ${datoscamposRecibirequipo.value.vendedor} con cédula ${datoscamposRecibirequipo.value.cedula})`,
+          '', toast, tokenCifrado.value
+        );
+        break; // Salir del bucle si elige "Nota de Crédito"
+
+      } else if (result.dismiss === Swal.DismissReason.cancel) {
+        await crearGasto(
+          link.value + api.value, datoscamposRecibirequipo.value.preciocompra,
+          `COMPRA DE EQUIPO (${datoscamposRecibirequipo.value.equipo}, ${datoscamposRecibirequipo.value.imei} a ${datoscamposRecibirequipo.value.vendedor} con cédula ${datoscamposRecibirequipo.value.cedula})`,
+          toast, tokenCifrado.value
+        );
+        break; // Salir del bucle si elige "Gasto"
+      }
+    }
+
+    await agregarProducto();
+    await agregarImei();
+    await fetchAndSetupData();
+    limpiarCamposCrear();
+
+    toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Agregados', life: 3000 });
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar los datos.', life: 3000 });
+  }
+}
+
+/************************************************************************/
+async function borrarSeleccionados() {
+  const ids = obtenerIdsSeleccionados(selectedItems.value);
+    Swal.fire({
+        title: "¿Estas Seguro?",
+        text: "Se Borraran los Datos!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, de acuerdo!",
+        cancelButtonText: "No, cancelar!",
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            const { value: password } = await Swal.fire({
+                title: 'Introduce la contraseña',
+                input: 'password',
+                inputPlaceholder: 'Contraseña',
+                showCancelButton: true,
+                confirmButtonText: 'Confirmar',
+                cancelButtonText: 'Cancelar'
+            });
+            if (password) {
+                if (password === token.value || password === tokenCorto.value) {
+                    let exitoTotal = true;
+                    if (ids.length > 0) {
+                        for (const id of ids) {
+                            try {
+                                const envioDatos = await eliminarDatos(`${link.value}${api.value}/borrar/recibirequipo`, id, tokenCifrado.value);
+                            } catch (error) {
+                                console.error(`Error al eliminar datos para ID: ${id}`, error);
+                                exitoTotal = false;
+                            }
+                        }
+                        if (exitoTotal) {
+                            fetchAndSetupData();
+                            toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Borrados', life: 3000 });
+                        } else {
+                            toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Borrar los datos.', life: 3000 });
+                        }
+                    } else {
+                        toast.add({ severity: 'error', summary: 'Error', detail: 'No hay datos para borrar', life: 3000 });
+                    }
+                } else {
+                    toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+                }
+            }
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+            toast.add({ severity: 'success', summary: 'No te preocupes', detail: 'Datos Seguros', life: 3000 });
+        }
+    });
+}
+/************************************************************************/
+async function eliminarSoloDeAqui(rowData) {
+    const { value: password } = await Swal.fire({
+        title: 'Introduce la contraseña',
+        input: 'password',
+        inputPlaceholder: 'Contraseña',
+        showCancelButton: true,
+        confirmButtonText: 'Eliminar',
+        cancelButtonText: 'Cancelar'
+    });
+
+    if (password && (password === token.value || password === tokenCorto.value)) {
+        const datosFactura = await peticionesFetch(
+            `${link.value}${api.value}`,
+            "borrarporcampo/recibirequipo", // Ajusta esto según tu API
+            { campo: 'id', valor: rowData.id },
+            tokenCifrado.value,
+            'POST'
+        );
+
+        if (datosFactura[0] == 'ok') {
+            toast.add({ severity: 'success', summary: 'Éxito', detail: 'Registro eliminado de la vista.', life: 3000 });
+            await fetchAndSetupData();
+        } else {
+            toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo eliminar el registro.', life: 3000 });
+        }
+    } else if (password !== undefined) {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+    }
+}
+
+/************************************************************************/
+async function eliminarPorCompleto(rowData) {
+    const { value: password } = await Swal.fire({
+        title: 'Introduce la contraseña',
+        input: 'password',
+        inputPlaceholder: 'Contraseña',
+        showCancelButton: true,
+        confirmButtonText: 'Eliminar',
+        cancelButtonText: 'Cancelar'
+    });
+
+    if (password && (password === token.value || password === tokenCorto.value)) {
+
+        const datosProd = await peticionesFetch(
+            `${link.value}${api.value}`,
+            "borrarporcampo/productos",
+            { campo: 'nombre', valor: rowData.equipo },
+            tokenCifrado.value,
+            'POST'
+        );
+
+        if (datosProd[0] == 'ok') {
+            toast.add({ severity: 'success', summary: 'Éxito', detail: 'Eliminado de Productos', life: 3000 });
+        }else{
+           toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo eliminar el Producto.', life: 3000 });
+        }
+
+        const datosImei = await peticionesFetch(
+            `${link.value}${api.value}`,
+            "borrarporcampo/imei",
+            { campo: 'imei', valor: rowData.imei },
+            tokenCifrado.value,
+            'POST'
+        );
+
+        if (datosImei[0] == 'ok') {
+            toast.add({ severity: 'success', summary: 'Éxito', detail: 'Eliminado de IMEI', life: 3000 });
+        }else{
+           toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo eliminar el IMEI.', life: 3000 });
+        }
+
+
+        const datosFactura = await peticionesFetch(
+            `${link.value}${api.value}`,
+            "borrarporcampo/recibirequipo",
+            { campo: 'id', valor: rowData.id },
+            tokenCifrado.value,
+            'POST'
+        );
+
+        if (datosFactura[0] == 'ok') {
+            toast.add({ severity: 'success', summary: 'Éxito', detail: 'Registro eliminado completamente.', life: 3000 });
+            await fetchAndSetupData();
+        } else {
+            toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo eliminar el registro.', life: 3000 });
+        }
+    } else if (password !== undefined) {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+    }
+}
+
+/************************************************************************/
+async function preguntarEliminar(rowData) {
+    const choice = await Swal.fire({
+        title: 'Eliminar registro',
+        text: '¿Deseas eliminar este registro solo de aquí o completamente?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Eliminar por completo',
+        cancelButtonText: 'Eliminar solo de aquí'
+    });
+
+    if (choice.isConfirmed) {
+        eliminarPorCompleto(rowData);
+    } else if (choice.dismiss === Swal.DismissReason.cancel) {
+        eliminarSoloDeAqui(rowData);
+    }
+}
+
+/************************************************************************/
+const itemsRecibirequipo = ref([]);
+const menu = ref(null);
+const currentRowData = ref(null);
+const toggleRecibirequipo = (event, rowData) => {
+currentRowData.value = rowData;
+itemsRecibirequipo.value = [
+{ label: 'Editar', icon: 'pi pi-pencil', command: () => { 
+visible.value = true;
+datoscampos.value = currentRowData.value;
+} },
+{ label: 'Eliminar', icon: 'pi pi-trash', command: () => {
+
+    preguntarEliminar(currentRowData.value)
+
+        } 
+    },
+];
+menu.value.toggle(event);
+};
+/************************************************************************/
+const filteredRecibirequipo = computed(() => {
+if (!searchQuery.value) return data.value;
+return data.value.filter(busqueda => {
+  return Object.values(busqueda).some(value =>
+    String(value).toLowerCase().includes(searchQuery.value.toLowerCase())
+   );
+  });
+});
+/************************************************************************/
+const fnAwesomplete = ()=>{
+}
+const handleSelectComplete = async(selected)=>{
+}
+/************************************************************************/
+const fnRouter = (ruta) => {
+  router.push(ruta);
+};
+/************************************************************************/
+const fnBuscarImei = async()=>{
+const imei = datoscamposRecibirequipo.value.imei;
+
+const datos = await buscarDatosIMEI(0,imei,tokenCifrado.value,toast,Swal,false)
+
+if (datos) {
+   datoscamposRecibirequipo.value.equipo = datos.modelName
+   datoscamposRecibirequipo.value.marca = datos.brand
+   datoscamposRecibirequipo.value.modelo = datos.model
+   datoscamposRecibirequipo.value.detalles = `ALMACENAMIENTO: 
+BATERIA TESTEADA: si
+BATERIA QUE MARCA: original
+DETALLES ESTETICOS: Ninguno
+DETALLES INTERNOS: Ninguno
+BATERIA MARCA: 100%`
+}
+
+
+}
+/************************************************************************/
+  const handleEscape = (event) => {
+    if (event.key === 'Escape') {
+      loader.hide();
+    }
+  };
+/************************************************************************/
+const fnBuscarCedula = async () => {
+    const cedula = datoscamposRecibirequipo.value.cedula;
+    toast.add({ severity: 'info', summary: 'Loading', detail: 'Buscando datos...', life: 3000 });
+    loader = $loading.show({
+        canCancel: true,
+        loader:'bars',
+        onCancel: () => {
+        loader.hide();
+    },
+    });
+
+    try {
+        const response = await window.electron.ipcRenderer.invoke('consultarPasaporte', cedula);
+        response.nombrerazon_social = response.nombre + ' ' + response.apellido;
+
+        if (response) {
+            toast.add({ severity: 'success', summary: 'Encontrado', detail: 'Datos Encontrados', life: 3000 });
+            datoscamposRecibirequipo.value.vendedor = response.nombrerazon_social;
+        } else {
+            toast.add({ severity: 'error', summary: 'Error', detail: 'Error, No se encuentran los Datos.', life: 3000 });
+        }
+    } catch (error) {
+        console.error('Error en la solicitud SOAP:', error);
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Error, No se encuentran los Datos.', life: 3000 });
+    } finally {
+        loader.hide();
+        toast.add({ severity: 'info', summary: 'Complete', detail: 'Búsqueda completada', life: 3000 });
+    }
+}
+
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="container-fluid mt-5">
+<Card>
+<template #content>
+    <div class="row">
+      <div class="col-md-12">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Recibirequipo</legend>
+            <div class="row">
+              <div class="col-sm-12">
+                <a href="#" @click="fetchAndSetupData" class="btn btn-warning text-white cartelito" data-toggle="tooltip" title="Recargar" id="reload"><i class="icon-arrows-cw"></i></a>
+               <a href="#" class="btn btn-success cartelito ms-1" title="Agregar Nuevo" id="nuevoregistro" @click="visiblecrear = true"><i class="icon-plus"></i></a>
+               <a href="#" @click="borrarSeleccionados" class="btn btn-danger btnaccion cartelito ms-1" data-toggle="tooltip" title="Borrar Selección" id="borrador"><i class="icon-trash-4"></i></a>
+<a href="#" v-if="usuarioLocal.usuario =='Soporte'"  @click="borrarTodo" class="btn btn-danger btnaccion cartelito float-end ms-1" data-toggle="tooltip" title="Borrar Todo" id="borrartodo"><i class="icon-trash"></i> Borrar Todo</a>
+              </div>
+            </div>
+        </fieldset>
+      </div>
+      <div class="col-md-12">
+ <div style="display: flex; justify-content: flex-end;">
+ <input v-model="searchQuery" placeholder="Buscar recibirequipo..." class="p-inputtext p-component" style="margin-bottom: 10px;" />
+</div>
+<DataTable 
+    :value="filteredRecibirequipo"  
+    scrollable 
+    scrollHeight="600px"  
+    dataKey="id" 
+    paginator 
+    :rows="10" 
+    size="small"
+    resizableColumns 
+    columnResizeMode="fit"
+    v-model:selection="selectedItems" 
+    selectionMode="single" 
+    :rowsPerPageOptions="[5, 10, 20, 50]" 
+    tableStyle="min-width: 50rem">
+    <Column selectionMode="multiple" headerStyle="width: 3rem"></Column>
+    <Column header="Options">
+        <template #body="slotProps">
+            <Button 
+                icon="pi pi-cog" 
+                @click="toggleRecibirequipo($event, slotProps.data)"
+                aria-haspopup="true"
+                aria-controls="overlay_menu_factura"
+            />
+            <Menu 
+                ref="menu" 
+                id="overlay_menu_Recibirequipo" 
+                :model="itemsRecibirequipo" 
+                :popup="true"
+            />
+        </template>
+    </Column>
+    <Column field="imei" header="Imei"></Column>
+<Column field="estado" header="Estado"></Column>
+<Column field="fecha" header="Fecha"></Column>
+<Column field="equipo" header="Equipo"></Column>
+<Column field="marca" header="Marca"></Column>
+<Column field="modelo" header="Modelo"></Column>
+<Column field="preciocompra" header="Preciocompra"></Column>
+<Column field="precioventa" header="Precioventa"></Column>
+<Column field="detalles" header="Detalles"></Column>
+<Column field="vendedor" header="Vendedor"></Column>
+<Column field="cedula" header="Cedula"></Column>
+<Column field="telefono" header="Telefono"></Column>
+<Column field="direccion" header="Direccion"></Column>
+<Column field="nota" header="Nota"></Column>
+<Column field="usuario" header="Usuario"></Column>
+
+</DataTable>
+      </div>
+    </div>
+  </template>
+</Card>
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Dialog v-model:visible="visible" :position="position" modal header="Modificar Recibirequipo" :style="{ width: '50rem' }" :breakpoints="{ '1199px': '75vw', '575px': '90vw' }">
+            <template #header>
+                <div class="inline-flex align-items-center justify-content-center gap-2">
+                    <span class="font-bold white-space-nowrap">Modal Editar</span>
+                </div>
+            </template>
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">Recibirequipo</legend>
+     <form id="formularioActualizarRecibirequipo" action="" method="">
+         <div  style="margin-top: 15px;color: #34AAB2;" class="row">
+<div class="form-group col-12" hidden>
+<label for="id-Actualizador">ID</label>
+<input type="input" v-model="datoscampos.id" name="id"  class="form-control" id="id-Actualizador" readonly placeholder="id"  maxlength="11">
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="imei-Actualizador">IMEI</label>
+<input type="input" v-model="datoscampos.imei" name="imei"  class="form-control" id="imei-Actualizador"  placeholder="imei" v-solonumeros maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="estado-Actualizador">ESTADO</label>
+<select class="form-control " id="estado-Actualizador" v-model="datoscampos.estado" name="estado" >
+  <option value="DISPONIBLE">DISPONIBLE</option>
+<option value="VENDIDO">VENDIDO</option>
+</select></div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="fecha-Actualizador">FECHA</label>
+<input type="input" v-model="datoscampos.fecha" name="fecha"  class="form-control" id="fecha-Actualizador" v-datepicker placeholder="fecha"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="equipo-Actualizador">EQUIPO</label>
+<input type="input" v-model="datoscampos.equipo" name="equipo"  class="form-control" id="equipo-Actualizador"  placeholder="equipo"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="marca-Actualizador">MARCA</label>
+<input type="input" v-model="datoscampos.marca" name="marca"  class="form-control" id="marca-Actualizador"  placeholder="marca" v-mayuscula maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="modelo-Actualizador">MODELO</label>
+<input type="input" v-model="datoscampos.modelo" name="modelo"  class="form-control" id="modelo-Actualizador"  placeholder="modelo" v-mayuscula maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="preciocompra-Actualizador">PRECIOCOMPRA</label>
+<input type="input" v-model="datoscampos.preciocompra" name="preciocompra"  class="form-control" id="preciocompra-Actualizador"  v-numeroFocusinOut v-decimales placeholder="preciocompra" v-solonumeros maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="precioventa-Actualizador">PRECIOVENTA</label>
+<input type="input" v-model="datoscampos.precioventa" name="precioventa"  class="form-control" id="precioventa-Actualizador"  v-numeroFocusinOut v-decimales placeholder="precioventa" v-solonumeros maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="detalles-Actualizador">DETALLES</label>
+<textarea class="form-control " id="detalles-Actualizador" name="detalles" v-model="datoscampos.detalles" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="vendedor-Actualizador">VENDEDOR</label>
+<input type="input" v-model="datoscampos.vendedor" name="vendedor"  class="form-control" id="vendedor-Actualizador"  placeholder="vendedor" v-mayuscula maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="cedula-Actualizador">CEDULA</label>
+<input type="input" v-model="datoscampos.cedula" name="cedula"  class="form-control" id="cedula-Actualizador"  placeholder="cedula"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="telefono-Actualizador">TELEFONO</label>
+<InputMask id="telefono-Actualizador" class="form-control" v-model="datoscampos.telefono" :mask="patronTelefono" :placeholder="patronTelefono" />
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="direccion-Actualizador">DIRECCION</label>
+<textarea class="form-control " id="direccion-Actualizador" name="direccion" v-model="datoscampos.direccion" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="nota-Actualizador">NOTA</label>
+<textarea class="form-control " id="nota-Actualizador" name="nota" v-model="datoscampos.nota" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-6" hidden>
+<label for="created_at-Actualizador">CREATED_AT</label>
+<input type="input" v-model="datoscampos.created_at" name="created_at"  class="form-control" id="created_at-Actualizador"  placeholder="created_at"  maxlength="">
+</div>
+<div class="form-group col-6" hidden>
+<label for="updated_at-Actualizador">UPDATED_AT</label>
+<input type="input" v-model="datoscampos.updated_at" name="updated_at"  class="form-control" id="updated_at-Actualizador"  placeholder="updated_at"  maxlength="">
+</div>
+<div class="form-group col-12" hidden>
+<label for="usuario-Actualizador">USUARIO</label>
+<input type="input" v-model="datoscampos.usuario" name="usuario"  class="form-control" id="usuario-Actualizador"  placeholder="usuario"  maxlength="250">
+</div>
+
+        </div>
+        </form>
+</fieldset>
+            <template #footer>
+                <Button label="Cancel" text severity="secondary" @click="visible = false" autofocus />
+                <Button label="Save" outlined severity="secondary" @click="funcionActualizar" autofocus />
+            </template>
+        </Dialog>
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Dialog v-model:visible="visiblecrear" :position="position" modal header="Crear Recibirequipo" :style="{ width: '50rem' }" :breakpoints="{ '1199px': '75vw', '575px': '90vw' }">
+            <template #header>
+                <div class="inline-flex align-items-center justify-content-center gap-2">
+                    <span class="font-bold white-space-nowrap">Modal Crear</span>
+                </div>
+            </template>
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">Recibirequipo</legend>
+     <form id="formularioActualizarRecibirequipo" action="" method="">
+         <div  style="margin-top: 15px;color: #34AAB2;" class="row">
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="imeiAgregarDatos">IMEI</label>
+
+<InputGroup>
+    <InputMask id="imeiAgregarDatos" class="form-control" v-model="datoscamposRecibirequipo.imei" mask="999999999999999" placeholder="123456789012345" @keydown.enter="fnBuscarImei" />
+    <Button icon="pi pi-search"  severity="warn"  @click="fnBuscarImei" />
+</InputGroup>
+
+
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="estadoAgregarDatos">ESTADO</label>
+<select class="form-control " v-model="datoscamposRecibirequipo.estado" id="estadoAgregarDatos" name="estado" >
+  <option value="DISPONIBLE">DISPONIBLE</option>
+<option value="VENDIDO">VENDIDO</option>
+</select></div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="fechaAgregarDatos">FECHA</label>
+<input type="input" v-model="datoscamposRecibirequipo.fecha" name="fecha"  class="form-control " id="fechaAgregarDatos" v-datepicker placeholder="fecha" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="equipoAgregarDatos">EQUIPO</label>
+<input type="input" v-model="datoscamposRecibirequipo.equipo" name="equipo"  class="form-control " id="equipoAgregarDatos" v-mayuscula placeholder="equipo" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="marcaAgregarDatos">MARCA</label>
+<input type="input" v-model="datoscamposRecibirequipo.marca" name="marca"  class="form-control mayusc" id="marcaAgregarDatos" v-mayuscula placeholder="marca" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="modeloAgregarDatos">MODELO</label>
+<input type="input" v-model="datoscamposRecibirequipo.modelo" name="modelo"  class="form-control mayusc" id="modeloAgregarDatos" v-mayuscula placeholder="modelo" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="preciocompraAgregarDatos">PRECIOCOMPRA</label>
+<input type="input" v-model="datoscamposRecibirequipo.preciocompra" name="preciocompra"  class="form-control soloNumero" id="preciocompraAgregarDatos" v-solonumeros v-numeroFocusinOut v-decimales placeholder="preciocompra" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="precioventaAgregarDatos">PRECIOVENTA</label>
+<input type="input" v-model="datoscamposRecibirequipo.precioventa" name="precioventa"  class="form-control soloNumero" id="precioventaAgregarDatos" v-solonumeros v-numeroFocusinOut v-decimales placeholder="precioventa" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="detallesAgregarDatos">DETALLES</label>
+<textarea class="form-control " v-model="datoscamposRecibirequipo.detalles" id="detallesAgregarDatos" name="detalles" cols="30" rows="6" ></textarea>
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="vendedorAgregarDatos">VENDEDOR</label>
+<input type="input" v-model="datoscamposRecibirequipo.vendedor" name="vendedor"  class="form-control mayusc" id="vendedorAgregarDatos" v-mayuscula placeholder="vendedor" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="cedulaAgregarDatos">CEDULA</label>
+<InputGroup>
+    <InputText placeholder="Cedula" v-model="datoscamposRecibirequipo.cedula" @keydown.enter="fnBuscarCedula" />
+    <Button icon="pi pi-search" severity="warn"  @click="fnBuscarCedula" />
+</InputGroup>
+
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="telefonoAgregarDatos">TELEFONO</label>
+<InputMask id="telefonoAgregarDatos" class="form-control" v-model="datoscamposRecibirequipo.telefono" :mask="patronTelefono" :placeholder="patronTelefono" />
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="direccionAgregarDatos">DIRECCION</label>
+<textarea class="form-control " v-model="datoscamposRecibirequipo.direccion" id="direccionAgregarDatos" name="direccion" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="notaAgregarDatos">NOTA</label>
+<textarea class="form-control " id="notaAgregarDatos" v-model="datoscamposRecibirequipo.nota" name="nota" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-6" hidden>
+<label for="created_atAgregarDatos">CREATED_AT</label>
+<input type="input" v-model="datoscamposRecibirequipo.created_at" name="created_at"  class="form-control " id="created_atAgregarDatos"  placeholder="created_at" maxlength="">
+</div>
+<div class="form-group col-6" hidden>
+<label for="updated_atAgregarDatos">UPDATED_AT</label>
+<input type="input" v-model="datoscamposRecibirequipo.updated_at" name="updated_at"  class="form-control " id="updated_atAgregarDatos"  placeholder="updated_at" maxlength="">
+</div>
+<div class="form-group col-12" hidden>
+<label for="usuarioAgregarDatos">USUARIO</label>
+<input type="input" v-model="datoscamposRecibirequipo.usuario" name="usuario"  class="form-control " id="usuarioAgregarDatos"  placeholder="usuario" maxlength="250">
+</div>
+
+        </div>
+        </form>
+</fieldset>
+            <template #footer>
+                <Button label="Cancel" text severity="secondary" @click="visiblecrear = false" autofocus />
+                <Button label="Crear" outlined severity="secondary" @click="funcionCrear" autofocus />
+            </template>
+        </Dialog>
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Toast />
+  </div>
+</main>
+
+  <LoadingOverlay :visible="isLoading" />
+
+</template>
+<style scoped>
+</style>

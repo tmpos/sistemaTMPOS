@@ -1,0 +1,659 @@
+<script setup>
+import { ref, onMounted, nextTick, watchEffect } from 'vue';
+import { useToast } from "primevue/usetoast";
+import { useRouter, useRoute } from 'vue-router';
+import * as XLSX from "xlsx"; // Import xlsx library
+const router = useRouter();
+const route = useRoute(); 
+import {enviarDatosPorPost,
+  eliminarDatos, 
+  obtenerIdsSeleccionados,
+  borrarTodoslosDatos,
+  lenguajeDataTable,
+  nfecha,
+  arrayToObjetoFromTabla,
+  peticionesFetch,
+  encryptarPassword,
+  envioElectron,
+  enviarSolicitudGet,
+  generarCodigoUnico,
+  peticiones,
+  cajeroACtivo,
+  generarTablaFromStringJSON,
+  mensajetoast,
+  lasMayusculas} from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+import SelectButton from 'primevue/selectbutton';
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const tokenCorto = ref('');
+/************************************************************************/
+const position = "top";
+const visibleAbono = ref(false)
+/************************************************************************/
+const datoscampos = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+const todosLosCuentasxpagar = ref([]);
+/************************************************************************/
+const btn1Abono = ref(null)
+const btn2Abono = ref(null)
+const btn3Abono = ref(null)
+const fechaAbonoModal = ref(null)
+const metodoAbonoModal = ref(null)
+const abonoAbonoModal = ref(0.00)
+/************************************************************************/
+watchEffect(() => {
+  if (visibleAbono.value) {
+    fechaAbonoModal.value = nfecha('fecha')
+    metodoAbonoModal.value = 'EFECTIVO'
+    btn1Abono.value = (Number(datoscampos.value.saldo) / 4).toFixed(2)
+    btn2Abono.value = (Number(datoscampos.value.saldo) / 2).toFixed(2)
+    btn3Abono.value = (Number(datoscampos.value.saldo)).toFixed(2)
+    abonoAbonoModal.value = datoscampos.value.saldo;
+
+  }
+})
+/************************************************************************/
+const fetchAllData = async () => {
+    const response = await enviarSolicitudGet(`${link.value+api.value}/datosarray/cuentasxpagar`,tokenCifrado.value);
+    const jsonData = response;
+    todosLosCuentasxpagar.value = jsonData;
+    datoscampos.value = jsonData.find(datos=>datos.id == route.params.id)
+    datoscampos.value.pagos = datoscampos.value.pagos || '[]'
+};
+/************************************************************************/
+async  function navigate(action) {
+    const currentIndex = todosLosCuentasxpagar.value.findIndex(cuentasxpagar => cuentasxpagar.id == route.params.id);
+    if (currentIndex === -1) return;
+    let newIndex;
+    switch (action) {
+        case 'primero':
+            newIndex = 0;
+            break;
+        case 'anterior':
+            newIndex = currentIndex > 0 ? currentIndex - 1 : 0;
+            break;
+        case 'siguiente':
+            newIndex = currentIndex + 1 < todosLosCuentasxpagar.value.length ? currentIndex + 1 : currentIndex;
+            break;
+        case 'ultimo':
+            newIndex = todosLosCuentasxpagar.value.length - 1;
+            break;
+        default:
+            return;
+    }
+    datoscampos.value = todosLosCuentasxpagar.value[newIndex];
+    datoscampos.value.pagos = datoscampos.value.pagos || '[]'
+    router.push({ path: `/editarcuentasxpagar/${todosLosCuentasxpagar.value[newIndex].id}` });
+}
+/************************************************************************/
+const datosCajero = ref({})
+/************************************************************************/
+onMounted(async() => {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCorto.value = datosJSON.VITE_TOKEN_CORTO;
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+if (!datosEmpresa.empresa.nombre) {
+    await datosEmpresa.inicializarDatosEmpresa(link.value+api.value);
+  }
+await fetchAllData()
+datosCajero.value = await cajeroACtivo(link.value+api.value)
+});
+/************************************************************************/
+async function funcionActualizar(e) {
+  e.preventDefault();
+  const url = link.value+api.value+"/actualizarcampos/cuentasxpagar";
+  if (!datoscampos.value) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+  if (datoscampos.value.hasOwnProperty('created_at')) {
+      datoscampos.value.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await enviarDatosPorPost(url, datoscampos.value,tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+const fnEliminar = async () => {
+  Swal.fire({
+    title: "Introduce la contraseña",
+    input: "password",
+    inputPlaceholder: "Contraseña",
+    showCancelButton: true,
+    confirmButtonText: "Eliminar",
+    cancelButtonText: "Cancelar",
+  }).then(async (result) => {
+    if (result.isConfirmed) {
+      const contrasenaIngresada = result.value;
+      if (
+        contrasenaIngresada === token.value ||
+        contrasenaIngresada === tokenCorto.value
+      ) {
+        const datosFactura = await peticionesFetch(
+          `${link.value}${api.value}`,
+          `borrarporcampo/cuentasxpagar`,
+          { campo: "id", valor: datoscampos.value.id },
+          tokenCifrado.value,
+          "POST",
+        );
+        if (datosFactura[0] == "ok") {
+          toast.add({
+            severity: "success",
+            summary: "Éxito",
+            detail: "Datos eliminados correctamente",
+            life: 3000,
+          });
+          const currentIndex = todosLosCuentasxpagar.value.findIndex(
+            (clientes) => clientes.id == route.params.id,
+          );
+          todosLosCuentasxpagar.value.splice(currentIndex, 1);
+          if (todosLosCuentasxpagar.value.length === 0) {
+            router.push({ path: "/clientes" });
+            return;
+          } else {
+            let newIndex = currentIndex;
+            if (currentIndex >= todosLosCuentasxpagar.value.length) {
+              newIndex = todosLosCuentasxpagar.value.length - 1;
+            }
+            const nextId = todosLosCuentasxpagar.value[newIndex].id;
+            router.push({ path: `/editarCuentasxpagar/${nextId}` });
+            datoscampos.value = todosLosCuentasxpagar.value[newIndex];
+            pagosArray.value = JSON.parse(datoscampos.value.pagos);
+            const datosFact = facturasArray.value.find(
+              (fact) => fact.no_factura == datoscampos.value.no_factura,
+            );
+            if (datosFact) {
+              productosArray.value = JSON.parse(datosFact.productos);
+            }
+          }
+          await fetchAllData();
+        } else {
+          toast.add({
+            severity: "error",
+            summary: "Error",
+            detail: "Error al eliminar los datos",
+            life: 3000,
+          });
+        }
+      } else {
+        toast.add({
+          severity: "error",
+          summary: "Error",
+          detail: "Contraseña incorrecta",
+          life: 3000,
+        });
+      }
+    }
+  });
+};
+/************************************************************************/
+const fnbtnAgregArbono = (cantidad)=>{
+   abonoAbonoModal.value = Number(cantidad).toFixed(2)
+}
+/************************************************************************/
+const fnPagarTodo = async () => {
+  // Check if there is a balance to pay
+  if (Number(datoscampos.value.saldo) <= 0) {
+    toast.add({ severity: 'info', summary: 'Info', detail: 'La cuenta ya está saldada.', life: 3000 });
+    return;
+  }
+
+  // Set new state for the account: saldo to 0 and estado to "SALDADO"
+  const pagosArray = JSON.parse(datoscampos.value.pagos) || [];
+
+  // Create a new payment entry that clears the balance
+  const totalPago = datoscampos.value.saldo;
+  const nuevoPago = {
+    nopago: pagosArray.length + 1,
+    cantidad: totalPago,
+    metodo: "EFECTIVO", // Assuming cash as default; adjust as needed
+    fecha: nfecha("fecha"),
+    hora: nfecha("hora"),
+    turno: datosCajero.value.turno,
+    cajero: datosCajero.value.username,
+    saldo: 0, // New balance after full payment
+  };
+
+  // Update datoscampos values
+  pagosArray.push(nuevoPago);
+  datoscampos.value.pagos = JSON.stringify(pagosArray);
+  datoscampos.value.saldo = 0;
+  datoscampos.value.abono = (Number(datoscampos.value.abono) + Number(totalPago)).toFixed(2);
+  datoscampos.value.estado = "SALDADO";
+
+  // Call the function to update the backend
+  await fnActualizador();
+
+  // Provide feedback to the user
+  toast.add({ severity: 'success', summary: 'Éxito', detail: 'Cuenta saldada completamente.', life: 3000 });
+};
+
+/************************************************************************/
+const fnActualizador = async()=>{
+  const url = link.value+api.value+"/actualizarcampos/cuentasxpagar";
+  if (!datoscampos.value) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+  if (datoscampos.value.hasOwnProperty('created_at')) {
+      datoscampos.value.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await enviarDatosPorPost(url, datoscampos.value,tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+const fnAgregarAbono = async()=>{
+
+    const pagosArray = JSON.parse(datoscampos.value.pagos) || [];
+  const saldoN = (Number(datoscampos.value.saldo) - Number(abonoAbonoModal.value)).toFixed(2)
+
+  var estado = 'PENDIENTE';
+  if (saldoN <= 0) {
+     estado = 'SALDADO';
+  }
+
+
+const totalAbono = pagosArray
+  .map(pago => Number(pago.cantidad))  // Convertir cada cantidad a Number
+  .reduce((acc, current) => acc + current, 0);  // Sumar todas las cantidades
+
+
+  const numeroPago = (pagosArray.length + 1)
+   const npago = {
+    "nopago": numeroPago,
+    "cantidad": abonoAbonoModal.value,
+    "metodo": metodoAbonoModal.value,
+    "fecha": fechaAbonoModal.value,
+    "hora": nfecha('hora'),
+    "turno":datosCajero.value.turno,
+    "cajero":datosCajero.value.username,
+    "saldo": saldoN
+  };
+
+datoscampos.value.saldo = saldoN
+datoscampos.value.abono = (totalAbono + Number(abonoAbonoModal.value)).toFixed(2)
+datoscampos.value.estado = estado
+
+pagosArray.push(npago)
+
+datoscampos.value.pagos = JSON.stringify(pagosArray)
+await fnActualizador()
+visibleAbono.value = false
+
+}
+/************************************************************************/
+const visibleEditar = ref(false)
+const editedIndex = ref(false)
+const selectedData = ref({})
+/************************************************************************/
+const fnEdit = (index) => {
+  visibleEditar.value = true;
+  const pagosArray = JSON.parse(datoscampos.value.pagos);
+  selectedData.value = { ...pagosArray[index] }; 
+  editedIndex.value = index;
+}
+/************************************************************************/
+const fnAgregarAbonoN = async() => {
+  const pagosArray = JSON.parse(datoscampos.value.pagos);
+  pagosArray[editedIndex.value] = { ...selectedData.value };
+  datoscampos.value.pagos = JSON.stringify(pagosArray);
+  visibleEditar.value = false;
+  await fnActualizador()
+}
+
+/************************************************************************/
+
+
+const fnDel = async (index) => {
+  const pagosArray = JSON.parse(datoscampos.value.pagos);
+
+  Swal.fire({
+    title: 'Introduce la contraseña',
+    input: 'password',
+    inputPlaceholder: 'Contraseña',
+    showCancelButton: true,
+    confirmButtonText: 'Eliminar',
+    cancelButtonText: 'Cancelar'
+  }).then(async (result) => {
+    if (result.isConfirmed) {
+      const contrasenaIngresada = result.value;
+
+      if (contrasenaIngresada === token.value || contrasenaIngresada === tokenCorto.value) {
+        // Remove the payment at the specified index
+        const updatedPagosArray = pagosArray.filter((_, i) => i !== index);
+        datoscampos.value.pagos = JSON.stringify(updatedPagosArray);
+
+        // Recalculate abono and saldo
+        const totalAbono = updatedPagosArray.reduce((acc, pago) => acc + Number(pago.cantidad), 0);
+        const newSaldo = (Number(datoscampos.value.total) - totalAbono).toFixed(2);
+
+        // Update datoscampos with new abono and saldo
+        datoscampos.value.abono = totalAbono.toFixed(2);
+        datoscampos.value.saldo = newSaldo;
+
+        // Update estado based on new saldo
+        datoscampos.value.estado = newSaldo > 0 ? "PENDIENTE" : "SALDADO";
+
+        // Update backend with recalculated values
+        await fnActualizador();
+
+        // Show success message
+        toast.add({ severity: 'success', summary: 'Éxito', detail: 'Pago eliminado y datos recalculados correctamente.', life: 3000 });
+      } else {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+      }
+    }
+  });
+};
+
+
+/************************************************************************/
+const fnGenerarExcel = async () => {
+  // Parse pagos field (string to array of objects)
+  let pagosArray = [];
+  try {
+    pagosArray = JSON.parse(datoscampos.value.pagos);
+  } catch (error) {
+    console.error("Error parsing pagos:", error);
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to parse payments.', life: 3000 });
+    return;
+  }
+
+  // Create cuentasxpagar details data
+  const cuentaData = [
+    { label: "ID", value: datoscampos.value.id },
+    { label: "No Emisión", value: datoscampos.value.no_emision },
+    { label: "No Factura", value: datoscampos.value.no_factura },
+    { label: "Fecha", value: datoscampos.value.fecha },
+    { label: "Hora", value: datoscampos.value.hora },
+    { label: "NCF", value: datoscampos.value.ncf },
+    { label: "RNC", value: datoscampos.value.rnc },
+    { label: "Proveedor", value: datoscampos.value.proveedor },
+    { label: "Estado", value: datoscampos.value.estado },
+    { label: "Fecha de Pago", value: datoscampos.value.fecha_pago },
+    { label: "Hora de Pago", value: datoscampos.value.hora_pago },
+    { label: "Subtotal", value: datoscampos.value.subtotal },
+    { label: "Impuestos", value: datoscampos.value.impuestos },
+    { label: "Total", value: datoscampos.value.total },
+    { label: "Saldo", value: datoscampos.value.saldo },
+    { label: "Abono", value: datoscampos.value.abono },
+    { label: "Nota", value: datoscampos.value.nota },
+  ];
+
+  // Prepare data for worksheet format
+  const worksheetData = [
+    ["Detalle de Cuenta por Pagar"], // Title row
+    ...cuentaData.map((item) => [item.label, item.value]), // Cuentasxpagar details
+    [],
+    ["Pagos Realizados"], // Title for payments section
+    ["No Pago", "Cantidad", "Metodo", "Fecha", "Hora", "Turno", "Cajero", "Saldo"], // Headers for payments
+    ...pagosArray.map((pago) => [
+      pago.nopago,
+      pago.cantidad,
+      pago.metodo,
+      pago.fecha,
+      pago.hora,
+      pago.turno,
+      pago.cajero,
+      pago.saldo,
+    ]),
+  ];
+
+  // Create the worksheet
+  const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+
+  // Add merges for headers
+  const merges = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }, // Merge 'Detalle de Cuenta por Pagar' title
+    { s: { r: cuentaData.length + 2, c: 0 }, e: { r: cuentaData.length + 2, c: 7 } }, // Merge 'Pagos Realizados' title
+  ];
+  worksheet["!merges"] = merges;
+
+  // Add worksheet to a new workbook
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Cuenta por Pagar");
+
+  // Export to Excel file
+  XLSX.writeFile(workbook, `Cuenta_Por_Pagar_${datoscampos.value.id}.xlsx`);
+};
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="container-fluid mt-5">
+        <fieldset class="border p-3 round mb-2">
+          <legend class="float-none w-auto px-2">Datos de Cuentasxpagar</legend>
+    <div class="row">
+      <div class="col-sm-12">
+<Button as="router-link"  to="/cuentasxpagar" icon="pi pi-home" raised round severity="primary" aria-label="Agregar Nuevo" class="" />
+<Button as="router-link"  to="/crearcuentasxpagar" icon="pi pi-plus" raised round severity="primary" aria-label="Agregar Nuevo" class="ml-2" />
+<Button icon="pi pi-trash" label="Borrar" raised round severity="primary" aria-label="Borrar" class="ml-2" />
+<Button icon="pi pi-step-backward" raised round severity="primary" aria-label="Primero" class="ml-2" @click="navigate('primero')" />
+<Button icon="pi pi-backward"  raised round severity="primary" aria-label="Anterior" class="ml-2" @click="navigate('anterior')" />
+<Button icon="pi pi-forward"  raised round severity="primary" aria-label="Anterior" class="ml-2" @click="navigate('siguiente')" />
+<Button icon="pi pi-step-forward"  raised round severity="primary" aria-label="Anterior" class="ml-2" @click="navigate('ultimo')" />
+<Button label="Abono" icon="pi pi-money-bill"  raised round severity="primary" aria-label="Anterior" class="ml-2" @click="visibleAbono = true" />
+<Button label="Pagar Todo" icon="pi pi-money-bill"  raised round severity="primary" aria-label="Anterior" class="ml-2" @click="fnPagarTodo" />
+<Button label="Excel" icon="pi pi-file-excel"  raised round severity="primary" aria-label="Anterior" class="ml-2" @click="fnGenerarExcel" />
+
+      </div>
+    </div>
+</fieldset>
+<section>
+<fieldset class="border p-3 round mb-2">
+  <legend class="float-none w-auto px-2">Campos</legend>
+    <form id="formularioActualizar" action="" method="">
+         <div class="box-body">
+          <div class="row" id="campos">
+<div class="form-group col-12" hidden>
+<label for="id-Actualizador">ID</label>
+<input type="input" v-model="datoscampos.id" name="id"  class="form-control" id="id-Actualizador" readonly placeholder="id"  maxlength="11">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="no_emision-Actualizador">NO_EMISION</label>
+<input type="input" v-model="datoscampos.no_emision" name="no_emision"  class="form-control" id="no_emision-Actualizador" readonly placeholder="no_emision"  maxlength="250" >
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="no_factura-Actualizador">NO_FACTURA</label>
+<input type="input" v-model="datoscampos.no_factura" name="no_factura"  class="form-control" id="no_factura-Actualizador"  placeholder="no_factura"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="fecha-Actualizador">FECHA</label>
+<input type="input" v-model="datoscampos.fecha" name="fecha"  class="form-control" id="fecha-Actualizador"  placeholder="fecha"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="hora-Actualizador">HORA</label>
+<input type="input" v-model="datoscampos.hora" name="hora"  class="form-control" id="hora-Actualizador"  placeholder="hora"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="ncf-Actualizador">NCF</label>
+<input type="input" v-model="datoscampos.ncf" name="ncf"  class="form-control" id="ncf-Actualizador"  placeholder="ncf"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="rnc-Actualizador">RNC</label>
+<input type="input" v-model="datoscampos.rnc" name="rnc"  class="form-control" id="rnc-Actualizador"  placeholder="rnc"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="proveedor-Actualizador">PROVEEDOR</label>
+<input type="input" v-model="datoscampos.proveedor" name="proveedor"  class="form-control" id="proveedor-Actualizador" v-mayuscula placeholder="proveedor"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="productos-Actualizador">PRODUCTOS</label>
+
+<div class="table-responsive">
+  <div v-html="generarTablaFromStringJSON(datoscampos.productos)" class="border p-3 rounded mb-2"></div>
+</div>
+
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="estado-Actualizador">ESTADO</label>
+<br>
+<SelectButton v-model="datoscampos.estado" @change="verificaImpuestos" :options="['PENDIENTE','PAGADO','OTRO']" aria-labelledby="basic" :allowEmpty="false" />
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="fecha_pago-Actualizador">FECHA_PAGO</label>
+<input type="input" v-model="datoscampos.fecha_pago" name="fecha_pago"  class="form-control" id="fecha_pago-Actualizador" v-datepicker placeholder="fecha_pago"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="hora_pago-Actualizador">HORA_PAGO</label>
+<input type="input" v-model="datoscampos.hora_pago" name="hora_pago"  class="form-control" id="hora_pago-Actualizador"  placeholder="hora_pago"  maxlength="250" >
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="subtotal-Actualizador">SUBTOTAL</label>
+<input type="input" v-model="datoscampos.subtotal" name="subtotal"  class="form-control" id="subtotal-Actualizador"  placeholder="subtotal" v-solonumeros maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="impuestos-Actualizador">IMPUESTOS</label>
+<input type="input" v-model="datoscampos.impuestos" name="impuestos"  class="form-control" id="impuestos-Actualizador"  placeholder="impuestos" v-solonumeros maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="total-Actualizador">TOTAL</label>
+<input type="input" v-model="datoscampos.total" name="total"  class="form-control" id="total-Actualizador"  placeholder="total" v-solonumeros maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="saldo-Actualizador">SALDO</label>
+<input type="input" v-model="datoscampos.saldo" name="saldo"  class="form-control" id="saldo-Actualizador"  placeholder="saldo" v-solonumeros maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="abono-Actualizador">ABONO</label>
+<input type="input" v-model="datoscampos.abono" name="abono"  class="form-control" id="abono-Actualizador"  placeholder="abono" v-solonumeros maxlength="250" readonly>
+</div>
+
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="nota-Actualizador">PAGOS REALIZADOS</label>
+<div class="table-responsive">
+  <div v-html="generarTablaFromStringJSON(datoscampos.pagos,true,fnEdit,fnDel)" class="border p-3 rounded mb-2"></div>
+</div>
+</div>
+
+
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="nota-Actualizador">NOTA</label>
+<textarea class="form-control " id="nota-Actualizador" name="nota" v-model="datoscampos.nota" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-6" hidden>
+<label for="created_at-Actualizador">CREATED_AT</label>
+<input type="input" v-model="datoscampos.created_at" name="created_at"  class="form-control" id="created_at-Actualizador"  placeholder="created_at"  maxlength="">
+</div>
+<div class="form-group col-6" hidden>
+<label for="updated_at-Actualizador">UPDATED_AT</label>
+<input type="input" v-model="datoscampos.updated_at" name="updated_at"  class="form-control" id="updated_at-Actualizador"  placeholder="updated_at"  maxlength="">
+</div>
+<div class="form-group col-12" hidden>
+<label for="usuario-Actualizador">USUARIO</label>
+<input type="input" v-model="datoscampos.usuario" name="usuario"  class="form-control" id="usuario-Actualizador"  placeholder="usuario"  maxlength="250">
+</div>
+<div class="form-group col-sm-12 mb-5 mt-5">
+<Button icon="pi pi-check" label="Actualizar"  raised round severity="primary" aria-label="Actualizar" class="w-100 " @click="funcionActualizar" />
+  </div>
+  </div>
+  </div>
+   </form>
+</fieldset>
+</section>
+  </div>
+   </main>
+
+<Dialog v-model:visible="visibleAbono" modal :position="position" header="Modal de Abono" :style="{ width: '40rem' }">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">Modal de Abono</span>
+    </div>
+  </template>
+
+      <fieldset class="border p-3 rounded mb-2">
+        <legend class="float-none w-auto px-2">{{clienteSeleccionadoModal}}</legend>
+          <div class="row">
+                <div class="col-12">
+                  <Button :label="btn1Abono" outlined severity="secondary" @click="fnbtnAgregArbono(btn1Abono)"  />
+                  <Button :label="btn2Abono" outlined severity="secondary" @click="fnbtnAgregArbono(btn2Abono)"  />
+                  <Button :label="btn3Abono" outlined severity="secondary" @click="fnbtnAgregArbono(btn3Abono)"  />
+                </div>
+
+                  <div class="col-4 form-group">
+                    <label for="fechaabono">FECHA</label>
+                    <input type="text" name="fechaabono" v-datepicker v-model="fechaAbonoModal"  class="form-control datepicker " id="fechaabono"   >
+                  </div>
+
+
+
+                  <div class="col-4 form-group">
+                    <label for="abono">ABONO</label>
+                    <input type="text" name="abono" v-model="abonoAbonoModal" v-solonumeros v-numeroFocusinOut v-decimales  class="form-control decimales soloNumero" id="abono"  value="0.00" >
+                  </div>
+
+                  <div class="col-4 form-group">
+                    <label for="metodoabono">METODO</label>
+                  <select name="metodoabono" v-model="metodoAbonoModal"  class="form-control " id="metodoabono">
+                    <option value="EFECTIVO" selected>EFECTIVO</option>
+                    <option value="TRANSFERENCIA">TRANSFERENCIA</option>
+                  </select>
+
+                  </div>
+          </div>
+      </fieldset>
+
+  <template #footer>
+    <Button label="Agregar Abono" outlined severity="secondary" @click="fnAgregarAbono"  />
+    <Button label="Cancel" outlined severity="secondary" @click="visibleAbono = false" autofocus />
+  </template>
+</Dialog>
+
+
+<Dialog v-model:visible="visibleEditar" modal :position="position" header="Modal de Abono" :style="{ width: '40rem' }">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">Modal de Abono</span>
+    </div>
+  </template>
+
+      <fieldset class="border p-3 rounded mb-2">
+        <legend class="float-none w-auto px-2">Editar Abono</legend>
+          <div class="row">
+                <div class="col-12" v-for="(value, key) in selectedData" :key="key">
+                 <input
+                   type="text"
+                  :name="key"
+                  class="form-control campoactualizar"
+                  :id="key + '-Actualizador'"
+                  v-model="selectedData[key]"
+                />
+                </div>
+          </div>
+      </fieldset>
+
+  <template #footer>
+    <Button label="Agregar Abono" outlined severity="secondary" @click="fnAgregarAbonoN"  />
+    <Button label="Cancel" outlined severity="secondary" @click="visibleEditar = false" autofocus />
+  </template>
+</Dialog>
+
+
+<Toast />
+</template>
+<style>
+</style>

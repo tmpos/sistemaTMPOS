@@ -1,0 +1,384 @@
+<script setup>
+import { ref, onMounted, nextTick, watchEffect,watch } from 'vue';
+import { useToast } from "primevue/usetoast";
+import { useRouter, useRoute } from 'vue-router';
+const router = useRouter();
+const route = useRoute(); 
+import {enviarDatosPorPost,
+  eliminarDatos, 
+  obtenerIdsSeleccionados,
+  borrarTodoslosDatos,
+  lenguajeDataTable,
+  nfecha,
+  arrayToObjetoFromTabla,
+  peticionesFetch,
+  encryptarPassword,
+  envioElectron,
+  generarCodigoUnico,
+  peticiones,
+  enviarDatosLocalStorage,
+  mensajetoast,
+  lasMayusculas} from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+import SelectButton from 'primevue/selectbutton';
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const tokenCorto = ref('');
+const cuentasBanco = ref([]);
+const cuentaLocal = ref('');
+const transaccionesArray = ref([]);
+const ultimaTransaccion = ref({});
+/************************************************************************/
+const datoscamposTransaccionesbancarias = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+const position = "top";
+/************************************************************************/
+const fetchAndSetupData = async () => {
+    const jsonData = await arrayToObjetoFromTabla(link.value+api.value,tokenCifrado.value,'transaccionesbancarias');
+    datoscamposTransaccionesbancarias.value = jsonData;
+    datoscamposTransaccionesbancarias.value.tipo = 'DEPOSITO'
+    datoscamposTransaccionesbancarias.value.fecha = nfecha('fecha')
+    datoscamposTransaccionesbancarias.value.hora = nfecha('hora')
+    datoscamposTransaccionesbancarias.value.estado = 'COMPLETADA'
+    datoscamposTransaccionesbancarias.value.cuenta_origen = 'DEPOSITO'
+    datoscamposTransaccionesbancarias.value.cuenta_destino = cuentasBanco.value[0].cuenta
+    datoscamposTransaccionesbancarias.value.monto = '0.00'
+    datoscamposTransaccionesbancarias.value.metodo = 'EFECTIVO'
+    datoscamposTransaccionesbancarias.value.balance_anterior = parseFloat(ultimaTransaccion.value).toFixed(2)
+    datoscamposTransaccionesbancarias.value.descripcion = 'DEPOSITO'
+};
+/************************************************************************/
+const fetchCuentas = async () => {
+const response = await peticionesFetch(`${link.value}${api.value}`, `datosarray/banco`, {}, tokenCifrado.value, 'GET');
+    const jsonData = response;
+    cuentasBanco.value = jsonData;
+    cuentaLocal.value = jsonData[0].cuenta
+};
+/************************************************************************/
+const fetchTransacciones = async () => {
+    try {
+        const response = await peticionesFetch(
+            `${link.value}${api.value}`, 
+            `datosarray/transaccionesbancarias`, 
+            {}, 
+            tokenCifrado.value, 
+            'GET'
+        );
+
+        const jsonData = response;
+
+        // Check if jsonData is an array and has elements
+        if (Array.isArray(jsonData) && jsonData.length > 0) {
+            transaccionesArray.value = jsonData;
+            ultimaTransaccion.value = jsonData[jsonData.length - 1].balance_actual || 0;
+        } else {
+            transaccionesArray.value = [];
+            ultimaTransaccion.value = 0; // Handle the case where jsonData is empty
+        }
+    } catch (error) {
+        console.error('Error fetching transactions:', error);
+        transaccionesArray.value = [];
+        ultimaTransaccion.value = 0; // Handle the error case
+    }
+};
+
+/************************************************************************/
+const usuarioLocal = ref({})
+/************************************************************************/
+onMounted(async() => {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+if (!datosEmpresa.empresa.nombre) {
+    await datosEmpresa.inicializarDatosEmpresa(link.value+api.value);
+  }
+usuarioLocal.value = JSON.parse(window.localStorage.getItem('usuarioLocal'))[0] || {}
+
+await fetchCuentas()
+await fetchTransacciones()
+await fetchAndSetupData()
+    datoscamposTransaccionesbancarias.value.beneficiario = datosEmpresa.empresa.nombre
+    datoscamposTransaccionesbancarias.value.depositante = usuarioLocal.value.nombre
+});
+/************************************************************************/
+watch(() => datoscamposTransaccionesbancarias.value.monto, (newMonto) => {
+   // const balanceAnterior = parseFloat(ultimaTransaccion.value) || 0;
+    const balanceAnterior = parseFloat(datoscamposTransaccionesbancarias.value.balance_anterior) || 0;
+    const monto = parseFloat(newMonto) || 0;
+
+    if (datoscamposTransaccionesbancarias.value.tipo === 'RETIRO') {
+        datoscamposTransaccionesbancarias.value.balance_actual = (balanceAnterior - monto).toFixed(2);
+    } else {
+        datoscamposTransaccionesbancarias.value.balance_actual = (balanceAnterior + monto).toFixed(2);
+    }
+});
+
+/************************************************************************/
+async function enviarDatos(event) {
+    event.preventDefault();
+  const url = link.value+api.value+"/insertar/transaccionesbancarias";
+  if (!datoscamposTransaccionesbancarias.value) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Datos incompletos, no se puede Enviar.', life: 3000 });
+    return;
+  }
+  if (datoscamposTransaccionesbancarias.value.hasOwnProperty('created_at')) {
+     datoscamposTransaccionesbancarias.value.created_at = nfecha('timestamp')
+     datoscamposTransaccionesbancarias.value.updated_at = nfecha('timestamp')
+    }
+
+const datosBanco = cuentasBanco.value.find(cuenta=>cuenta.cuenta === cuentaLocal.value);
+
+
+  const envioDatos = await enviarDatosPorPost(url, datoscamposTransaccionesbancarias.value,tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Agregados con éxito.', life: 3000 });
+
+
+ const datos = {
+    datos:datoscamposTransaccionesbancarias.value
+ }
+
+
+ const datosEmpresa = JSON.stringify(enviarDatosLocalStorage() )
+ window.electron.ipcRenderer.invoke('recibotransferencia',JSON.stringify(datos),datosEmpresa);
+
+
+  const urlBanco = link.value+api.value+"/actualizarcampos/banco";
+  if (!datosBanco) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+  if (datosBanco.hasOwnProperty('created_at')) {
+    datosBanco.updated_at = nfecha('timestamp');
+
+    datosBanco.saldo = datoscamposTransaccionesbancarias.value.balance_actual
+  }
+  const envioDatosBanco = await enviarDatosPorPost(urlBanco, datosBanco, tokenCifrado.value);
+
+await fetchCuentas()
+await fetchTransacciones()
+await fetchAndSetupData()
+
+Swal.fire({
+  title: "Datos Agregados",
+  text: "Que hacemos ahora?",
+  icon: "warning",
+  showCancelButton: true,
+  confirmButtonText: "Agregar Otro!",
+  cancelButtonText: "No, Regresar al Inicio!",
+ }).then(async(result) => {
+  if (result.isConfirmed) {
+      fetchAndSetupData()
+} else if (result.dismiss === Swal.DismissReason.cancel) {
+    router.push({ path: `/transaccionesbancarias` });
+  }
+})
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+const options = ref(['DEPOSITO',
+'RETIRO',
+'TRANSFERENCIA',
+'OTRO']);
+/************************************************************************/
+const fnTipoTransaccion = ()=>{
+  if (datoscamposTransaccionesbancarias.value.tipo === 'DEPOSITO') {
+    datoscamposTransaccionesbancarias.value.metodo = 'EFECTIVO'
+    datoscamposTransaccionesbancarias.value.cuenta_origen = 'DEPOSITO'
+    datoscamposTransaccionesbancarias.value.depositante = usuarioLocal.value.usuario
+    datoscamposTransaccionesbancarias.value.beneficiario = datosEmpresa.empresa.nombre
+    datoscamposTransaccionesbancarias.value.cuenta_destino = cuentaLocal.value
+    datoscamposTransaccionesbancarias.value.descripcion = 'DEPOSITO'
+
+    const balanceAnterior = parseFloat(datoscamposTransaccionesbancarias.value.balance_anterior) || 0;
+    const monto = parseFloat(datoscamposTransaccionesbancarias.value.monto) || 0;
+        datoscamposTransaccionesbancarias.value.balance_actual = (balanceAnterior + monto).toFixed(2);
+
+  }else if(datoscamposTransaccionesbancarias.value.tipo === 'TRANSFERENCIA'){
+    datoscamposTransaccionesbancarias.value.metodo = 'TRANSFERENCIA'
+    datoscamposTransaccionesbancarias.value.cuenta_origen = cuentaLocal.value
+    datoscamposTransaccionesbancarias.value.cuenta_destino = 'CUENTA DESTINO'
+    datoscamposTransaccionesbancarias.value.descripcion = 'TRANSFERENCIA'
+    const balanceAnterior = parseFloat(datoscamposTransaccionesbancarias.value.balance_anterior) || 0;
+    const monto = parseFloat(datoscamposTransaccionesbancarias.value.monto) || 0;
+        datoscamposTransaccionesbancarias.value.balance_actual = (balanceAnterior + monto).toFixed(2);
+  
+
+  }else if(datoscamposTransaccionesbancarias.value.tipo === 'RETIRO'){
+    datoscamposTransaccionesbancarias.value.metodo = 'TRANSFERENCIA'
+    datoscamposTransaccionesbancarias.value.cuenta_origen = cuentaLocal.value
+    datoscamposTransaccionesbancarias.value.cuenta_destino = 'CUENTA DESTINO'
+    datoscamposTransaccionesbancarias.value.depositante = datosEmpresa.empresa.nombre
+    datoscamposTransaccionesbancarias.value.beneficiario = 'BENEFICIARIO'
+    datoscamposTransaccionesbancarias.value.descripcion = 'RETIRO'
+    const balanceAnterior = parseFloat(datoscamposTransaccionesbancarias.value.balance_anterior) || 0;
+    const monto = parseFloat(datoscamposTransaccionesbancarias.value.monto) || 0;
+        datoscamposTransaccionesbancarias.value.balance_actual = (balanceAnterior - monto).toFixed(2);
+  }
+
+
+}
+/************************************************************************/
+const fnRouter = (ruta) => {
+  router.push(ruta);
+};
+/************************************************************************/
+const fnCambiarBanco = ()=>{
+
+const datosBanco = cuentasBanco.value.find(cuenta=>cuenta.cuenta === cuentaLocal.value);
+
+  if(datoscamposTransaccionesbancarias.value.tipo === 'RETIRO'){
+  datoscamposTransaccionesbancarias.value.cuenta_origen = datosBanco.cuenta
+  datoscamposTransaccionesbancarias.value.balance_anterior = datosBanco.saldo
+  datoscamposTransaccionesbancarias.value.balance_actual= datosBanco.saldo
+  datoscamposTransaccionesbancarias.value.cuenta_destino = 'DESTINO'
+
+  }else{
+  datoscamposTransaccionesbancarias.value.cuenta_origen = 'ORIGEN'
+  datoscamposTransaccionesbancarias.value.cuenta_destino = datosBanco.cuenta
+  datoscamposTransaccionesbancarias.value.balance_anterior = datosBanco.saldo
+  datoscamposTransaccionesbancarias.value.balance_actual= datosBanco.saldo
+
+  }
+}
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper card">
+  <div class="container-fluid mt-5">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Transacciones Bancarias</legend>
+    <div class="row">
+      <div class="col-sm-12">
+       <router-link to="/transaccionesbancarias" class="btn btn-dark text-white "><i class="icon-home"></i></router-link>
+       <router-link to="/banco" class="btn btn-primary text-white ml-2 "><i class="icon-warehouse"></i> BANCO</router-link>
+
+
+    </div>
+
+<div class="col-12 col-md-4">
+  <label for="cuenta_local">TIPO DE TRANSACCION</label>
+        <SelectButton v-model="datoscamposTransaccionesbancarias.tipo" @change="fnTipoTransaccion" :options="options" aria-labelledby="basic" :allowEmpty="false"  />
+</div>
+
+<div class="col-12 col-md-4">
+  <label for="cuenta_local">CUENTA LOCAL</label>
+<select name="cuenta_local" v-model="cuentaLocal" @change="fnCambiarBanco" id="cuenta_local" class="form-control">
+  <option :value="cuenta.cuenta" v-for="cuenta in cuentasBanco">{{cuenta.nombre}}</option>
+</select>
+</div>
+
+
+    </div>
+</fieldset>
+<section>
+<fieldset class="border p-3 rounded mb-2">
+  <legend class="float-none w-auto px-2">Campos</legend>
+    <form id="formularioActualizar" action="" method="">
+         <div class="box-body">
+          <div class="row" id="campos">
+<div class="form-group col-12 col-sm-6 col-md-5" >
+<label for="cuentaAgregarDatos">CUENTA ORIGEN</label>
+<input type="input" v-model="datoscamposTransaccionesbancarias.cuenta_origen" name="cuenta"  class="form-control soloNumero" id="cuentaorigenAgregarDatos" v-solonumeros placeholder="cuenta Origen" maxlength="250">
+</div>
+
+<div class="form-group col-12 col-sm-6 col-md-5" >
+<label for="cuentaAgregarDatos">CUENTA DESTINO</label>
+<input type="input" v-model="datoscamposTransaccionesbancarias.cuenta_destino" name="cuenta"  class="form-control soloNumero" id="cuentaDestinoAgregarDatos" v-solonumeros placeholder="cuenta Destino" maxlength="250">
+</div>
+
+<div class="form-group col-12 col-sm-3 col-md-2" >
+<label for="montoAgregarDatos">MONTO</label>
+<input type="input" v-model="datoscamposTransaccionesbancarias.monto" name="monto"  class="form-control soloNumero" id="montoAgregarDatos" v-solonumeros v-numeroFocusinOut v-decimales placeholder="monto" maxlength="250">
+</div>
+
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="balance_anteriorAgregarDatos">BALANCE_ANTERIOR</label>
+<input type="input" v-model="datoscamposTransaccionesbancarias.balance_anterior" name="balance_anterior"  class="form-control soloNumero" id="balance_anteriorAgregarDatos" v-solonumeros placeholder="balance_anterior" maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="balance_actualAgregarDatos">BALANCE_ACTUAL</label>
+<input type="input" v-model="datoscamposTransaccionesbancarias.balance_actual" name="balance_actual"  class="form-control soloNumero" id="balance_actualAgregarDatos" v-solonumeros placeholder="balance_actual" maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="metodoAgregarDatos">METODO</label>
+<select class="form-control " v-model="datoscamposTransaccionesbancarias.metodo" id="metodoAgregarDatos" name="metodo" >
+  <option value="TRANSFERENCIA">TRANSFERENCIA</option>
+<option value="EFECTIVO">EFECTIVO</option>
+<option value="CHEQUE">CHEQUE</option>
+<option value="OTRO">OTRO</option>
+</select></div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="descripcionAgregarDatos">DESCRIPCION</label>
+<textarea class="form-control " v-model="datoscamposTransaccionesbancarias.descripcion" id="descripcionAgregarDatos" name="descripcion" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-12 col-sm-12 col-md-6" >
+<label for="personaAgregarDatos">PERSONA DEPOSITANTE</label>
+<input type="input" v-model="datoscamposTransaccionesbancarias.depositante" name="persona"  class="form-control mayusc" id="personaAgregarDatos" v-mayuscula placeholder="DEPOSITANTE" maxlength="250">
+</div>
+
+<div class="form-group col-12 col-sm-12 col-md-6" >
+<label for="personaAgregarDatos">PERSONA BENEFICIARIO</label>
+<input type="input" v-model="datoscamposTransaccionesbancarias.beneficiario" name="beneficiario"  class="form-control mayusc" id="personabeneficiarioAgregarDatos" v-mayuscula placeholder="BENEFICIARIO" maxlength="250">
+</div>
+
+
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="fechaAgregarDatos">FECHA</label>
+<input type="input" v-model="datoscamposTransaccionesbancarias.fecha" name="fecha"  class="form-control " id="fechaAgregarDatos" v-datepicker placeholder="fecha" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="horaAgregarDatos">HORA</label>
+<input type="input" v-model="datoscamposTransaccionesbancarias.hora" name="hora"  class="form-control " id="horaAgregarDatos"  placeholder="hora" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="estadoAgregarDatos">ESTADO</label>
+<select class="form-control " v-model="datoscamposTransaccionesbancarias.estado" id="estadoAgregarDatos" name="estado" >
+  <option value="COMPLETADA">COMPLETADA</option>
+<option value="PENDIENTE">PENDIENTE</option>
+<option value="FALLIDA">FALLIDA</option>
+<option value="OTRO">OTRO</option>
+</select></div>
+<div class="form-group col-6" hidden>
+<label for="created_atAgregarDatos">CREATED_AT</label>
+<input type="input" v-model="datoscamposTransaccionesbancarias.created_at" name="created_at"  class="form-control " id="created_atAgregarDatos"  placeholder="created_at" maxlength="">
+</div>
+<div class="form-group col-6" hidden>
+<label for="updated_atAgregarDatos">UPDATED_AT</label>
+<input type="input" v-model="datoscamposTransaccionesbancarias.updated_at" name="updated_at"  class="form-control " id="updated_atAgregarDatos"  placeholder="updated_at" maxlength="">
+</div>
+<div class="form-group col-12" hidden>
+<label for="usuarioAgregarDatos">USUARIO</label>
+<input type="input" v-model="datoscamposTransaccionesbancarias.usuario" name="usuario"  class="form-control " id="usuarioAgregarDatos"  placeholder="usuario" maxlength="250">
+</div>
+<div class="form-group col-sm-12 mb-5 mt-5">
+<button type="submit" @click="enviarDatos" class="btn btn-primary elboton w-100">Enviar Datos</button>
+  </div>
+  </div>
+  </div>
+   </form>
+   </fieldset>
+</section>
+  </div>
+   </main>
+<Toast />
+</template>
+<style>
+</style>

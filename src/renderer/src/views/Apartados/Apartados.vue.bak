@@ -1,0 +1,554 @@
+
+<script setup>
+import { ref, onMounted, nextTick, watchEffect,computed } from 'vue';
+import axios from 'axios';
+import { enviarDatosPorPost, eliminarDatos, obtenerIdsSeleccionados, borrarTodoslosDatos, lenguajeDataTable, nfecha, arrayToObjetoFromTabla, peticionesFetch, encryptarPassword, envioElectron, mensajetoast, crearTablaSiNoExiste, peticiones, lasMayusculas } from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+import { useToast } from "primevue/usetoast";
+const toast = useToast();
+import { useRouter, useRoute } from 'vue-router';
+const router = useRouter();
+/************************************************************************/
+import jsPDF from 'jspdf';
+/************************************************************************/
+const usuarioLocal = ref({})
+/************************************************************************/
+const camposArray = ['no_emision', 'no_factura', 'cod_cliente', 'nombre_cliente', 'cedula_cliente', 'telefono_cliente', 'whatsapp_cliente', 'email_cliente', 'direccion_cliente', 'productos', 'fecha_emision', 'hora', 'fecha_vencimiento', 'monto_credito', 'cuotas', 'tiempo', 'fecha_ultimo_pago', 'proxima_fecha_pago', 'abonado', 'saldo', 'estatus', 'vendedor', 'pagos', 'nota'];
+/************************************************************************/
+import { useDatosEmpresa } from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const tokenCorto = ref('');
+/************************************************************************/
+const selectedItems = ref([]);
+/************************************************************************/
+const position = ref('top');
+const openPosition = (pos) => {
+    position.value = pos;
+    visible.value = true;
+}
+/************************************************************************/
+const datoscamposApartados = ref({})
+/************************************************************************/
+const visible = ref(false);
+const visiblecrear = ref(false);
+const value = ref(null);
+const id = ref(null);
+const datoscampos = ref({});
+const data = ref([]);
+const searchQuery = ref('');
+const ApartadosEditar = ref(null);
+/************************************************************************/
+async function limpiarCamposCrear() {
+datoscamposApartados.value = {}
+await campos();
+}
+/************************************************************************/
+const visibleAbonoModal = ref(false)
+const btn1Abono = ref('0.00')
+const btn2Abono = ref('0.00')
+const btn3Abono = ref('0.00')
+const fechaAbonoModal = ref('')
+const abonoAbonoModal = ref('0.00')
+const metodoAbonoModal = ref('EFECTIVO')
+/************************************************************************/
+watchEffect(() => {
+  if (visiblecrear.value) {
+  }
+});
+/************************************************************************/
+const fetchAndSetupData = async () => {
+const response = await peticionesFetch(`${link.value}${api.value}`, `datosarray/apartados`, {}, tokenCifrado.value, 'GET');
+    const jsonData = response.reverse();
+    data.value = jsonData;
+};
+/************************************************************************/
+async function campos() {
+  const campos = await arrayToObjetoFromTabla(link.value+api.value, tokenCifrado.value, 'apartados', true,camposArray,'usuario');
+  datoscamposApartados.value = campos;
+}
+/************************************************************************/
+onMounted(async () => {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCorto.value = datosJSON.VITE_TOKEN_CORTO;
+
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+await crearTablaSiNoExiste(link.value, api.value, 'apartados', camposArray, tokenCifrado.value);
+usuarioLocal.value = JSON.parse(window.localStorage.getItem('usuarioLocal'))[0] || {};
+await campos();
+await fetchAndSetupData();
+});
+/************************************************************************/
+  async function borrarTodo() {
+    Swal.fire({
+        title: "¿Estás seguro?",
+        text: "¡Se borrarán los datos!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, de acuerdo",
+        cancelButtonText: "No, cancelar"
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            const { value: password } = await Swal.fire({
+                title: 'Introduce la contraseña',
+                input: 'password',
+                inputPlaceholder: 'Contraseña',
+                showCancelButton: true,
+                confirmButtonText: 'Confirmar',
+                cancelButtonText: 'Cancelar'
+            });
+            if (password) {
+               if (password === token.value || password === tokenCorto.value) {
+                    const envioDatos = await borrarTodoslosDatos(link.value + api.value + '/borrartodo', 'apartados', tokenCifrado.value);
+                    if (envioDatos[0] == 'ok') {
+                        fetchAndSetupData();
+                        toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos borrados', life: 3000 });
+                    } else {
+                        toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al borrar datos.', life: 3000 });
+                   }
+                } else {
+                    toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+                }
+            }
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+            toast.add({ severity: 'success', summary: 'No te preocupes', detail: 'Datos seguros', life: 3000 });
+        }
+    });
+}
+/************************************************************************/
+async function borrarSeleccionados() {
+  const ids = obtenerIdsSeleccionados(selectedItems.value);
+    Swal.fire({
+        title: "¿Estas Seguro?",
+        text: "Se Borraran los Datos!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, de acuerdo!",
+        cancelButtonText: "No, cancelar!",
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            const { value: password } = await Swal.fire({
+                title: 'Introduce la contraseña',
+                input: 'password',
+                inputPlaceholder: 'Contraseña',
+                showCancelButton: true,
+                confirmButtonText: 'Confirmar',
+                cancelButtonText: 'Cancelar'
+            });
+            if (password) {
+                if (password === token.value || password === tokenCorto.value) {
+                    let exitoTotal = true;
+                    if (ids.length > 0) {
+                        for (const id of ids) {
+                            try {
+                                const envioDatos = await eliminarDatos(`${link.value}${api.value}/borrar/apartados`, id, tokenCifrado.value);
+                            } catch (error) {
+                                console.error(`Error al eliminar datos para ID: ${id}`, error);
+                                exitoTotal = false;
+                            }
+                        }
+                        if (exitoTotal) {
+                            fetchAndSetupData();
+                            toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Borrados', life: 3000 });
+                        } else {
+                            toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Borrar los datos.', life: 3000 });
+                        }
+                    } else {
+                        toast.add({ severity: 'error', summary: 'Error', detail: 'No hay datos para borrar', life: 3000 });
+                    }
+                } else {
+                    toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+                }
+            }
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+            toast.add({ severity: 'success', summary: 'No te preocupes', detail: 'Datos Seguros', life: 3000 });
+        }
+    });
+}
+/************************************************************************/
+const currentRowData = ref(null);
+/************************************************************************/
+/************************************************************************/
+const itemsApartados = ref([]);
+const menu = ref(null);
+const toggleApartados = (event, rowData) => {
+currentRowData.value = rowData;
+itemsApartados.value = [
+{ label: 'Editar', icon: 'pi pi-pencil', command: () => { 
+router.push({ path: `/editarapartados/${currentRowData.value.id}` });
+} },
+{ label: 'Abonar', icon: 'pi pi-print', command: () => { 
+    fechaAbonoModal.value = nfecha('fecha')
+    metodoAbonoModal.value = 'EFECTIVO'
+    btn1Abono.value = (Number(currentRowData.value.saldo) / 4).toFixed(2)
+    btn2Abono.value = (Number(currentRowData.value.saldo) / 2).toFixed(2)
+    btn3Abono.value = (Number(currentRowData.value.saldo)).toFixed(2)
+    abonoAbonoModal.value = currentRowData.value.saldo;
+
+
+   visibleAbonoModal.value = true;
+} },
+{ label: 'Print', icon: 'pi pi-print', command: () => { 
+   fnPrint()
+} },
+{ label: 'Eliminar', icon: 'pi pi-trash', command: () => {
+            Swal.fire({
+                title: 'Introduce la contraseña',
+                input: 'password',
+                inputPlaceholder: 'Contraseña',
+                showCancelButton: true,
+                confirmButtonText: 'Eliminar',
+                cancelButtonText: 'Cancelar'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    const contrasenaIngresada = result.value;
+                    if (contrasenaIngresada === token.value || contrasenaIngresada === tokenCorto.value) {
+                        const datosFactura = await peticionesFetch(`${link.value}${api.value}`, `borrarporcampo/apartados`, { campo: 'id', valor: rowData.id }, tokenCifrado.value, 'POST');
+                        if (datosFactura[0] == 'ok') {
+                            toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos eliminados correctamente', life: 3000 });
+                            await fetchAndSetupData()
+                        } else {
+                            toast.add({ severity: 'error', summary: 'Error', detail: 'Error al eliminar los datos', life: 3000 });
+                        }
+                    } else {
+                        toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+                    }
+                }
+            });
+        } 
+    },
+];
+menu.value.toggle(event);
+};
+/************************************************************************/
+
+/************************************************************************/
+const filteredApartados = computed(() => {
+if (!searchQuery.value) return data.value;
+return data.value.filter(busqueda => {
+  return Object.values(busqueda).some(value =>
+    String(value).toLowerCase().includes(searchQuery.value.toLowerCase())
+   );
+  });
+});
+/************************************************************************/
+const fnAwesomplete = ()=>{
+}
+const handleSelectComplete = async(selected)=>{
+}
+/************************************************************************/
+const onRowSelect = (event) => {
+ router.push({ path: `/editarapartados/${event.data.id}` });
+
+};
+/************************************************************************/
+/************************************************************************/
+const fnbtnAgregArbono = (cantidad)=>{
+   abonoAbonoModal.value = Number(cantidad).toFixed(2)
+}
+/************************************************************************/
+const fnAgregarAbonoModal = async() => {
+  visibleAbonoModal.value = false;
+    let totalAbonado = Number(abonoAbonoModal.value);
+
+        const pagosArray = JSON.parse(currentRowData.value.pagos) || [];
+        const saldoFactura = Number(currentRowData.value.saldo);
+
+        let abonoActual = Math.min(totalAbonado, saldoFactura); // Abonar lo máximo posible sin exceder el saldo
+        let saldoN = (saldoFactura - abonoActual).toFixed(2);
+
+        var estado = 'PENDIENTE';
+        if (saldoN <= 0) {
+            estado = 'SALDADO';
+        }
+
+        const numeroPago = pagosArray.length + 1;
+        const npago = {
+            "nopago": numeroPago,
+            "cantidad": abonoActual.toFixed(2),
+            "metodo": metodoAbonoModal.value,
+            "fecha": fechaAbonoModal.value,
+            "hora": nfecha('hora'),
+            "turno": datosEmpresa.usuario.token,
+            "cajero": datosEmpresa.usuario.email,
+            "saldo": saldoN
+        };
+
+        pagosArray.push(npago);
+
+        const sumaAbono = pagosArray
+            .map(abono => Number(abono.cantidad))
+            .reduce((acc, curr) => acc + curr, 0)
+            .toFixed(2);
+
+        currentRowData.value.pagos = JSON.stringify(pagosArray);
+        currentRowData.value.estatus = estado;
+        currentRowData.value.abonado = sumaAbono;
+        currentRowData.value.saldo = saldoN;
+        currentRowData.value.updated_at = nfecha('timestamp');
+
+        // Actualizar la currentRowData en la base de datos
+        funcionActualizar()
+        fnPrint()
+};
+/************************************************************************/
+const funcionActualizar = async()=>{
+      const url = link.value+api.value+"/actualizarcampos/apartados";
+      currentRowData.value.updated_at = nfecha('timestamp')
+  const envioDatos = await enviarDatosPorPost(url, currentRowData.value,tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+const fnPrint = () => {
+  const doc = new jsPDF({
+    orientation: 'p', // Vertical
+    unit: 'mm',
+    format: [80, 200], // Tamaño de ticket
+  });
+
+  let y = 10; // Posición vertical inicial
+
+  // Datos de la empresa
+  doc.setFontSize(10);
+  doc.text(datosEmpresa.empresa.nombre, 40, y, { align: 'center' });
+  y += 5;
+  doc.text(datosEmpresa.empresa.direccion, 40, y, { align: 'center' });
+  y += 5;
+  doc.text(`Tel: ${datosEmpresa.empresa.telefono}`, 40, y, { align: 'center' });
+  y += 10;
+
+  // Línea separadora
+  doc.line(5, y, 75, y);
+  y += 5;
+
+  // Datos del cliente
+  doc.setFontSize(9);
+  doc.text(`Cliente: ${currentRowData.value.nombre_cliente}`, 5, y);
+  y += 5;
+  doc.text(`Cédula: ${currentRowData.value.cedula_cliente}`, 5, y);
+  y += 5;
+  doc.text(`Teléfono: ${currentRowData.value.telefono_cliente}`, 5, y);
+  y += 10;
+
+  // Detalles del crédito
+  doc.text(`No. Factura: ${currentRowData.value.no_factura}`, 5, y);
+  y += 5;
+  doc.text(`Total Crédito: RD$ ${currentRowData.value.monto_credito}`, 5, y);
+  y += 5;
+  doc.text(`Cuotas: ${currentRowData.value.cuotas}`, 5, y);
+  y += 5;
+  doc.text(`Saldo Pendiente: RD$ ${currentRowData.value.saldo}`, 5, y);
+  y += 10;
+
+  // Línea separadora
+  doc.line(5, y, 75, y);
+  y += 5;
+
+  // Pagos realizados
+  doc.setFontSize(8);
+  doc.text(`Pagos`, 5, y);
+  y += 5;
+
+  const pagosArray = JSON.parse(currentRowData.value.pagos || "[]");
+
+  if (pagosArray.length === 0) {
+    doc.text("No hay pagos registrados.", 5, y);
+    y += 5;
+  } else {
+    pagosArray.forEach((pago, index) => {
+      doc.text(`#${index + 1} - ${pago.fecha} - RD$ ${pago.cantidad} (${pago.metodo})`, 5, y);
+      y += 5;
+    });
+  }
+  
+  y += 10;
+
+  // Totales
+  doc.setFontSize(10);
+  doc.text(`Total Crédito: RD$ ${currentRowData.value.monto_credito}`, 5, y);
+  y += 5;
+  doc.text(`Total Abonado: RD$ ${currentRowData.value.abonado}`, 5, y);
+  y += 5;
+  doc.text(`Saldo Pendiente: RD$ ${currentRowData.value.saldo}`, 5, y);
+  y += 10;
+
+  // Línea final
+  doc.line(5, y, 75, y);
+  y += 5;
+
+  doc.text(`Gracias por su pago`, 40, y, { align: 'center' });
+
+  // Convertir a Blob URL para mostrarlo en el Swal
+  const pdfDataUri = doc.output('datauristring');
+
+  Swal.fire({
+    title: 'Ticket de Pago',
+    html: `<iframe width="100%" height="400" src="${pdfDataUri}"></iframe>`,
+    showCancelButton: true,
+    confirmButtonText: 'Imprimir',
+    cancelButtonText: 'Cerrar',
+    preConfirm: () => {
+      doc.autoPrint();
+      window.open(doc.output('bloburl'), '_blank');
+    },
+  });
+};
+/************************************************************************/
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="mt-5">
+<Card>
+  <template #content>
+    <div class="flex flex-col space-y-4">
+<div class="w-full">
+<fieldset class="border p-3 rounded-md mb-2">
+  <legend class="px-2">Datos de Apartados</legend>
+  <div class="flex items-center">
+    <div class="flex space-x-2">
+      <Button icon="pi pi-refresh" severity="primary" @click="fetchAndSetupData" data-toggle="tooltip" title="Recargar" id="reload" />
+      <Button as="router-link" icon="pi pi-plus-circle" to="/crearapartados" class="ms-1" />
+      <Button icon="pi pi-trash" severity="danger" @click="borrarSeleccionados" data-toggle="tooltip" title="Borrar Selección" id="borrador" />
+    </div>
+    <div class="ml-auto">
+      <Button
+        v-if="usuarioLocal.usuario == 'Soporte'"
+        label="Borrar Todo"
+        icon="pi pi-trash"
+        severity="danger"
+        @click="borrarTodo"
+        id="borrartodo"
+      />
+    </div>
+  </div>
+</fieldset>
+</div>
+
+      <div class="w-full">
+        <div class="flex justify-end mb-4">
+          <InputText v-model="searchQuery" placeholder="Buscar apartados..." class="p-inputtext p-component" />
+        </div>
+        <DataTable
+          :value="filteredApartados"
+          scrollable
+          scrollHeight="600px"
+          dataKey="id"
+          paginator
+          :rows="10"
+          v-model:selection="selectedItems"
+          @rowSelect="onRowSelect"
+          selectionMode="single"
+          :rowsPerPageOptions="[5, 10, 20, 50]"
+          tableStyle="min-width: 50rem">
+         <Column selectionMode="multiple" headerStyle="width: 3rem"></Column>
+          <Column header="Options">
+            <template #body="slotProps">
+              <Button
+                icon="pi pi-cog"
+                @click="toggleApartados($event, slotProps.data)"
+                aria-haspopup="true"
+                aria-controls="overlay_menu_factura"
+              />
+              <Menu
+                ref="menu"
+                id="overlay_menu_Apartados"
+                :model="itemsApartados"
+                :popup="true"
+              />
+            </template>
+          </Column>
+          <Column field="no_emision" header="No_emision"></Column>
+<Column field="no_factura" header="No_factura"></Column>
+<Column field="cod_cliente" header="Cod_cliente"></Column>
+<Column field="nombre_cliente" header="Nombre_cliente"></Column>
+<Column field="cedula_cliente" header="Cedula_cliente"></Column>
+<Column field="telefono_cliente" header="Telefono_cliente"></Column>
+<Column field="whatsapp_cliente" header="Whatsapp_cliente"></Column>
+<Column field="email_cliente" header="Email_cliente"></Column>
+<Column field="direccion_cliente" header="Direccion_cliente"></Column>
+
+<Column field="fecha_emision" header="Fecha_emision"></Column>
+<Column field="hora" header="Hora"></Column>
+<Column field="fecha_vencimiento" header="Fecha_vencimiento"></Column>
+<Column field="monto_credito" header="Monto_credito"></Column>
+<Column field="cuotas" header="Cuotas"></Column>
+<Column field="tiempo" header="Tiempo"></Column>
+<Column field="fecha_ultimo_pago" header="Fecha_ultimo_pago"></Column>
+<Column field="proxima_fecha_pago" header="Proxima_fecha_pago"></Column>
+<Column field="abonado" header="Abonado"></Column>
+<Column field="saldo" header="Saldo"></Column>
+<Column field="estatus" header="Estatus"></Column>
+<Column field="vendedor" header="Vendedor"></Column>
+
+
+        </DataTable>
+      </div>
+    </div>
+  </template>
+</Card>
+
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<!-- //////////////////////////////////////////////////////////////////////// -->
+<Dialog v-model:visible="visibleAbonoModal" modal :position="position" header="Modal de Abono" :style="{ width: '40rem' }">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">Modal de Abono</span>
+    </div>
+  </template>
+
+      <fieldset class="border p-3 rounded mb-2">
+        <legend class="float-none w-auto px-2">{{currentRowData.nombre_cliente}}</legend>
+          <div class="row">
+                <div class="col-12">
+                  <Button :label="btn1Abono"  outlined severity="secondary" @click="fnbtnAgregArbono(btn1Abono)"  />
+                  <Button :label="btn2Abono" class="mx-1" outlined severity="secondary" @click="fnbtnAgregArbono(btn2Abono)"  />
+                  <Button :label="btn3Abono" outlined severity="secondary" @click="fnbtnAgregArbono(btn3Abono)"  />
+                </div>
+
+                  <div class="col-4 form-group">
+                    <label for="fechaabono">FECHA</label>
+                    <InputText type="text" name="fechaabono" v-datepicker v-model="fechaAbonoModal"  class="form-control datepicker " id="fechaabono"  />
+                  </div>
+
+                  <div class="col-4 form-group">
+                    <label for="abono">ABONO</label>
+                    <InputText type="text" name="abono" v-model="abonoAbonoModal" v-solonumeros v-numeroFocusinOut v-decimales  class="form-control decimales soloNumero" id="abono"  />
+                  </div>
+
+                  <div class="col-4 form-group">
+                    <label for="metodoabono">METODO</label>
+                  <Dropdown  v-model="metodoAbonoModal" :options="['EFECTIVO','TRANSFERENCIA','TARJETA']" placeholder="Seleccione estatus" class="w-full" />
+                  </div>
+          </div>
+      </fieldset>
+
+  <template #footer>
+    <Button label="Agregar Abono" outlined severity="secondary" @click="fnAgregarAbonoModal"  />
+    <Button label="Cancel" outlined severity="secondary" @click="visibleAbonoModal = false" autofocus />
+  </template>
+</Dialog>
+<!-- //////////////////////////////////////////////////////////////////////// -->
+<Toast />
+  </div>
+</main>
+</template>
+<style scoped>
+</style>
+

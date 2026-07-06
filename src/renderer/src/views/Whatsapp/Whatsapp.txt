@@ -1,0 +1,22 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"name": "Whatsapp",
+"link": "/whatsapp",
+"icon": "fas icon-whatsapp"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/whatsapp',
+        name: 'whatsapp',
+        component: () => import('../views/Whatsapp/Whatsapp.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********
+**********************|-CAMPOS-|******************
+"id, nombre, cargo, whatsapp, otro, created_at, updated_at, imagen, usuario"
+******************************************************

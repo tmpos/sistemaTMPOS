@@ -1,0 +1,1567 @@
+<script setup>
+import { ref, onMounted, nextTick, watchEffect,computed } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
+import LoadingOverlay from '../../Loading/LoadingOverlay.vue';
+const router = useRouter();
+import axios from 'axios';
+import EnviarWhatsApp from '@/components/WhatsappModal.vue';
+import { enviarDatosPorPost,generarTablaFromStringJSON,generarCodigoUnico,transformarFechaTimestamp, eliminarDatos, obtenerIdsSeleccionados, borrarTodoslosDatos, lenguajeDataTable, nfecha, arrayToObjetoFromTabla, peticionesFetch, encryptarPassword, envioElectron, mensajetoast, crearTablaSiNoExiste, peticiones,
+formatearFecha,
+cajeroACtivo,
+peticionesFetchOffline,
+arrayToObjetoFromTablaOffline,
+crearTablaSiNoExisteOffline,
+ lasMayusculas,enviarDatosLocalStorage } from '@/funciones/funciones.js';
+import Swal from 'sweetalert2'
+import { useToast } from "primevue/usetoast";
+const toast = useToast();
+/************************************************************************/
+import flatPickr from 'vue-flatpickr-component';
+import 'flatpickr/dist/flatpickr.css';
+/************************************************************************/
+  const basic = ref({
+    dateFormat: 'd/m/Y',
+  });
+//import config from '../../../../../resources/config.json';
+/************************************************************************/
+const usuarioLocal = ref({})
+/************************************************************************/
+import Awesomplete from '@/components/Awesomplete.vue';
+/************************************************************************/
+const camposArray = ["almacen", "no_emision", "no_factura", "cod_cliente", "nombre_cliente", "cedula_cliente", "telefono_cliente", "whatsapp_cliente", "email_cliente", "direccion_cliente", "rnc_cliente", "nombrecomercial_cliente", "fecha_emision", "monto_credito", "interes", "fecha_vencimiento", "cuotas", "saldo", "abonado", "fecha_pago", "pagos", "estatus", "hora", "vendedor", "delivery", "nota", "usuario", "valorcuotascredito", "tipocredito", "tiempocredito", "fechas_pago_credito", "institucion", "cliente", "quiencredito", "identificadordb"
+];
+/************************************************************************/
+import { useDatosEmpresa } from '@/stores'
+const datosEmpresa = useDatosEmpresa();
+const loading = ref(true);
+const link = ref(null);
+const api = ref(null);
+const token = ref(null);
+const patronTelefono = ref(null);
+const linkImpresora = ref(null);
+const patroncedula = ref(null);
+const tokenCifrado = ref(null);
+const tokenCorto = ref(null);
+/************************************************************************/
+const datosCajero = ref(null)
+const datosConfiguracion = ref(null)
+const fechaInteligente = ref(false)
+const visiblePrint01 = ref(false)
+/************************************************************************/
+const visibleAbonosInteligentes = ref(false)
+const datosAbonosInteligentes = ref([])
+const clienteSeleccionadoCompleto = ref({})
+/************************************************************************/
+const menuInteligente = ref();
+const buscadorFechaInteligente = ref()
+/************************************************************************/
+const position = ref('top');
+const openPosition = (pos) => {
+    position.value = pos;
+    visible.value = true;
+}
+/************************************************************************/
+const estadoFiltro = ref('PENDIENTE');
+const filtrarPorFecha = ref(null);
+const currentRowData = ref(null);
+/************************************************************************/
+const fechaAbonoModal = ref(null)
+const abonoAbonoModal = ref(null)
+const metodoAbonoModal = ref(null)
+const btn1Abono = ref(null)
+const btn2Abono = ref(null)
+const btn3Abono = ref(null)
+const visiblePrint = ref(false)
+/************************************************************************/
+const enviarWhatsAppRef = ref(null);
+const datosWhatsApp = ref({
+  nombre: 'John Doe',
+  numero: '123456789',
+  texto: 'Hola, este es un mensaje predefinido.'
+});
+/****************************************************/
+const showWhatsAppModal = async (datosFactura) => {
+  if (enviarWhatsAppRef.value) {
+       const mensajaeEnviar = `Hola *${datosFactura.nombre_cliente}* le escribimos de *${datosEmpresa.empresa.nombre}* para notificarle de un saldo pendiente de *${datosFactura.saldo}* correspondiente a la factura *${datosFactura.no_factura}*`;
+
+          datosWhatsApp.value.nombre = datosFactura.nombre_cliente;
+          datosWhatsApp.value.numero = datosFactura.telefono_cliente;
+          datosWhatsApp.value.texto = mensajaeEnviar;
+          enviarWhatsAppRef.value.updateDatosWhatsApp(datosWhatsApp.value);
+          enviarWhatsAppRef.value.visible = true;
+  }
+};
+/************************************************************************/
+
+/************************************************************************/
+const clienteSeleccionado = ref(null);
+const clienteSeleccionadoModal = ref(null);
+const clienteSeleccionadoCodigo = ref(null);
+const facturasPendientes = ref([]);
+const clientesArray = ref([]);
+const clientesArrayNombre = ref([]);
+/************************************************************************/
+const totaAdeudado = ref(0);
+const cantidadFacturas = ref(0);
+/************************************************************************/
+const visible = ref(false);
+const visibleAbonoModal = ref(false);
+const visibleAbono = ref(false);
+const visibleDatosCliente = ref(false);
+const visiblecrear = ref(false);
+const value = ref(null);
+const id = ref(null);
+const datoscampos = ref({});
+const data = ref([]);
+const searchQuery = ref('');
+const Cuentas_cobrarEditar = ref(null);
+/************************************************************************/
+async function limpiarCamposCrear() {
+datoscamposCuentas_cobrar.value = {}
+await campos();
+}
+/************************************************************************/
+watchEffect(() => {
+  if (visiblecrear.value) {
+  }
+
+  if (visibleAbono.value) {
+    fechaAbonoModal.value = nfecha('fecha')
+    metodoAbonoModal.value = 'EFECTIVO'
+    btn1Abono.value = (Number(currentRowData.value.saldo) / 4).toFixed(2)
+    btn2Abono.value = (Number(currentRowData.value.saldo) / 2).toFixed(2)
+    btn3Abono.value = (Number(currentRowData.value.saldo)).toFixed(2)
+    abonoAbonoModal.value = currentRowData.value.saldo;
+  }
+
+  if (visibleAbonoModal.value) {
+    fechaAbonoModal.value = nfecha('fecha')
+    metodoAbonoModal.value = 'EFECTIVO'
+    btn1Abono.value = (Number(totaAdeudado.value) / 4).toFixed(2)
+    btn2Abono.value = (Number(totaAdeudado.value) / 2).toFixed(2)
+    btn3Abono.value = (Number(totaAdeudado.value)).toFixed(2)
+    abonoAbonoModal.value = totaAdeudado.value;
+  }
+
+
+});
+/************************************************************************/
+const fetchAndSetupData = async () => {
+const response = await peticionesFetchOffline('getDataAsArray', 'cuentas_cobrar');
+    const jsonData = response.filter(fact=>fact.almacen === datosEmpresa.empresa.nombre).reverse();
+    data.value = jsonData;
+clientesArrayNombre.value = [...new Set(response.map(cuenta => cuenta.nombre_cliente))];
+
+};
+/************************************************************************/
+const fetchClientes = async () => {
+    const response = await peticionesFetchOffline('getDataAsArray', 'clientes');
+    const jsonData = response;
+    
+    // Filtramos los clientes cuyo nombre no esté vacío y luego mapeamos para obtener solo los nombres
+    const filteredClientes = jsonData.filter(cliente => cliente.nombre && cliente.nombre.trim() !== '');
+    
+    // Asignamos los clientes filtrados al array
+    clientesArray.value = filteredClientes;
+    //clientesArrayNombre.value = filteredClientes.map(cliente => cliente.nombre);
+};
+
+/************************************************************************/
+async function campos() {
+  const campos = await arrayToObjetoFromTablaOffline('cuentas_cobrar');
+
+  datoscamposCuentas_cobrar.value = campos;
+}
+/************************************************************************/
+onMounted(async () => {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCorto.value = datosJSON.VITE_TOKEN_CORTO;
+
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+await crearTablaSiNoExisteOffline('cuentas_cobrar', camposArray, toast);
+usuarioLocal.value = JSON.parse(window.localStorage.getItem('usuarioLocal'))[0] || {};
+await fetchAndSetupData();
+await fetchClientes();
+datosCajero.value = await cajeroACtivo(link.value+api.value)
+
+    datosConfiguracion.value = JSON.parse(localStorage.getItem('configuracion')) || {};
+
+loading.value = false
+
+});
+/************************************************************************/
+async function borrarTodo() {
+    Swal.fire({
+        title: "¿Estás seguro?",
+        text: "¡Se borrarán los datos!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, de acuerdo",
+        cancelButtonText: "No, cancelar"
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            // Solicitar contraseña
+            const { value: password } = await Swal.fire({
+                title: 'Introduce la contraseña',
+                input: 'password',
+                inputPlaceholder: 'Contraseña',
+                showCancelButton: true,
+                confirmButtonText: 'Confirmar',
+                cancelButtonText: 'Cancelar'
+            });
+
+            if (password) {
+                if (password === token.value || password === tokenCorto.value) {
+                    // Contraseña correcta, proceder con el borrado
+                    const envioDatos = await peticionesFetchOffline('deleteAll', 'cuentas_cobrar');
+                    if (envioDatos[0] == 'ok') {
+                        fetchAndSetupData();
+                        toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos borrados', life: 3000 });
+                    } else {
+                        toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al borrar datos.', life: 3000 });
+                    }
+                } else {
+                    toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+                }
+            }
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+            toast.add({ severity: 'success', summary: 'No te preocupes', detail: 'Datos seguros', life: 3000 });
+        }
+    });
+}
+
+/************************************************************************/
+async function funcionActualizar() {
+  const url = link.value+api.value+"/actualizarcampos/cuentas_cobrar";
+  if (!datoscampos.value) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+  if (datoscampos.value.hasOwnProperty('created_at')) {
+    datoscampos.value.updated_at = nfecha('timestamp');
+  }
+  const envioDatos = await peticionesFetchOffline('updateData','cuentas_cobrar', JSON.stringify(datoscampos.value));
+  if (envioDatos[0] == 'ok') {
+    visible.value = false;
+    fetchAndSetupData();
+    toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+async function funcionCrear() {
+  const url = link.value+api.value+"/insertar/cuentas_cobrar";
+  if (datoscamposCuentas_cobrar.value.hasOwnProperty('created_at')) {
+    datoscamposCuentas_cobrar.value.created_at = nfecha('timestamp');
+    datoscamposCuentas_cobrar.value.updated_at = nfecha('timestamp');
+  }
+  const envioDatos = await peticionesFetchOffline('insertData','cuentas_cobrar', JSON.stringify(datoscamposCuentas_cobrar.value));
+  if (envioDatos[0] == 'ok') {
+    fetchAndSetupData();
+    toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Agregados', life: 3000 });
+    limpiarCamposCrear();
+    visiblecrear.value = false;
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+async function borrarSeleccionados() {
+  const ids = obtenerIdsSeleccionados();
+  Swal.fire({
+    title: "Estas Seguro?",
+    text: "Se Borraran los Datos!",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Si, de acuerdo!",
+    cancelButtonText: "No, cancelar!",
+  }).then(async (result) => {
+    if (result.isConfirmed) {
+      let exitoTotal = true;
+      if (ids.length > 0) {
+        for (const id of ids) {
+          try {
+            const envioDatos = await peticionesFetchOffline('deleteEntry','cuentas_cobrar', id);
+          } catch (error) {
+            console.error(`Error al eliminar datos para ID: ${id}`, error);
+            exitoTotal = false;
+          }
+        }
+        if (exitoTotal) {
+          fetchAndSetupData();
+          toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Borrados', life: 3000 });
+        } else {
+          toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Borrar los datos.', life: 3000 });
+        }
+      } else {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'No hay datos para borrar', life: 3000 });
+      }
+    } else if (result.dismiss === Swal.DismissReason.cancel) {
+      toast.add({ severity: 'success', summary: 'No te preocupes', detail: 'Datos Seguros', life: 3000 });
+    }
+  })
+}
+/************************************************************************/
+//handleSelectComplete = (selected)
+const itemsCuentas_cobrar = ref([]);
+const menu = ref(null);
+
+const toggleCuentas_cobrar = (event, rowData) => {
+currentRowData.value = rowData;
+itemsCuentas_cobrar.value = [
+{ label: 'Whatsapp', icon: 'pi pi-whatsapp', command: async() => { 
+  enviarWhatsAppRef.value.visible = true;
+  await showWhatsAppModal(currentRowData.value)
+
+} },
+{ label: 'Abonar', icon: 'pi pi-money-bill', command: () => {
+  clienteSeleccionadoModal.value = currentRowData.value.nombre_cliente;
+  visibleAbono.value = true
+ } },
+{ label: 'Editar', icon: 'pi pi-pencil', command: () => { 
+router.push({ path: `/editarcuentas_cobrar/${currentRowData.value.id}` });
+} },
+{ label: 'Balance', icon: 'pi pi-eye', command: () => { 
+    const selected = {value:currentRowData.value.nombre_cliente}
+    handleSelectComplete(selected)
+
+} },
+{
+  label: 'Abonos',
+  icon: 'pi pi-money-bill',
+  command: () => {
+    if (!currentRowData.value || !currentRowData.value.pagos) {
+      toast.add({ severity: 'warn', summary: 'Aviso', detail: 'No hay abonos disponibles', life: 3000 });
+      return;
+    }
+
+    visibleAbonosInteligentes.value = true;
+
+    // Convertir la cadena JSON de pagos en un array
+    const pagosArray = JSON.parse(currentRowData.value.pagos);
+
+    // Mapear los datos de los pagos a un formato más legible
+    const datospagos = pagosArray.map(p => ({
+      cliente: currentRowData.value.nombre_cliente,
+      no_emision: currentRowData.value.no_emision,
+      no_factura: currentRowData.value.no_factura,
+      fecha: p.fecha,
+      hora: p.hora,
+      cantidad: p.cantidad,
+      pendiente: p.saldo,  // Muestra cuánto queda pendiente después del abono
+      metodo: p.metodo
+    }));
+
+    datosAbonosInteligentes.value = datospagos;
+  }
+},
+
+{ label: 'Imprimir', icon: 'pi pi-print', command: () => { 
+ const impresionpagina = link.value+'/vista/cuentascobrartermica.php?factura=' + currentRowData.value.no_emision ;
+ // window.electron.ipcRenderer.invoke('open-new-window', impresionpagina, 'url',true,false);
+
+
+         const datosEmpresa = JSON.stringify(enviarDatosLocalStorage() )
+        window.electron.ipcRenderer.invoke('facturaCredito',currentRowData.value.no_emision,datosEmpresa);
+
+
+} },
+{ label: 'Imprimir Factura', icon: 'pi pi-print', command: async() => { 
+
+    if (window.electron) {
+
+         const datosFactura = await peticionesFetchOffline('getDataByField', 'facturas','no_factura',currentRowData.value.no_factura);
+         const datosCliente = await peticionesFetchOffline('getDataByField', 'clientes','codigo',datosFactura.cod_cliente);
+
+     const datosEmpresa1 = JSON.stringify(enviarDatosLocalStorage());
+     const envio = await window.electron.ipcRenderer.invoke('facturaPDF', JSON.stringify(datosFactura),JSON.stringify(datosCliente), datosEmpresa1,null);
+
+    } else {
+
+      router.push({ path: `/factura/${currentRowData.value.no_factura}/facturas` });
+
+    }
+
+
+
+
+} },
+{ label: 'Completar', icon: 'pi pi-check', command: () => { 
+  loading.value = true
+  Swal.fire({
+    title: 'Introduce la contraseña',
+    input: 'password',
+    inputPlaceholder: 'Contraseña',
+    showCancelButton: true,
+    confirmButtonText: 'Eliminar',
+    cancelButtonText: 'Cancelar'
+  }).then(async (result) => {
+    if (result.isConfirmed) {
+      const contrasenaIngresada = result.value;
+      if (contrasenaIngresada === token.value || contrasenaIngresada === tokenCorto.value) {
+        const factura = currentRowData.value
+
+          const saldo = Number(factura.saldo);
+          const pagos = JSON.parse(factura.pagos);
+          const nopago = (pagos.length + 1);
+          pagos.push({
+            "nopago": nopago.toString(),
+            "cantidad": saldo,
+            "metodo": 'EFECTIVO',
+            "fecha": nfecha('fecha'),
+            "hora": nfecha('hora'),
+            "saldo": '0.00',
+            "turno": datosCajero.value.turno,
+            "cajero": datosCajero.value.username
+          });
+
+          factura.cuotas = saldo.toFixed(2);
+          factura.fecha_pago = nfecha('fecha');
+          factura.estatus = 'SALDADO';
+          factura.saldo = '0.00';
+          factura.pagos = JSON.stringify(pagos);
+          factura.updated_at = nfecha('timestamp');
+
+/*          const peticion = await peticionesFetch(`${link.value}${api.value}`, `actualizarcampos/cuentas_cobrar`, factura, tokenCifrado.value, 'POST');*/
+          const peticion = await peticionesFetchOffline('updateData','cuentas_cobrar', JSON.stringify(factura));
+
+        loading.value = false
+          if (peticion[0] === 'ok') {
+            toast.add({ severity: 'success', summary: 'Cuenta Actualizada', detail: 'Cuenta actualizada correctamente', life: 3000 });
+
+         await fetchAndSetupData();
+               const fechas = nfecha('timestampcompleta')
+                    const impresionpagina = link.value+'/vista/reciboPagoCXC.php?idcliente=' + factura.cod_cliente +
+                           '&fechainicio=' + fechas.fechainicio +
+                           '&fechafin=' + fechas.fechafin;
+          window.electron.ipcRenderer.invoke('open-new-window', impresionpagina, 'url',true,false);
+
+
+          } else {
+            toast.add({ severity: 'error', summary: 'Error', detail: 'Error al actualizar cuenta', life: 3000 });
+          }
+
+
+
+      } else {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+        loading.value = false
+      }
+    }else{
+       loading.value = false
+    }
+  });
+
+} },
+{ label: 'Eliminar', icon: 'pi pi-trash', command: () => {
+            Swal.fire({
+                title: 'Introduce la contraseña',
+                input: 'password',
+                inputPlaceholder: 'Contraseña',
+                showCancelButton: true,
+                confirmButtonText: 'Eliminar',
+                cancelButtonText: 'Cancelar'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    const contrasenaIngresada = result.value;
+                    if (contrasenaIngresada === token.value || contrasenaIngresada === tokenCorto.value) {
+                        const datosFactura = await peticionesFetchOffline('deleteEntry','cuentas_cobrar', rowData.id);
+                        if (datosFactura[0] == 'ok') {
+                            toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos eliminados correctamente', life: 3000 });
+                            await fetchAndSetupData()
+                        } else {
+                            toast.add({ severity: 'error', summary: 'Error', detail: 'Error al eliminar los datos', life: 3000 });
+                        }
+                    } else {
+                        toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+                    }
+                }
+            });
+        } 
+    },
+];
+menu.value.toggle(event);
+};
+/************************************************************************/
+const filteredCuentas_cobrar = computed(() => {
+  let filteredData = data.value;
+  
+  if (searchQuery.value) {
+    filteredData = filteredData.filter(busqueda => {
+      return Object.values(busqueda).some(value =>
+        String(value).toLowerCase().includes(searchQuery.value.toLowerCase())
+      );
+    });
+  }
+
+  if (estadoFiltro.value !== 'TODOS') {
+    filteredData = filteredData.filter(item => item.estatus === estadoFiltro.value);
+  }
+
+  if (filtrarPorFecha.value) {
+    const fechaFormateada = formatearFecha(filtrarPorFecha.value);
+    filteredData = filteredData.filter(item => item.fecha_emision === fechaFormateada);
+  }
+
+  if (buscadorFechaInteligente.value) {
+    let fechas;
+    let fechaInicio;
+    let fechaFin;
+    if (typeof buscadorFechaInteligente.value === 'string') {
+      fechas = buscadorFechaInteligente.value.split(' - ');
+     fechaInicio = fechas[0];
+     fechaFin = fechas[1];
+    } else {
+      fechas = buscadorFechaInteligente.value;
+     fechaInicio = formatearFecha(fechas[0]);
+     fechaFin = formatearFecha(fechas[1]);
+    }
+
+
+    if (fechaInicio && fechaFin) {
+      const fechaAmericanaInicio = transformarFechaTimestamp(fechaInicio, false);
+      const fechaAmericanaFin = transformarFechaTimestamp(fechaFin, false);
+      const fechaInicioTimeStamp = new Date(fechaAmericanaInicio + ' 00:00:01');
+      const fechaFinTimeStamp = new Date(fechaAmericanaFin + ' 23:59:59');
+      filteredData = filteredData.filter(item => {
+        const fechaUpdated = new Date(item.updated_at);
+        if (fechaUpdated) {
+          return fechaUpdated >= fechaInicioTimeStamp && fechaUpdated <= fechaFinTimeStamp;
+        }
+      });
+if (filteredData.length > 0) {
+    fechaInteligente.value = true;
+
+    const datospagos = filteredData.flatMap(pagos => {
+        const losPagos = JSON.parse(pagos.pagos);
+        return losPagos.map(p => ({
+            cliente: pagos.nombre_cliente,
+            no_emision: pagos.no_emision,
+            no_factura: pagos.no_factura,
+            fecha: p.fecha,
+            hora: p.hora,
+            cantidad: p.cantidad,
+            pendiente: p.saldo,
+            metodo: p.metodo
+        }));
+    });
+
+    datosAbonosInteligentes.value = datospagos;
+}
+
+
+    }
+  }
+
+
+  return filteredData;
+});
+/************************************************************************/
+const getRowClass = (data) => {
+  if (data.fecha_pago === nfecha('fecha')) {
+    return 'row-yellow';
+  } else if (data.estatus === 'PENDIENTE') {
+    return 'row-red';
+  } else if (data.estatus === 'SALDADO') {
+    return 'row-green';
+  }
+  return '';
+};
+/************************************************************************/
+const fnAwesomplete = ()=>{
+
+}
+/************************************************************************/
+const handleSelectComplete = async(selected)=>{
+ let cliente = clientesArray.value.find(client=>client.nombre === selected.value)
+ if(!cliente){
+/*  const jsonData = await arrayToObjetoFromTabla(link.value+api.value,tokenCifrado.value,'clientes');
+    jsonData.codigo = generarCodigoUnico();
+    jsonData.activo = 'ON';
+    jsonData.genero = 'HOMBRE';
+    jsonData.estado_civil = 'SOLTERO';
+    jsonData.precio_fijado = 'Normal';
+    jsonData.nombre = selected.value;
+   cliente = jsonData*/
+ }
+
+ const datosArray = data.value.filter(fact=>fact.cod_cliente === cliente.codigo).filter(fact=>fact.estatus === 'PENDIENTE')
+ clienteSeleccionadoModal.value = selected.value;
+ clienteSeleccionadoCodigo.value = cliente.codigo;
+ facturasPendientes.value = datosArray;
+ totaAdeudado.value = datosArray.map(factura=>Number(factura.saldo)).reduce((total, saldo) => total + saldo, 0).toFixed(2);
+ cantidadFacturas.value = datosArray.length
+ visibleDatosCliente.value = true;
+ clienteSeleccionado.value = ''
+}
+/************************************************************************/
+const imprimirSaldo = ()=>{
+visibleDatosCliente.value = false;
+    var hoy = new Date();
+    var yyyy = hoy.getFullYear();
+    var mm = (hoy.getMonth() + 1).toString().padStart(2, "0");
+    var dd = hoy.getDate().toString().padStart(2, "0");
+    var fechaHoy = `${yyyy}-${mm}-${dd}`;
+
+    Swal.fire({
+        title: 'Ingresar fechas',
+        html:
+            `<input type="date" id="fechaInicio" class="swal2-input" value="${fechaHoy}" placeholder="Fecha Inicio">` +
+            `<input type="date" id="fechaFin" class="swal2-input" value="${fechaHoy}" placeholder="Fecha Fin">`,
+        focusConfirm: false,
+        showCancelButton: true,
+        preConfirm: () => {
+            const fechaInicio = document.getElementById('fechaInicio').value;
+            const fechaFin = document.getElementById('fechaFin').value;
+            
+            if (!fechaInicio || !fechaFin) {
+                Swal.showValidationMessage(`Por favor ingrese ambas fechas`);
+                return false;
+            }
+            
+            return { fechaInicio: fechaInicio, fechaFin: fechaFin };
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const fechas = result.value;
+            const impresionpagina = link.value+'/vista/reciboPagoCXC.php?idcliente=' + clienteSeleccionadoCodigo.value +
+                           '&fechainicio=' + fechas.fechaInicio +
+                           ' 00:00:00&fechafin=' + fechas.fechaFin+' 23:59:00';
+          window.electron.ipcRenderer.invoke('open-new-window', impresionpagina, 'url',true,false);
+        }
+    });
+
+
+}
+/**************************************************************************/
+
+const imprimirFactura = () => {
+  const impresionpagina = link.value + '/vista/recibofiao.php?idcliente=' + clienteSeleccionadoCodigo.value;
+  window.electron.ipcRenderer.invoke('open-new-window', impresionpagina, 'url', true, false);
+
+
+
+};
+
+const fnAbonar = () => {
+  // Código para la función fnAbonar
+};
+
+const fnPagarTodo = () => {
+  visibleDatosCliente.value = false;
+  loading.value = true
+  Swal.fire({
+    title: 'Introduce la contraseña', 
+    input: 'password',
+    inputPlaceholder: 'Contraseña',
+    showCancelButton: true,
+    confirmButtonText: 'Eliminar',
+    cancelButtonText: 'Cancelar'
+  }).then(async (result) => {
+    if (result.isConfirmed) {
+      const contrasenaIngresada = result.value;
+      if (contrasenaIngresada === token.value || contrasenaIngresada === tokenCorto.value) {
+
+        const promesas = facturasPendientes.value.map(async (factura) => {
+          const saldo = Number(factura.saldo);
+          const pagos = JSON.parse(factura.pagos);
+          const nopago = (pagos.length + 1);
+          pagos.push({
+            "nopago": nopago.toString(),
+            "cantidad": saldo,
+            "metodo": 'EFECTIVO',
+            "fecha": nfecha('fecha'),
+            "hora": nfecha('hora'),
+            "saldo": '0.00',
+            "turno": datosCajero.value.turno,
+            "cajero": datosCajero.value.username
+          });
+
+          factura.cuotas = saldo.toFixed(2);
+          factura.fecha_pago = nfecha('fecha');
+          factura.estatus = 'SALDADO';
+          factura.saldo = '0.00';
+          factura.pagos = JSON.stringify(pagos);
+          factura.updated_at = nfecha('timestamp');
+
+/*          const peticion = await peticionesFetch(`${link.value}${api.value}`, `actualizarcampos/cuentas_cobrar`, factura, tokenCifrado.value, 'POST');*/
+          const peticion = await peticionesFetchOffline('updateData','cuentas_cobrar', JSON.stringify(factura));
+
+          if (peticion[0] === 'ok') {
+            toast.add({ severity: 'success', summary: 'Cuenta Actualizada', detail: 'Cuenta actualizada correctamente', life: 3000 });
+          } else {
+            toast.add({ severity: 'error', summary: 'Error', detail: 'Error al actualizar cuenta', life: 3000 });
+          }
+        });
+
+        await Promise.all(promesas);
+        toast.add({ severity: 'success', summary: 'Proceso Completo', detail: 'Todas las facturas han sido actualizadas', life: 3000 });
+        loading.value = false
+         await fetchAndSetupData();
+               const fechas = nfecha('timestampcompleta')
+                    const impresionpagina = link.value+'/vista/reciboPagoCXC.php?idcliente=' + clienteSeleccionadoCodigo.value +
+                           '&fechainicio=' + fechas.fechainicio +
+                           '&fechafin=' + fechas.fechafin;
+          window.electron.ipcRenderer.invoke('open-new-window', impresionpagina, 'url',true,false);
+
+
+
+      } else {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+        loading.value = false
+      }
+    }else{
+       loading.value = false
+    }
+  });
+};
+
+/************************************************************************/
+const fnbtnAgregArbono = (cantidad)=>{
+   abonoAbonoModal.value = Number(cantidad).toFixed(2)
+}
+/************************************************************************/
+const fnAgregarAbono = async()=>{
+
+     visibleAbono.value = false
+
+    const pagosArray = JSON.parse(currentRowData.value.pagos) || [];
+
+  const saldoN = (Number(currentRowData.value.saldo) - Number(abonoAbonoModal.value)).toFixed(2)
+
+  var estado = 'PENDIENTE';
+  if (saldoN <= 0) {
+     estado = 'SALDADO';
+  }
+
+
+  if (Number(abonoAbonoModal.value) > Number(currentRowData.value.saldo)) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'El Abono no puede ser mayor que el Saldo Pendiente', life: 3000 });
+    return
+  }
+  
+
+  const numeroPago = (pagosArray.length + 1)
+   const npago = {
+    "nopago": numeroPago,
+    "cantidad": abonoAbonoModal.value,
+    "metodo": metodoAbonoModal.value,
+    "fecha": fechaAbonoModal.value,
+    "timestamp": nfecha('timestamp'),
+    "hora": nfecha('hora'),
+    "turno":datosCajero.value.turno,
+    "cajero":datosCajero.value.username,
+    "saldo": saldoN
+  };
+
+  pagosArray.push(npago)
+
+
+const sumaAbono = pagosArray
+  .map(abono => Number(abono.cantidad))
+  .reduce((acc, curr) => acc + curr, 0).toFixed(2);
+
+
+  currentRowData.value.pagos = JSON.stringify(pagosArray)
+  currentRowData.value.estatus = estado;
+  currentRowData.value.abonado = sumaAbono;
+  currentRowData.value.saldo = saldoN;
+  currentRowData.value.updated_at = nfecha('timestamp');
+
+/*          const peticion = await peticionesFetch(`${link.value}${api.value}`, `actualizarcampos/cuentas_cobrar`, currentRowData.value, tokenCifrado.value, 'POST');*/
+          const peticion = await peticionesFetchOffline('updateData','cuentas_cobrar', JSON.stringify(currentRowData.value));
+
+          if (peticion[0] === 'ok') {
+            toast.add({ severity: 'success', summary: 'Cuenta Actualizada', detail: 'Cuenta actualizada correctamente', life: 3000 });
+         const impresionpagina = link.value+'/vista/cuentascobrartermica.php?factura=' + currentRowData.value.no_emision ;
+         // window.electron.ipcRenderer.invoke('open-new-window', impresionpagina, 'url',true,false);
+
+         const datosEmpresa = JSON.stringify(enviarDatosLocalStorage() )
+        window.electron.ipcRenderer.invoke('facturaCredito',currentRowData.value.no_emision,datosEmpresa);
+
+          //visibleAbono.value = false
+
+          } else {
+            toast.add({ severity: 'error', summary: 'Error', detail: 'Error al actualizar cuenta', life: 3000 });
+          }
+
+
+}
+/************************************************************************/
+const fnAgregarAbonoModal = async() => {
+  visibleAbonoModal.value = false;
+    let totalAbonado = Number(abonoAbonoModal.value);
+
+    for (let factura of facturasPendientes.value) {
+        if (totalAbonado <= 0) break; // Si ya no hay más abono disponible, salir del bucle
+
+        const pagosArray = JSON.parse(factura.pagos) || [];
+        const saldoFactura = Number(factura.saldo);
+
+        let abonoActual = Math.min(totalAbonado, saldoFactura); // Abonar lo máximo posible sin exceder el saldo
+        let saldoN = (saldoFactura - abonoActual).toFixed(2);
+
+        var estado = 'PENDIENTE';
+        if (saldoN <= 0) {
+            estado = 'SALDADO';
+        }
+
+        const numeroPago = pagosArray.length + 1;
+        const npago = {
+            "nopago": numeroPago,
+            "cantidad": abonoActual.toFixed(2),
+            "metodo": metodoAbonoModal.value,
+            "fecha": fechaAbonoModal.value,
+            "timestamp": nfecha('timestamp'),
+            "hora": nfecha('hora'),
+            "turno": datosCajero.value.turno,
+            "cajero": datosCajero.value.username,
+            "saldo": saldoN
+        };
+
+        pagosArray.push(npago);
+
+        const sumaAbono = pagosArray
+            .map(abono => Number(abono.cantidad))
+            .reduce((acc, curr) => acc + curr, 0)
+            .toFixed(2);
+
+        factura.pagos = JSON.stringify(pagosArray);
+        factura.estatus = estado;
+        factura.abonado = sumaAbono;
+        factura.saldo = saldoN;
+        factura.updated_at = nfecha('timestamp');
+
+        // Actualizar la factura en la base de datos
+        const peticion = await peticionesFetchOffline('updateData','cuentas_cobrar', JSON.stringify(factura));
+/*        const peticion = await peticionesFetch(
+            `${link.value}${api.value}`,
+            `actualizarcampos/cuentas_cobrar`,
+            factura,
+            tokenCifrado.value,
+            'POST'
+        );*/
+
+        totalAbonado -= abonoActual; // Restar el abono actual del total
+    }
+
+    if (totalAbonado > 0) {
+        toast.add({ severity: 'warn', summary: 'Aviso', detail: `Quedó un sobrante de ${totalAbonado.toFixed(2)}`, life: 3000 });
+    }
+
+  imprimirSaldo()
+
+};
+
+/************************************************************************/
+const onRowSelect = (selected) => {
+router.push({ path: `/editarcuentas_cobrar/${selected.data.id}` });
+}
+/************************************************************************/
+const fnExportarExcel = () => {
+  const filteredData = filteredCuentas_cobrar.value;
+
+  // Crear un nuevo libro de trabajo
+  const wb = XLSX.utils.book_new();
+
+  // Convertir los datos filtrados a una hoja de cálculo
+  const ws = XLSX.utils.json_to_sheet(filteredData);
+
+  // Añadir la hoja de cálculo al libro de trabajo
+  XLSX.utils.book_append_sheet(wb, ws, 'Cuentas_cobrar');
+
+  // Generar el archivo Excel
+  XLSX.writeFile(wb, 'Cuentas_cobrar.xlsx');
+};
+/************************************************************************/
+const imprimirReporte = ()=>{
+  const impresionpagina = link.value + '/vista/reporteClientesCobrar.php?codcliente=' + clienteSeleccionadoCodigo.value;
+  window.electron.ipcRenderer.invoke('open-new-window', impresionpagina, 'url', false, true,false);
+}
+/************************************************************************/
+const fnVerDetalles = async()=>{
+  imprimirReporte()
+}
+/************************************************************************/
+const fnImpresoraGrande = ()=>{
+  
+  const datosFact = data.value.filter(fact=>fact.cod_cliente == clienteSeleccionadoCodigo.value)
+  const impresionpagina = link.value + '/vista/reporteClientesCobrar.php?codcliente=' + clienteSeleccionadoCodigo.value;
+  window.electron.ipcRenderer.invoke('open-new-window', impresionpagina, 'url', true, true,false);
+}
+
+const fnReportePDF = () => {
+  // Filtrar los datos según el cod_cliente
+  const datosFact = data.value.filter(fact => fact.cod_cliente === clienteSeleccionadoCodigo.value);
+  // Crear un nuevo documento PDF
+  const doc = new jsPDF('p', 'mm', 'a4');
+
+  // Definir las columnas de la tabla
+  const columns = [
+    { header: 'No_emision', dataKey: 'no_emision' },
+    { header: 'No_factura', dataKey: 'no_factura' },
+    { header: 'Fecha_emision', dataKey: 'fecha_emision' },
+    { header: 'Monto_credito', dataKey: 'monto_credito' },
+    { header: 'Abonado', dataKey: 'cuotas' },
+    { header: 'Saldo', dataKey: 'saldo' },
+    { header: 'Estatus', dataKey: 'estatus' }
+  ];
+
+  // Preparar los datos para la tabla
+  const rows = [];
+  datosFact.forEach(factura => {
+    const { no_emision, no_factura, fecha_emision, monto_credito, cuotas, saldo, estatus, pagos } = factura;
+    const pagosArray = JSON.parse(pagos);
+    const pagosString = pagosArray.map(pago => `Nopago: ${pago.nopago}, Cantidad: ${pago.cantidad}, Metodo: ${pago.metodo}, Fecha: ${pago.fecha}, Hora: ${pago.hora}, Saldo: ${pago.saldo}`).join('\n');
+
+    // Añadir la fila de la factura
+    rows.push({
+      no_emision,
+      no_factura,
+      fecha_emision,
+      monto_credito,
+      cuotas,
+      saldo,
+      estatus
+    });
+
+    // Añadir una fila adicional para los pagos
+    rows.push({
+      no_emision: '',
+      no_factura: '',
+      fecha_emision: '',
+      monto_credito: '',
+      cuotas: '',
+      saldo: '',
+      estatus: '',
+      pagos: pagosString
+    });
+  });
+
+  // Añadir la tabla al PDF
+  doc.autoTable({
+    head: [columns.map(col => col.header)],
+    body: rows.map(row => {
+      if (row.pagos) {
+        return [{ content: row.pagos, colSpan: columns.length, styles: { halign: 'left' } }];
+      }
+      return columns.map(col => row[col.dataKey]);
+    }),
+    startY: 20,
+    styles: {
+      fontSize: 10,
+      cellPadding: 5,
+      overflow: 'linebreak',
+      cellWidth: 'wrap'
+    },
+    headStyles: {
+      fillColor: [255, 255, 255],
+      textColor: [0, 0, 0],
+      fontStyle: 'bold'
+    },
+    bodyStyles: {
+      fillColor: [255, 255, 255],
+      textColor: [0, 0, 0]
+    },
+    columnStyles: {
+      0: { cellWidth: 25 },
+      1: { cellWidth: 25 },
+      2: { cellWidth: 25 },
+      3: { cellWidth: 25 },
+      4: { cellWidth: 25 },
+      5: { cellWidth: 25 },
+      6: { cellWidth: 25 }
+    },
+    didDrawPage: function (data) {
+      // Añadir el encabezado de la página
+      doc.setFontSize(20);
+      doc.setTextColor(40);
+      doc.text('Reporte de Cuentas por Cobrar', data.settings.margin.left, 15);
+    },
+    margin: { top: 40 },
+    rowPageBreak: 'auto', // Permitir que las filas se rompan en múltiples páginas si es necesario
+    theme: 'grid' // Añadir líneas de cuadrícula para mejorar la legibilidad
+  });
+
+  // Guardar el PDF
+  const clienteNombre = datosFact.length > 0 ? datosFact[0].nombre_cliente : 'Desconocido';
+  doc.save(`Reporte_Cuentas_cobrar_${clienteNombre}.pdf`);
+};
+
+const fnReporteEXCEL = () => {
+  // Filtrar los datos según el cod_cliente
+  const datosFact = data.value.filter(fact => fact.cod_cliente === clienteSeleccionadoCodigo.value);
+
+  // Crear un nuevo libro de trabajo
+  const wb = XLSX.utils.book_new();
+
+  // Definir las columnas de la tabla
+  const columns = [
+    'No_emision',
+    'No_factura',
+    'Fecha_emision',
+    'Monto_credito',
+    'Abonado',
+    'Saldo',
+    'Estatus',
+    'Pagos'
+  ];
+
+  // Preparar los datos para la tabla
+  const rows = [];
+  datosFact.forEach(factura => {
+    const { no_emision, no_factura, fecha_emision, monto_credito, cuotas, saldo, estatus, pagos } = factura;
+    const pagosArray = JSON.parse(pagos);
+    const pagosString = pagosArray.map(pago => `Nopago: ${pago.nopago}, Cantidad: ${pago.cantidad}, Metodo: ${pago.metodo}, Fecha: ${pago.fecha}, Hora: ${pago.hora}, Saldo: ${pago.saldo}`).join('\n');
+
+    // Añadir la fila de la factura
+    rows.push([
+      no_emision,
+      no_factura,
+      fecha_emision,
+      monto_credito,
+      cuotas,
+      saldo,
+      estatus,
+      pagosString
+    ]);
+  });
+
+  // Crear una hoja de cálculo
+  const ws = XLSX.utils.aoa_to_sheet([columns, ...rows]);
+
+  // Añadir la hoja de cálculo al libro de trabajo
+  XLSX.utils.book_append_sheet(wb, ws, 'Reporte de Cuentas por Cobrar');
+
+  // Generar el archivo Excel
+  const clienteNombre = datosFact.length > 0 ? datosFact[0].nombre_cliente : 'Desconocido';
+  XLSX.writeFile(wb, `Reporte_Cuentas_cobrar_${clienteNombre}.xlsx`);
+};
+/************************************************************************/
+const handleInteligenteSelect = (event) => {
+  const selectedItem = event.item;
+  buscadorFechaInteligente.value = selectedItem.value.fechainicio+' - '+selectedItem.value.fechafin
+  console.log("Selected item:", selectedItem.value);
+  // Aquí puedes agregar cualquier lógica adicional que necesites
+};
+/************************************************************************/
+
+const itemsInteligente = ref([  
+  { label: 'Hoy', command: handleInteligenteSelect,value:nfecha('rangohoy') },
+  { label: 'Ayer', command: handleInteligenteSelect,value:nfecha('rangoayer') },
+  { label: 'Esta Semana', command: handleInteligenteSelect,value:nfecha('rangosemana')},
+  { label: 'Hace 7 dias', command: handleInteligenteSelect,value:nfecha('rango7dias')},
+  { label: 'Este mes', command: handleInteligenteSelect,value:nfecha('rangomes')},
+])
+
+const toggleInteligente = (event)=>{
+  menuInteligente.value.toggle(event);
+
+}
+/************************************************************************/
+/************************************************************************/
+const fechaInteligenteSeleccionada = (fechas)=>{
+    if(fechas){
+        const fechainicio = formatearFecha(fechas[0])
+        const fechafin = formatearFecha(fechas[1])
+         if(fechainicio === null || fechafin === null || fechainicio ==='31/12/1969' || fechafin ==='31/12/1969'){
+          toast.add({ severity: 'warn', summary: 'Error', detail: 'Seleccione ambas fechas', life: 3000 });
+          return
+         }
+
+         const retorno = {fechainicio,fechafin}
+         return retorno
+
+    }
+
+}
+/************************************************************************/
+const  fnAbonosFechaInteligente = ()=>{
+  visibleAbonosInteligentes.value = true
+}
+/************************************************************************/
+const editCxC = (index, data, idTable)=>{
+  console.log("idTable", idTable);
+  console.log("data", data);
+  console.log("index", index);
+
+}
+/************************************************************************/
+const fnCrearExcelAbonos = () => {
+  if (!datosAbonosInteligentes.value || datosAbonosInteligentes.value.length === 0) {
+    toast.add({ severity: 'warn', summary: 'Aviso', detail: 'No hay abonos para exportar', life: 3000 });
+    return;
+  }
+
+  // Crear un nuevo libro de trabajo
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(datosAbonosInteligentes.value.map(abono => ({
+    'Cliente': abono.cliente,
+    'No Emisión': abono.no_emision,
+    'No Factura': abono.no_factura,
+    'Fecha': abono.fecha,
+    'Hora': abono.hora,
+    'Cantidad': abono.cantidad,
+    'Pendiente': abono.pendiente,
+    'Método': abono.metodo
+  })));
+
+  // Agregar hoja de cálculo al libro
+  XLSX.utils.book_append_sheet(wb, ws, 'Abonos Inteligentes');
+
+  // Guardar el archivo Excel
+  XLSX.writeFile(wb, `Abonos_Inteligentes_${new Date().toISOString().slice(0, 10)}.xlsx`);
+};
+
+const fnCrearPdfAbonos = () => {
+  if (!datosAbonosInteligentes.value || datosAbonosInteligentes.value.length === 0) {
+    toast.add({ severity: 'warn', summary: 'Aviso', detail: 'No hay abonos para generar el PDF', life: 3000 });
+    return;
+  }
+
+  const doc = new jsPDF('l', 'mm', 'a4');
+  doc.setFontSize(16);
+  doc.text('Reporte de Abonos Inteligentes', 10, 15);
+
+  // Definir estructura de la tabla
+  const columns = ['Cliente', 'No Emisión', 'No Factura', 'Fecha', 'Hora', 'Cantidad','Pendiente', 'Método'];
+  const rows = datosAbonosInteligentes.value.map(abono => [
+    abono.cliente,
+    abono.no_emision,
+    abono.no_factura,
+    abono.fecha,
+    abono.hora,
+    abono.cantidad,
+    abono.pendiente,
+    abono.metodo
+  ]);
+
+  doc.autoTable({
+    head: [columns],
+    body: rows,
+    startY: 25,
+    styles: { fontSize: 10, cellPadding: 3, overflow: 'linebreak' },
+    headStyles: { fillColor: [200, 200, 200], textColor: [0, 0, 0] },
+    columnStyles: { 0: { cellWidth: 30 }, 1: { cellWidth: 30 }, 2: { cellWidth: 30 }, 3: { cellWidth: 30 }, 4: { cellWidth: 20 }, 5: { cellWidth: 25 }, 6: { cellWidth: 30 } }
+  });
+
+  doc.save(`Abonos_Inteligentes_${new Date().toISOString().slice(0, 10)}.pdf`);
+};
+
+/************************************************************************/
+const colorEstado = (data) => {
+
+    if (data.tipocredito === 'NORMAL') {
+        return 'success'; // Suficiente stock
+    } else if (data.tipocredito === 'CUOTAS') {
+        return 'warn'; // Stock bajo
+    }  else {
+        return 'secondary'; // Por si acaso
+    }
+};
+/************************************************************************/
+const fnImpresoraGrande00 = async()=>{
+  if(window.electron){
+      const datosEmpresa1 = JSON.stringify(enviarDatosLocalStorage());
+         const datosFactura = facturasPendientes.value
+       const datosCliente = clientesArray.value.find(cl=>cl.codigo === clienteSeleccionadoCodigo.value)
+       const envio = await window.electron.ipcRenderer.invoke('creditoPDF', JSON.stringify(facturasPendientes.value),JSON.stringify(datosCliente), datosEmpresa1);
+   
+ }
+}
+const fnImpresoraChica00 = async()=>{
+  if(window.electron){
+ 
+     const datosEmpresa1 = JSON.stringify(enviarDatosLocalStorage());
+         const datosFactura = facturasPendientes.value
+       const datosCliente = clientesArray.value.find(cl=>cl.codigo === clienteSeleccionadoCodigo.value)
+       const envio = await window.electron.ipcRenderer.invoke('ticketCXC', JSON.stringify(facturasPendientes.value),JSON.stringify(datosCliente), datosEmpresa1);
+   
+ }
+}
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="container-fluid mt-5">
+<Card>
+<template #content>
+    <div class="row">
+      <div class="col-md-12">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Cuentas_cobrar</legend>
+            <div class="row">
+              <div class="col-sm-12">
+                <a href="#" @click="fetchAndSetupData" class="btn btn-warning text-white cartelito" data-toggle="tooltip" title="Recargar" id="reload"><i class="icon-arrows-cw"></i></a>
+<router-link to="/vender" class="btn btn-success text-white ms-1"><i class="icon-plus"></i></router-link>
+               <a href="#" @click="borrarSeleccionados" class="btn btn-danger btnaccion cartelito ms-1" data-toggle="tooltip" title="Borrar Selección" id="borrador"><i class="icon-trash-4"></i></a>
+<a href="#" v-if="usuarioLocal.usuario =='Soporte'"  @click="borrarTodo" class="btn btn-danger btnaccion cartelito float-end ms-1" data-toggle="tooltip" title="Borrar Todo" id="borrartodo"><i class="icon-trash"></i> Borrar Todo</a>
+
+<a href="#"  @click="fnExportarExcel" class="btn btn-success btnaccion cartelito  ms-1" data-toggle="tooltip" title="Excel" id="excel"><i class="pi pi-file-excel"></i> Excel</a>
+
+<a href="#" v-if="fechaInteligente"  @click="fnAbonosFechaInteligente" class="btn btn-dark btnaccion cartelito  ms-1"  id="excel"><i class="pi pi-money-bill"></i> Ver Abonos</a>
+
+
+              </div>
+
+              <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+              <label for="email_cliente-Actualizador">FILTRAR POR ESTADO</label>
+              <Dropdown  v-model="estadoFiltro" :options="['TODOS','PENDIENTE','SALDADO']" placeholder="Seleccione estatus" class="w-full" />
+              </div>
+              <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+              <label for="porfecha">FILTRAR POR FECHA</label>
+                    <Calendar v-model="filtrarPorFecha" fluid name="porfecha" dateFormat="dd/mm/yy"  />
+              </div>
+
+              <div class="col-12 col-sm-12 col-md-4 col-lg-3">
+              <label for="porfecha">BUSCAR CLIENTE</label>
+                 <awesomplete
+                    class="dropdown-input"
+                    v-model="clienteSeleccionado"
+                    @change="fnAwesomplete"
+                    @selectComplete="handleSelectComplete"
+                    :list="clientesArrayNombre">
+            </awesomplete>
+
+              </div>
+
+              <div class="col-12 col-sm-12 col-md-12 col-lg-3">
+             <label for="porfecha">BUSCADOR INTELIGENTE</label>
+
+<InputGroup>
+    <DatePicker dateFormat="dd/mm/yy" selectionMode="range" :showButtonBar="true" @value-change="fechaInteligenteSeleccionada" v-model="buscadorFechaInteligente" />
+<!--      <flat-pickr v-model="buscadorFechaInteligente" @on-change="fechaInteligenteSeleccionada"  class="form-input w-full" :config="basic"></flat-pickr> -->
+    <InputGroupAddon>
+        <Button icon="pi pi-search" severity="secondary" variant="text" @click="toggleInteligente" />
+    </InputGroupAddon>
+</InputGroup>
+ <Menu ref="menuInteligente" :model="itemsInteligente" popup class="!min-w-fit" />
+              </div>
+
+
+            </div>
+        </fieldset>
+      </div>
+      <div class="col-md-12">
+ <div style="display: flex; justify-content: flex-end;">
+ <input v-model="searchQuery" placeholder="Buscar cuentas_cobrar..." class="p-inputtext p-component" style="margin-bottom: 10px;" />
+</div>
+<DataTable 
+    :value="filteredCuentas_cobrar"  
+    scrollable 
+    scrollHeight="600px"  
+    dataKey="id" 
+    paginator 
+    :rows="10" 
+    @rowSelect="onRowSelect" 
+    selectionMode="single" 
+    size="small"
+    resizableColumns 
+    columnResizeMode="fit"
+    :rowClass="getRowClass"
+    :rowsPerPageOptions="[5, 10, 20, 50]" 
+    tableStyle="min-width: 50rem">
+    <Column header="Options">
+        <template #body="slotProps">
+            <Button 
+                icon="pi pi-cog" 
+                @click="toggleCuentas_cobrar($event, slotProps.data)"
+                aria-haspopup="true"
+                aria-controls="overlay_menu_factura"
+            />
+            <Menu 
+                ref="menu" 
+                id="overlay_menu_Cuentas_cobrar" 
+                :model="itemsCuentas_cobrar" 
+                :popup="true"
+            />
+        </template>
+    </Column>
+    <Column field="id" header="ID"></Column>
+<Column field="tipocredito" header="Tipo Credito">
+            <template #body="slotProps">
+            <Badge :value="slotProps.data.tipocredito" :severity="colorEstado(slotProps.data)" />
+        </template>
+</Column>
+    <Column field="no_emision" header="No_emision"></Column>
+<Column field="no_factura" header="No_factura"></Column>
+<Column field="cod_cliente" header="Cod_cliente"></Column>
+<Column field="nombre_cliente" header="Nombre_cliente"></Column>
+<Column field="cedula_cliente" header="Cedula_cliente"></Column>
+<Column field="telefono_cliente" header="Telefono_cliente"></Column>
+<!-- <Column field="whatsapp_cliente" header="Whatsapp_cliente"></Column>
+<Column field="email_cliente" header="Email_cliente"></Column>
+<Column field="direccion_cliente" header="Direccion_cliente"></Column>
+<Column field="rnc_cliente" header="Rnc_cliente"></Column>
+<Column field="nombrecomercial_cliente" header="Nombrecomercial_cliente"></Column> -->
+<!-- <Column field="saldo" header="Saldo"></Column> -->
+
+<Column field="saldo" header="Saldo">
+    <template #body="slotProps">
+            <Badge :value="slotProps.data.saldo" severity="secondary" />
+    </template>
+</Column>
+<Column field="fecha_emision" header="Fecha_emision"></Column>
+<Column field="monto_credito" header="Monto_credito"></Column>
+<Column field="interes" header="Interes"></Column>
+<Column field="fecha_vencimiento" header="Fecha_vencimiento"></Column>
+<Column field="cuotas" header="Cuotas"></Column>
+<Column field="fecha_pago" header="Fecha_pago"></Column>
+<Column field="estatus" header="Estatus"></Column>
+<Column field="hora" header="Hora"></Column>
+<Column field="vendedor" header="Vendedor"></Column>
+<Column field="delivery" header="Delivery"></Column>
+
+</DataTable>
+      </div>
+    </div>
+  </template>
+</Card>
+<Toast />
+  </div>
+</main>
+
+
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+
+<Dialog v-model:visible="visibleDatosCliente" modal :position="position" header="Imprimir Factura" :style="{ width: '40rem' }">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">Datos del Cliente</span>
+    </div>
+  </template>
+
+      <fieldset class="border p-3 rounded mb-2">
+        <legend class="float-none w-auto px-2">{{clienteSeleccionadoModal}}</legend>
+          <div class="row">
+            <div class="col-12">
+              <h3>Total Adeudado: {{totaAdeudado}}</h3>
+              <h5>Total de Facturas Pendientes: {{cantidadFacturas}}</h5>
+            </div>
+
+          </div>
+      </fieldset>
+
+  <template #footer>
+    <Button label="Saldo" outlined severity="secondary" @click="imprimirSaldo"  />
+    <Button label="Reporte" outlined severity="secondary" @click="visiblePrint = true"  />
+    <Button label="Imprimir" outlined severity="secondary" @click="visiblePrint01 = true"  />
+    <Button label="Abonar" outlined severity="secondary" @click="visibleAbonoModal = true"  />
+    <Button label="Pagar Todo" outlined severity="secondary" @click="fnPagarTodo"  />
+    <Button label="Cancel" outlined severity="secondary" @click="visibleDatosCliente = false" autofocus />
+  </template>
+</Dialog>
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+  <Dialog v-model:visible="visiblePrint01" :position="position" modal header="Productos" :style="{ width: '30rem' }" :breakpoints="{ '1199px': '75vw', '575px': '90vw' }">
+    <template #header>
+      <div class="inline-flex align-items-center justify-content-center gap-2">
+        <span class="font-bold white-space-nowrap">Modal Editar</span>
+      </div>
+    </template>
+
+    <fieldset class="border p-3 rounded mb-2">
+      <legend class="float-none w-auto px-2">Elige la Impresora</legend>
+      <div class="flex flex-wrap gap-4 justify-center">
+         <Button label="Impresora Grande" icon="pi pi-print" @click="fnImpresoraGrande00" iconPos="bottom" />
+         <Button label="Impresora Térmica" icon="pi pi-print" @click="fnImpresoraChica00" iconPos="bottom" />
+     </div >
+    </fieldset>
+
+    <template #footer>
+      <Button label="Cancel" text severity="secondary" @click="visiblePrint01 = false" />
+    </template>
+  </Dialog>
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Dialog v-model:visible="visibleAbono" modal :position="position" header="Modal de Abono" :style="{ width: '40rem' }">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">Modal de Abono</span>
+    </div>
+  </template>
+
+      <fieldset class="border p-3 rounded mb-2">
+        <legend class="float-none w-auto px-2">{{clienteSeleccionadoModal}}</legend>
+          <div class="row">
+                <div class="col-12">
+                  <Button :label="btn1Abono" outlined severity="secondary" @click="fnbtnAgregArbono(btn1Abono)"  />
+                  <Button :label="btn2Abono" class="mx-1" outlined severity="secondary" @click="fnbtnAgregArbono(btn2Abono)"  />
+                  <Button :label="btn3Abono" outlined severity="secondary" @click="fnbtnAgregArbono(btn3Abono)"  />
+                </div>
+
+                  <div class="col-4 form-group">
+                    <label for="fechaabono">FECHA</label>
+                    <InputText type="text" name="fechaabono" v-datepicker v-model="fechaAbonoModal"  class="form-control datepicker " id="fechaabono"  />
+                  </div>
+
+
+
+                  <div class="col-4 form-group">
+                    <label for="abono">ABONO </label>
+                    <InputText  name="abono" v-model="abonoAbonoModal" v-solonumeros v-decimales  class="form-control" id="abono"  />
+                  </div>
+
+                  <div class="col-4 form-group">
+                    <label for="metodoabono">METODO</label>
+                  <Dropdown  v-model="metodoAbonoModal" :options="['EFECTIVO','TRANSFERENCIA','TARJETA']" placeholder="Seleccione estatus" class="w-full" />
+                  </div>
+          </div>
+      </fieldset>
+
+  <template #footer>
+    <Button label="Agregar Abono" outlined severity="secondary" @click="fnAgregarAbono"  />
+    <Button label="Cancel" outlined severity="secondary" @click="visibleAbono = false" autofocus />
+  </template>
+</Dialog>
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Dialog v-model:visible="visibleAbonoModal" modal :position="position" header="Modal de Abono" :style="{ width: '40rem' }">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">Modal de Abono</span>
+    </div>
+  </template>
+
+      <fieldset class="border p-3 rounded mb-2">
+        <legend class="float-none w-auto px-2">{{clienteSeleccionadoModal}}</legend>
+          <div class="row">
+                <div class="col-12">
+                  <Button :label="btn1Abono" outlined severity="secondary" @click="fnbtnAgregArbono(btn1Abono)"  />
+                  <Button :label="btn2Abono" class="mx-1" outlined severity="secondary" @click="fnbtnAgregArbono(btn2Abono)"  />
+                  <Button :label="btn3Abono" outlined severity="secondary" @click="fnbtnAgregArbono(btn3Abono)"  />
+                </div>
+
+                  <div class="col-4 form-group">
+                    <label for="fechaabono">FECHA</label>
+                    <InputText type="text" name="fechaabono" v-datepicker v-model="fechaAbonoModal"  class="form-control datepicker " id="fechaabono" />
+                  </div>
+
+
+
+                  <div class="col-4 form-group">
+                    <label for="abono">ABONO</label>
+                    <InputText name="abono" v-model="abonoAbonoModal" v-solonumeros v-numeroFocusinOut v-decimales  class="form-control decimales soloNumero" id="abono"  />
+                  </div>
+
+                  <div class="col-4 form-group">
+                    <label for="metodoabono">METODO</label>
+                  <Dropdown  v-model="metodoAbonoModal" :options="['EFECTIVO','TRANSFERENCIA','TARJETA']" placeholder="Seleccione estatus" class="w-full" />
+                  </div>
+          </div>
+      </fieldset>
+
+  <template #footer>
+    <Button label="Agregar Abono" outlined severity="secondary" @click="fnAgregarAbonoModal"  />
+    <Button label="Cancel" outlined severity="secondary" @click="visibleAbonoModal = false" autofocus />
+  </template>
+</Dialog>
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+  <Dialog v-model:visible="visiblePrint" :position="position" modal header="Productos" :style="{ width: '50rem' }" :breakpoints="{ '1199px': '75vw', '575px': '90vw' }">
+    <template #header>
+      <div class="inline-flex align-items-center justify-content-center gap-2">
+        <span class="font-bold white-space-nowrap">Modal Editar</span>
+      </div>
+    </template>
+
+    <fieldset class="border p-3 rounded mb-2">
+      <legend class="float-none w-auto px-2">Elige una Opción</legend>
+      <div class="flex flex-wrap gap-4 justify-center">
+         <Button label="Ver Detalles" icon="pi pi-eye" @click="fnVerDetalles" iconPos="bottom" />
+         <Button label="Impresora" icon="pi pi-print" @click="fnImpresoraGrande" iconPos="bottom" />
+         <Button label="Térmica" icon="pi pi-print" @click="imprimirFactura" iconPos="bottom" />
+         <Button label="PDF" icon="pi pi-arrow-circle-down" @click="fnReportePDF" iconPos="bottom" />
+         <Button label="EXCEL" icon="pi pi-arrow-circle-down" @click="fnReporteEXCEL" iconPos="bottom" />
+     </div >
+    </fieldset>
+
+    <template #footer>
+      <Button label="Cancel" text severity="secondary" @click="visiblePrint = false" />
+    </template>
+  </Dialog>
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+
+<Dialog v-model:visible="visibleAbonosInteligentes" position="top" modal :style="{ width: '75rem' }" header="AbonosInteligente">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">AbonosInteligente</span>
+    </div>
+  </template>
+
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">AbonosInteligente</legend>
+    <div class="grid grid-cols-1  gap-4">
+      <div>
+<div class="overflow-x-auto border rounded-md p-4">
+  <div v-html="generarTablaFromStringJSON(datosAbonosInteligentes, false, true,null,null,'tablaCxC',undefined)" class="min-w-full whitespace-nowrap"></div>
+</div>
+      </div>
+    </div>
+  </fieldset>
+
+  <template #footer>
+      <Button label="Excel" outlined severity="primary" icon="pi pi-file-excel" @click="fnCrearExcelAbonos"  />
+      <Button label="Pdf" outlined severity="danger" icon="pi pi-file-pdf" @click="fnCrearPdfAbonos"  />
+      <Button label="Cerrar" outlined severity="secondary" @click="visibleAbonosInteligentes = false"  />
+  </template>
+</Dialog>
+
+
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+
+<LoadingOverlay :visible="loading" />
+<EnviarWhatsApp ref="enviarWhatsAppRef" :initialDatosWhatsApp="datosWhatsApp" />
+</template>
+<style >
+.row-red {
+  color: red !important;
+}
+
+.row-green {
+  color: green !important;
+}
+
+.row-yellow {
+  color: yellow !important;
+}
+
+/* Estado: Pendiente - Blanco en modo claro, gris claro en modo oscuro */
+.pendiente {
+  color: #FFFFFF !important; /* Blanco */
+}
+
+/* Estado: Devolución - Rojo */
+.devolucion {
+  color: #DC3545 !important; /* Rojo */
+}
+
+/* Estado: Reparado - Azul para diferenciarlo */
+.reparado {
+  color: #007BFF !important; /* Azul */
+}
+
+/* Estado: Entregado - Verde */
+.entregado {
+  color: #28A745 !important; /* Verde */
+}
+
+/* Estado: Revisión - Amarillo */
+.revision {
+  color: #FFC107 !important; /* Amarillo */
+}
+
+/* Modo oscuro: Pendiente en gris claro */
+@media (prefers-color-scheme: dark) {
+  .pendiente {
+    color: #DDDDDD !important; /* Gris claro */
+  }
+}
+
+</style>

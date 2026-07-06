@@ -1,0 +1,72 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Gastosfijos",
+"to": "/gastosfijos",
+"permiso": "Administrador,Soporte",
+"icon": "pi pi-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/gastosfijos',
+        name: 'gastosfijos',
+        component: () => import('../views/Gastosfijos/Gastosfijos.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/creargastosfijos',
+        name: 'creargastosfijos',
+        component: () => import('@/views/Gastosfijos/CrearGastosfijos.vue'),
+    },
+    {
+        path: '/editargastosfijos/:id',
+        name: 'editargastosfijos',
+        component: () => import('@/views/Gastosfijos/EditarGastosfijos.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'descripcion', 'valor', 'fecha_pago', 'alerta', 'dias_alerta', 'tipo', 'cuentaporpagar', 'ultimo_pago'"
+******************************************************
+{
+        
+      "descripcion": "descripcion",
+      "DESCRIPCION": "DESCRIPCION",
+      "Descripcion": "Descripcion",
+     
+      "valor": "valor",
+      "VALOR": "VALOR",
+      "Valor": "Valor",
+     
+      "fecha_pago": "fecha_pago",
+      "FECHA_PAGO": "FECHA_PAGO",
+      "Fecha_pago": "Fecha_pago",
+     
+      "alerta": "alerta",
+      "ALERTA": "ALERTA",
+      "Alerta": "Alerta",
+     
+      "dias_alerta": "dias_alerta",
+      "DIAS_ALERTA": "DIAS_ALERTA",
+      "Dias_alerta": "Dias_alerta",
+     
+      "tipo": "tipo",
+      "TIPO": "TIPO",
+      "Tipo": "Tipo",
+     
+      "cuentaporpagar": "cuentaporpagar",
+      "CUENTAPORPAGAR": "CUENTAPORPAGAR",
+      "Cuentaporpagar": "Cuentaporpagar",
+     
+      "ultimo_pago": "ultimo_pago",
+      "ULTIMO_PAGO": "ULTIMO_PAGO",
+      "Ultimo_pago": "Ultimo_pago",
+}
+

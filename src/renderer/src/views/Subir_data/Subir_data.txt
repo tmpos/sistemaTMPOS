@@ -1,0 +1,56 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Subir_data",
+"to": "/subir_data",
+"permiso": "Administrador,Soporte",
+"icon": "pi pi-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/subir_data',
+        name: 'subir_data',
+        component: () => import('../views/Subir_data/Subir_data.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/crearsubir_data',
+        name: 'crearsubir_data',
+        component: () => import('@/views/Subir_data/CrearSubir_data.vue'),
+    },
+    {
+        path: '/editarsubir_data/:id',
+        name: 'editarsubir_data',
+        component: () => import('@/views/Subir_data/EditarSubir_data.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'tabla', 'accion', 'estado', 'data'"
+******************************************************
+{
+        
+      "tabla": "tabla",
+      "TABLA": "TABLA",
+      "Tabla": "Tabla",
+     
+      "accion": "accion",
+      "ACCION": "ACCION",
+      "Accion": "Accion",
+     
+      "estado": "estado",
+      "ESTADO": "ESTADO",
+      "Estado": "Estado",
+     
+      "data": "data",
+      "DATA": "DATA",
+      "Data": "Data",
+}
+

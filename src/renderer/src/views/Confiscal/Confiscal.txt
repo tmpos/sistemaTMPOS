@@ -1,0 +1,22 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Confiscal",
+"to": "/confiscal",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/confiscal',
+        name: 'confiscal',
+        component: () => import('../views/Confiscal/Confiscal.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********
+**********************|-CAMPOS-|******************
+"id, nombre, prefijo, secuencia, aprobados, fecha, expiracion, contador, created_at, updated_at, usuario"
+******************************************************

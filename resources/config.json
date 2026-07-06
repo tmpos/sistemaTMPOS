@@ -1,0 +1,52 @@
+{
+  "VITE_LINKURL": "https://demo.tmposrd.com",
+  "VITE_LINK_API": "/api2",
+  "VITE_LINK_UPDATE": "https://actualizacion.tmposrd.com",
+  "VITE_TOKEN": "1234567890abc",
+  "VITE_TOKEN_CORTO": "1234",
+  "VITE_PATRON_TELEFONO": "+1(999) 999-9999",
+  "VITE_PATRON_CEDULA": "999-9999999-9",
+  "VITE_THEME": "{\"preset\":\"Aura\",\"primary\":\"lime\",\"surface\":\"zinc\",\"darkTheme\":false,\"menuMode\":\"static\",\"tipo\":\"light\"}",
+  "VITE_IMPRESORA_LOCAL": "http://printer.test",
+  "impresora": "{\"fontSize\":\"11\",\"fontFamily\":\"arial\",\"pageWidth\":\"300\",\"bodyWidth\":\"250\",\"ticketWidth\":\"240\",\"logoWidth\":\"150\",\"pageSizeWidth\":\"80000\",\"pageSizeHeight\":\"295000\",\"copies\":\"1\"}",
+    "impresoraLabel": {
+      "preview": false,
+      "width": "50800",
+      "height": "76200",
+      "unit": "mm",
+      "margin": "0 0 0 0",
+      "copies": 1,
+      "silent": true,
+      "printerName": "4BARCODE",
+      "timeOutPerLine": 1000
+    },
+    "themeConfig": {
+      "primaryColor": "#6366f1",
+      "secondaryColor": "#8b5cf6",
+      "accentColor": "#10b981",
+      "surfaceColor": "#ffffff",
+      "textColor": "#0f172a",
+      "appTopbarBg": "#ffffff",
+      "appTopbarText": "#475569",
+      "appTopbarButtonBg": "#eef2ff",
+      "appTopbarButtonText": "#6366f1"
+    },
+  "VITE_ID_EMPRESA": "1",
+  "VITE_UPDATE": "false",
+  "VITE_PRODUCTION": "false",
+  "VITE_CAJERO_ACTIVO": "false",
+  "almacen": "DEMO TMPOS SRL",
+  "VITE_TURNOS": [
+    {
+      "turno": "COMPLETO"
+    }
+  ],
+  "datosDefault": "{\"logo\":true,\"direccion\":true,\"telefono\":true,\"email\":true,\"legal\":false,\"fecha\":true,\"hora\":true,\"rnc\":true,\"nombre_cliente\":true,\"vendedor\":false,\"cajero\":true,\"mesero\":false,\"instalador\":false,\"mesa\":false,\"delivery\":false,\"metodopago\":true,\"comprobante\":true,\"no_factura\":true,\"subtotal\":true,\"descuento\":true,\"impuestos\":true,\"total\":true,\"cambio\":false,\"barcode\":true,\"firma\":false,\"nota\":true,\"empaque\":false}",
+  "VITE_IMPRESORA_TINTA": "",
+  "VITE_IMPRESORA_TERMICA": "POS80",
+  "ONLINE": "false",
+  "OFFLINE": "true",
+  "HUELLA": "false",
+  "subirData": "false",
+  "SERVIDORLOCAL": "http://localhost:3000/api"
+}

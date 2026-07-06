@@ -1,0 +1,297 @@
+<script setup>
+import { ref, onMounted, nextTick, watchEffect } from 'vue';
+import { useToast } from "primevue/usetoast";
+
+import { useRouter,useRoute } from 'vue-router';
+const router = useRouter();
+
+import {enviarDatosPorPost,
+  eliminarDatos, 
+  obtenerIdsSeleccionados,
+  borrarTodoslosDatos,
+  lenguajeDataTable,
+  nfecha,
+  arrayToObjetoFromTabla,
+  peticionesFetch,
+  encryptarPassword,
+  envioElectron,
+  generarCodigoUnico,
+  peticiones,
+  generadorCodigo,
+  mensajetoast,
+  lasMayusculas} from '@/funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+/************************************************************************/
+import Awesomplete from '@/components/Awesomplete.vue';
+/************************************************************************/
+/************************************************************************/
+import {useDatosEmpresa} from '@/stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const clientesArray = ref([]);
+const facturasArray = ref([]);
+const facturasNumeros = ref([]);
+/************************************************************************/
+const datoscamposCuentas_cobrar = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+/************************************************************************/
+const fetchAndSetupData = async () => {
+    const jsonData = await arrayToObjetoFromTablaOffline('cuentas_cobrar');
+    datoscamposCuentas_cobrar.value = jsonData;
+     const ultimaFactura = await peticionesFetchOffline('getMaxValue', 'cuentas_cobrar', 'no_emision');
+    datoscamposCuentas_cobrar.value.no_emision = generadorCodigo(ultimaFactura[0], '', 7) || '';
+};
+/************************************************************************/
+const fetchDataFacturas = async () => {
+const response = await peticionesFetchOffline('getDataAsArray', 'facturas');
+    const jsonData = response;
+    facturasArray.value = jsonData;
+    facturasNumeros.value = jsonData.map(fact=>fact.no_factura);
+};
+/************************************************************************/
+//clientesArray
+const fetchDataClientes = async () => {
+const response = await peticionesFetchOffline('getDataAsArray', 'clientes');
+    const jsonData = response;
+    clientesArray.value = jsonData;
+};
+/************************************************************************/
+onMounted(async () => {
+    const datosJSON = await envioElectron('datosarchivo');
+    link.value = datosJSON.VITE_LINKURL;
+    api.value = datosJSON.VITE_LINK_API;
+    token.value = datosJSON.VITE_TOKEN; 
+    patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO || '9999999999'; // Ensure a default value if undefined
+    linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+    patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+
+    tokenCifrado.value = await encryptarPassword(token.value, 10);
+    if (!datosEmpresa.empresa.nombre) {
+        await datosEmpresa.inicializarDatosEmpresa(link.value + api.value);
+    }
+    await fetchAndSetupData()
+    await fetchDataFacturas()
+    await fetchDataClientes()
+
+});
+
+/************************************************************************/
+async function enviarDatos(event) {
+    event.preventDefault();
+  const url = link.value+api.value+"/insertar/cuentas_cobrar";
+  if (!datoscamposCuentas_cobrar.value) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Datos incompletos, no se puede Enviar.', life: 3000 });
+    return;
+  }
+  if (datoscamposCuentas_cobrar.value.hasOwnProperty('created_at')) {
+     datoscamposCuentas_cobrar.value.created_at = nfecha('timestamp')
+     datoscamposCuentas_cobrar.value.updated_at = nfecha('timestamp')
+     datoscamposCuentas_cobrar.value.identificadordb = generarCodigoUnico()
+    }
+  const envioDatos = await peticionesFetchOffline('insertData', 'cuentas_cobrar', JSON.stringify(datoscamposCuentas_cobrar.value));
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Agregados con éxito.', life: 3000 });
+Swal.fire({
+  title: "Datos Agregados",
+  text: "Que hacemos ahora?",
+  icon: "warning",
+  showCancelButton: true,
+  confirmButtonText: "Agregar Otro!",
+  cancelButtonText: "No, Regresar al Inicio!",
+ }).then(async(result) => {
+  if (result.isConfirmed) {
+      fetchAndSetupData()
+} else if (result.dismiss === Swal.DismissReason.cancel) {
+    router.push({ path: `/cuentas_cobrar` });
+  }
+})
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+const fnAwesomplete = ()=>{
+
+}
+const handleSelectComplete = async(selected)=>{
+
+ const datosEquipo = facturasArray.value.find(fact=>fact.no_factura == selected.value)
+ if (datosEquipo) {
+  const datosCliente = clientesArray.value.find(client=>client.codigo == datosEquipo.cod_cliente)
+ datoscamposCuentas_cobrar.value.cod_cliente = datosEquipo.cod_cliente || '';
+ datoscamposCuentas_cobrar.value.nombre_cliente = datosEquipo.nombre_cliente || '';
+ datoscamposCuentas_cobrar.value.cedula_cliente = datosCliente.cedula || '';
+ datoscamposCuentas_cobrar.value.telefono_cliente = datosCliente.telefono || '';
+ datoscamposCuentas_cobrar.value.whatsapp_cliente = datosCliente.whatsapp || '';
+ datoscamposCuentas_cobrar.value.email_cliente = datosCliente.email || '';
+ datoscamposCuentas_cobrar.value.direccion_cliente = datosCliente.direccion || '';
+
+
+ }
+
+}
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper card">
+  <div class="w-full px-4 mt-5">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Cuentas_cobrar</legend>
+    <div class="grid grid-cols-12 gap-4">
+      <div class="sm:col-span-12">
+       <router-link to="/cuentas_cobrar" class="btn btn-dark text-white "><i class="icon-home"></i></router-link>
+      </div>
+    </div>
+</fieldset>
+<section>
+    <form id="formularioActualizar" action="" method="">
+         <div class="box-body">
+          <div class="grid grid-cols-12 gap-4" id="campos">
+<div class="form-group col-span-12 sm:col-span-2 md:col-span-2 lg:col-span-2 xl:col-span-2" >
+<label for="no_emisionAgregarDatos">NO_EMISION</label>
+<input type="input" v-model="datoscamposCuentas_cobrar.no_emision" name="no_emision"  class="form-control soloNumero" id="no_emisionAgregarDatos" v-solonumeros placeholder="no_emision" maxlength="250" readonly>
+</div>
+<div class="form-group col-span-12 sm:col-span-2 md:col-span-2 lg:col-span-2 xl:col-span-2" >
+<label for="no_facturaAgregarDatos">NO_FACTURA</label>
+
+            <awesomplete
+                    class="dropdown-input"
+                    v-model="datoscamposCuentas_cobrar.no_factura"
+                    @change="fnAwesomplete"
+                    @selectComplete="handleSelectComplete"
+                    :list="facturasNumeros">
+            </awesomplete>
+
+</div>
+<div class="form-group col-span-12 sm:col-span-2 md:col-span-2 lg:col-span-2 xl:col-span-2" >
+<label for="cod_clienteAgregarDatos">COD_CLIENTE</label>
+<input type="input" v-model="datoscamposCuentas_cobrar.cod_cliente" name="cod_cliente"  class="form-control " id="cod_clienteAgregarDatos"  placeholder="cod_cliente" maxlength="250" readonly>
+</div>
+<div class="form-group col-span-12 sm:col-span-4 md:col-span-4 lg:col-span-4 xl:col-span-4" >
+<label for="nombre_clienteAgregarDatos">NOMBRE_CLIENTE</label>
+<input type="input" v-model="datoscamposCuentas_cobrar.nombre_cliente" name="nombre_cliente"  class="form-control mayusc" id="nombre_clienteAgregarDatos" v-mayuscula placeholder="nombre_cliente" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-2 md:col-span-2 lg:col-span-2 xl:col-span-2" >
+<label for="cedula_clienteAgregarDatos">CEDULA_CLIENTE</label>
+<input type="input" v-model="datoscamposCuentas_cobrar.cedula_cliente" name="cedula_cliente"  class="form-control " id="cedula_clienteAgregarDatos"  placeholder="cedula_cliente" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-4 md:col-span-4 lg:col-span-4 xl:col-span-4" >
+<label for="telefono_clienteAgregarDatos">TELEFONO_CLIENTE</label>
+<InputMask id="telefono_clienteAgregarDatos" class="form-control" v-model="datoscamposCuentas_cobrar.telefono_cliente" :mask="patronTelefono" :placeholder="patronTelefono" />
+</div>
+<div class="form-group col-span-12 sm:col-span-4 md:col-span-4 lg:col-span-4 xl:col-span-4" >
+<label for="whatsapp_clienteAgregarDatos">WHATSAPP_CLIENTE</label>
+<InputMask id="whatsapp_clienteAgregarDatos" class="form-control" v-model="datoscamposCuentas_cobrar.whatsapp_cliente" :mask="patronTelefono" :placeholder="patronTelefono" />
+</div>
+<div class="form-group col-span-12 sm:col-span-4 md:col-span-4 lg:col-span-4 xl:col-span-4" >
+<label for="email_clienteAgregarDatos">EMAIL_CLIENTE</label>
+<input type="input" v-model="datoscamposCuentas_cobrar.email_cliente" name="email_cliente"  class="form-control " id="email_clienteAgregarDatos"  placeholder="email_cliente" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12" >
+<label for="direccion_clienteAgregarDatos">DIRECCION_CLIENTE</label>
+<textarea class="form-control " v-model="datoscamposCuentas_cobrar.direccion_cliente" id="direccion_clienteAgregarDatos" name="direccion_cliente" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-span-12 sm:col-span-4 md:col-span-4 lg:col-span-4 xl:col-span-4" >
+<label for="rnc_clienteAgregarDatos">RNC_CLIENTE</label>
+<input type="input" v-model="datoscamposCuentas_cobrar.rnc_cliente" name="rnc_cliente"  class="form-control " id="rnc_clienteAgregarDatos"  placeholder="rnc_cliente" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-8 md:col-span-8 lg:col-span-8 xl:col-span-8" >
+<label for="nombrecomercial_clienteAgregarDatos">NOMBRECOMERCIAL_CLIENTE</label>
+<input type="input" v-model="datoscamposCuentas_cobrar.nombrecomercial_cliente" name="nombrecomercial_cliente"  class="form-control " id="nombrecomercial_clienteAgregarDatos"  placeholder="nombrecomercial_cliente" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-2 md:col-span-2 lg:col-span-2 xl:col-span-2" >
+<label for="fecha_emisionAgregarDatos">FECHA_EMISION</label>
+<input type="input" v-model="datoscamposCuentas_cobrar.fecha_emision" name="fecha_emision"  class="form-control " id="fecha_emisionAgregarDatos"  placeholder="fecha_emision" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-2 md:col-span-2 lg:col-span-2 xl:col-span-2" >
+<label for="monto_creditoAgregarDatos">MONTO_CREDITO</label>
+<input type="input" v-model="datoscamposCuentas_cobrar.monto_credito" name="monto_credito"  class="form-control soloNumero" id="monto_creditoAgregarDatos" v-solonumeros placeholder="monto_credito" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-2 md:col-span-2 lg:col-span-2 xl:col-span-2" >
+<label for="interesAgregarDatos">INTERES</label>
+<input type="input" v-model="datoscamposCuentas_cobrar.interes" name="interes"  class="form-control soloNumero" id="interesAgregarDatos" v-solonumeros placeholder="interes" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-2 md:col-span-2 lg:col-span-2 xl:col-span-2" >
+<label for="fecha_vencimientoAgregarDatos">FECHA_VENCIMIENTO</label>
+<input type="input" v-model="datoscamposCuentas_cobrar.fecha_vencimiento" name="fecha_vencimiento"  class="form-control " id="fecha_vencimientoAgregarDatos"  placeholder="fecha_vencimiento" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-2 md:col-span-2 lg:col-span-2 xl:col-span-2" >
+<label for="cuotasAgregarDatos">CUOTAS</label>
+<input type="input" v-model="datoscamposCuentas_cobrar.cuotas" name="cuotas"  class="form-control soloNumero" id="cuotasAgregarDatos" v-solonumeros placeholder="cuotas" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-2 md:col-span-2 lg:col-span-2 xl:col-span-2" >
+<label for="saldoAgregarDatos">SALDO</label>
+<input type="input" v-model="datoscamposCuentas_cobrar.saldo" name="saldo"  class="form-control soloNumero" id="saldoAgregarDatos" v-solonumeros placeholder="saldo" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-2 md:col-span-2 lg:col-span-2 xl:col-span-2" >
+<label for="fecha_pagoAgregarDatos">FECHA_PAGO</label>
+<input type="input" v-model="datoscamposCuentas_cobrar.fecha_pago" name="fecha_pago"  class="form-control " id="fecha_pagoAgregarDatos"  placeholder="fecha_pago" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12" >
+<label for="pagosAgregarDatos">PAGOS</label>
+<textarea class="form-control " v-model="datoscamposCuentas_cobrar.pagos" id="pagosAgregarDatos" name="pagos" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-span-12 sm:col-span-3 md:col-span-3 lg:col-span-3 xl:col-span-3" >
+<label for="estatusAgregarDatos">ESTATUS</label>
+<select class="form-control " v-model="datoscamposCuentas_cobrar.estatus" id="estatusAgregarDatos" name="estatus" >
+  <option value="PENDIENTE">PENDIENTE</option>
+<option value="SALDADO">SALDADO</option>
+<option value="ELIMINADO">ELIMINADO</option>
+</select></div>
+<div class="form-group col-span-12 sm:col-span-3 md:col-span-3 lg:col-span-3 xl:col-span-3" >
+<label for="horaAgregarDatos">HORA</label>
+<input type="input" v-model="datoscamposCuentas_cobrar.hora" name="hora"  class="form-control " id="horaAgregarDatos"  placeholder="hora" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-3 md:col-span-3 lg:col-span-3 xl:col-span-3" >
+<label for="vendedorAgregarDatos">VENDEDOR</label>
+<input type="input" v-model="datoscamposCuentas_cobrar.vendedor" name="vendedor"  class="form-control mayusc" id="vendedorAgregarDatos" v-mayuscula placeholder="vendedor" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-3 md:col-span-3 lg:col-span-3 xl:col-span-3" >
+<label for="deliveyAgregarDatos">DELIVEY</label>
+<input type="input" v-model="datoscamposCuentas_cobrar.delivey" name="delivey"  class="form-control mayusc" id="deliveyAgregarDatos" v-mayuscula placeholder="delivey" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12" >
+<label for="notaAgregarDatos">NOTA</label>
+<textarea class="form-control " v-model="datoscamposCuentas_cobrar.nota" id="notaAgregarDatos" name="nota" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-span-12 sm:col-span-6 md:col-span-6 lg:col-span-6 xl:col-span-6" hidden>
+<label for="updated_atAgregarDatos">UPDATED_AT</label>
+<input type="input" v-model="datoscamposCuentas_cobrar.updated_at" name="updated_at"  class="form-control " id="updated_atAgregarDatos"  placeholder="updated_at" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-6 md:col-span-6 lg:col-span-6 xl:col-span-6" hidden>
+<label for="created_atAgregarDatos">CREATED_AT</label>
+<input type="input" v-model="datoscamposCuentas_cobrar.created_at" name="created_at"  class="form-control " id="created_atAgregarDatos"  placeholder="created_at" maxlength="250">
+</div>
+<div class="form-group col-span-6" hidden>
+<label for="created_atAgregarDatos">CREATED_AT</label>
+<input type="input" v-model="datoscamposCuentas_cobrar.created_at" name="created_at"  class="form-control " id="created_atAgregarDatos"  placeholder="created_at" maxlength="">
+</div>
+<div class="form-group col-span-6" hidden>
+<label for="updated_atAgregarDatos">UPDATED_AT</label>
+<input type="input" v-model="datoscamposCuentas_cobrar.updated_at" name="updated_at"  class="form-control " id="updated_atAgregarDatos"  placeholder="updated_at" maxlength="">
+</div>
+<div class="form-group col-span-12" hidden>
+<label for="usuarioAgregarDatos">USUARIO</label>
+<input type="input" v-model="datoscamposCuentas_cobrar.usuario" name="usuario"  class="form-control " id="usuarioAgregarDatos"  placeholder="usuario" maxlength="250">
+</div>
+<div class="form-group sm:col-span-12 mb-5 mt-5">
+<button type="submit" @click="enviarDatos" class="btn btn-primary elboton w-100">Enviar Datos</button>
+  </div>
+  </div>
+  </div>
+   </form>
+</section>
+  </div>
+   </main>
+<Toast />
+</template>
+<style>
+</style>

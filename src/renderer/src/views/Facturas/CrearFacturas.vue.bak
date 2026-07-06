@@ -1,0 +1,252 @@
+<script setup>
+import { ref, onMounted, nextTick, watchEffect } from 'vue';
+import { useToast } from "primevue/usetoast";
+import { useRouter, useRoute } from 'vue-router';
+const router = useRouter();
+const route = useRoute(); 
+import {enviarDatosPorPost,
+  eliminarDatos, 
+  obtenerIdsSeleccionados,
+  borrarTodoslosDatos,
+  lenguajeDataTable,
+  nfecha,
+  arrayToObjetoFromTabla,
+  peticionesFetch,
+  encryptarPassword,
+  envioElectron,
+  generarCodigoUnico,
+  peticiones,
+  mensajetoast,
+  lasMayusculas} from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const tokenCorto = ref('');
+/************************************************************************/
+const datoscamposFacturas = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+const position = "top";
+/************************************************************************/
+const fetchAndSetupData = async () => {
+    const jsonData = await arrayToObjetoFromTabla(link.value+api.value,tokenCifrado.value,'facturas');
+    datoscamposFacturas.value = jsonData;
+};
+/************************************************************************/
+onMounted(async() => {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+if (!datosEmpresa.empresa.nombre) {
+    await datosEmpresa.inicializarDatosEmpresa(link.value+api.value);
+  }
+fetchAndSetupData()
+});
+/************************************************************************/
+async function enviarDatos(event) {
+    event.preventDefault();
+  const url = link.value+api.value+"/insertar/facturas";
+  if (!datoscamposFacturas.value) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Datos incompletos, no se puede Enviar.', life: 3000 });
+    return;
+  }
+  if (datoscamposFacturas.value.hasOwnProperty('created_at')) {
+     datoscamposFacturas.value.created_at = nfecha('timestamp')
+     datoscamposFacturas.value.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await enviarDatosPorPost(url, datoscamposFacturas.value,tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Agregados con éxito.', life: 3000 });
+Swal.fire({
+  title: "Datos Agregados",
+  text: "Que hacemos ahora?",
+  icon: "warning",
+  showCancelButton: true,
+  confirmButtonText: "Agregar Otro!",
+  cancelButtonText: "No, Regresar al Inicio!",
+ }).then(async(result) => {
+  if (result.isConfirmed) {
+      fetchAndSetupData()
+} else if (result.dismiss === Swal.DismissReason.cancel) {
+    router.push({ path: `/facturas` });
+  }
+})
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper card">
+  <div class="container-fluid mt-5">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Facturas</legend>
+    <div class="row">
+      <div class="col-sm-12">
+       <router-link to="/facturas" class="btn btn-dark text-white "><i class="icon-home"></i></router-link>
+      </div>
+    </div>
+</fieldset>
+<section>
+<fieldset class="border p-3 rounded mb-2">
+  <legend class="float-none w-auto px-2">Campos</legend>
+    <form id="formularioActualizar" action="" method="">
+         <div class="box-body">
+          <div class="row" id="campos">
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="no_facturaAgregarDatos">NO_FACTURA</label>
+<input type="input" v-model="datoscamposFacturas.no_factura" name="no_factura"  class="form-control " id="no_facturaAgregarDatos"  placeholder="no_factura" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="tipo_facturaAgregarDatos">TIPO_FACTURA</label>
+<input type="input" v-model="datoscamposFacturas.tipo_factura" name="tipo_factura"  class="form-control " id="tipo_facturaAgregarDatos"  placeholder="tipo_factura" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="comprobanteAgregarDatos">COMPROBANTE</label>
+<input type="input" v-model="datoscamposFacturas.comprobante" name="comprobante"  class="form-control " id="comprobanteAgregarDatos"  placeholder="comprobante" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="cod_clienteAgregarDatos">COD_CLIENTE</label>
+<input type="input" v-model="datoscamposFacturas.cod_cliente" name="cod_cliente"  class="form-control " id="cod_clienteAgregarDatos"  placeholder="cod_cliente" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-8 col-md-8 col-lg-8 col-xl-8" >
+<label for="nombre_clienteAgregarDatos">NOMBRE_CLIENTE</label>
+<input type="input" v-model="datoscamposFacturas.nombre_cliente" name="nombre_cliente"  class="form-control mayusc" id="nombre_clienteAgregarDatos" v-mayuscula placeholder="nombre_cliente" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="telefono_clienteAgregarDatos">TELEFONO_CLIENTE</label>
+<InputMask id="telefono_clienteAgregarDatos" class="form-control" v-model="datoscamposFacturas.telefono_cliente" :mask="patronTelefono" :placeholder="patronTelefono" />
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="productosAgregarDatos">PRODUCTOS</label>
+<textarea class="form-control " v-model="datoscamposFacturas.productos" id="productosAgregarDatos" name="productos" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="vendedorAgregarDatos">VENDEDOR</label>
+<input type="input" v-model="datoscamposFacturas.vendedor" name="vendedor"  class="form-control " id="vendedorAgregarDatos"  placeholder="vendedor" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="metodo_pagoAgregarDatos">METODO_PAGO</label>
+<input type="input" v-model="datoscamposFacturas.metodo_pago" name="metodo_pago"  class="form-control " id="metodo_pagoAgregarDatos"  placeholder="metodo_pago" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="tarjetaAgregarDatos">TARJETA</label>
+<input type="input" v-model="datoscamposFacturas.tarjeta" name="tarjeta"  class="form-control " id="tarjetaAgregarDatos"  placeholder="tarjeta" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="transferenciaAgregarDatos">TRANSFERENCIA</label>
+<input type="input" v-model="datoscamposFacturas.transferencia" name="transferencia"  class="form-control " id="transferenciaAgregarDatos"  placeholder="transferencia" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="efectivoAgregarDatos">EFECTIVO</label>
+<input type="input" v-model="datoscamposFacturas.efectivo" name="efectivo"  class="form-control " id="efectivoAgregarDatos"  placeholder="efectivo" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="canal_ventaAgregarDatos">CANAL_VENTA</label>
+<input type="input" v-model="datoscamposFacturas.canal_venta" name="canal_venta"  class="form-control " id="canal_ventaAgregarDatos"  placeholder="canal_venta" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="fecha_emisionAgregarDatos">FECHA_EMISION</label>
+<input type="input" v-model="datoscamposFacturas.fecha_emision" name="fecha_emision"  class="form-control " id="fecha_emisionAgregarDatos"  placeholder="fecha_emision" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="impuestoAgregarDatos">IMPUESTO</label>
+<input type="input" v-model="datoscamposFacturas.impuesto" name="impuesto"  class="form-control " id="impuestoAgregarDatos"  placeholder="impuesto" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="descuentoAgregarDatos">DESCUENTO</label>
+<input type="input" v-model="datoscamposFacturas.descuento" name="descuento"  class="form-control " id="descuentoAgregarDatos"  placeholder="descuento" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="subtotalAgregarDatos">SUBTOTAL</label>
+<input type="input" v-model="datoscamposFacturas.subtotal" name="subtotal"  class="form-control " id="subtotalAgregarDatos"  placeholder="subtotal" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="totalAgregarDatos">TOTAL</label>
+<input type="input" v-model="datoscamposFacturas.total" name="total"  class="form-control " id="totalAgregarDatos"  placeholder="total" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="gananciaAgregarDatos">GANANCIA</label>
+<input type="input" v-model="datoscamposFacturas.ganancia" name="ganancia"  class="form-control " id="gananciaAgregarDatos"  placeholder="ganancia" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="financieraAgregarDatos">FINANCIERA</label>
+<input type="input" v-model="datoscamposFacturas.financiera" name="financiera"  class="form-control " id="financieraAgregarDatos"  placeholder="financiera" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="estado_facturaAgregarDatos">ESTADO_FACTURA</label>
+<input type="input" v-model="datoscamposFacturas.estado_factura" name="estado_factura"  class="form-control " id="estado_facturaAgregarDatos"  placeholder="estado_factura" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="fecha_estadoAgregarDatos">FECHA_ESTADO</label>
+<input type="input" v-model="datoscamposFacturas.fecha_estado" name="fecha_estado"  class="form-control " id="fecha_estadoAgregarDatos"  placeholder="fecha_estado" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="mesAgregarDatos">MES</label>
+<input type="input" v-model="datoscamposFacturas.mes" name="mes"  class="form-control " id="mesAgregarDatos"  placeholder="mes" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="yearAgregarDatos">YEAR</label>
+<input type="input" v-model="datoscamposFacturas.year" name="year"  class="form-control " id="yearAgregarDatos"  placeholder="year" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="horaAgregarDatos">HORA</label>
+<input type="input" v-model="datoscamposFacturas.hora" name="hora"  class="form-control " id="horaAgregarDatos"  placeholder="hora" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="otroAgregarDatos">OTRO</label>
+<textarea class="form-control " id="otroAgregarDatos" v-model="datoscamposFacturas.otro" name="otro" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="notaAgregarDatos">NOTA</label>
+<textarea class="form-control " id="notaAgregarDatos" v-model="datoscamposFacturas.nota" name="nota" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="cajeroAgregarDatos">CAJERO</label>
+<input type="input" v-model="datoscamposFacturas.cajero" name="cajero"  class="form-control " id="cajeroAgregarDatos"  placeholder="cajero" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="tokenAgregarDatos">TOKEN</label>
+<input type="input" v-model="datoscamposFacturas.token" name="token"  class="form-control " id="tokenAgregarDatos"  placeholder="token" maxlength="250">
+</div>
+<div class="form-group col-6" hidden>
+<label for="created_atAgregarDatos">CREATED_AT</label>
+<input type="input" v-model="datoscamposFacturas.created_at" name="created_at"  class="form-control " id="created_atAgregarDatos"  placeholder="created_at" maxlength="">
+</div>
+<div class="form-group col-6" hidden>
+<label for="updated_atAgregarDatos">UPDATED_AT</label>
+<input type="input" v-model="datoscamposFacturas.updated_at" name="updated_at"  class="form-control " id="updated_atAgregarDatos"  placeholder="updated_at" maxlength="">
+</div>
+<div class="form-group col-12" hidden>
+<label for="usuarioAgregarDatos">USUARIO</label>
+<input type="input" v-model="datoscamposFacturas.usuario" name="usuario"  class="form-control " id="usuarioAgregarDatos"  placeholder="usuario" maxlength="250">
+</div>
+<div class="form-group col-sm-12 mb-5 mt-5">
+<button type="submit" @click="enviarDatos" class="btn btn-primary elboton w-100">Enviar Datos</button>
+  </div>
+  </div>
+  </div>
+   </form>
+   </fieldset>
+</section>
+  </div>
+   </main>
+<Toast />
+</template>
+<style>
+</style>

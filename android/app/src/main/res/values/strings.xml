@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">tm-pos</string>
+    <string name="title_activity_main">tm-pos</string>
+    <string name="package_name">com.tmposrd.ferreteria</string>
+    <string name="custom_url_scheme">com.tmposrd.ferreteria</string>
+</resources>

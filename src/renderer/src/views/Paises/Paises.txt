@@ -1,0 +1,22 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Paises",
+"to": "/paises",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/paises',
+        name: 'paises',
+        component: () => import('../views/Paises/Paises.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********
+**********************|-CAMPOS-|******************
+"id, nombre, moneda, simbolo, iso, prefijo, digitos, nombre_imp, c_imp, idioma, z_horaria, created_at, updated_at, usuario"
+******************************************************

@@ -1,0 +1,320 @@
+<script setup>
+import { ref, onMounted, nextTick, watchEffect } from 'vue';
+import { useToast } from "primevue/usetoast";
+import { useRouter, useRoute } from 'vue-router';
+import * as XLSX from "xlsx"; // Import xlsx library
+const router = useRouter();
+const route = useRoute(); 
+import {enviarDatosPorPost,
+  eliminarDatos, 
+  obtenerIdsSeleccionados,
+  borrarTodoslosDatos,
+  lenguajeDataTable,
+  nfecha,
+  arrayToObjetoFromTabla,
+  peticionesFetch,
+  encryptarPassword,
+  generarTablaFromStringJSON,
+  envioElectron,
+  enviarSolicitudGet,
+  generarCodigoUnico,
+  peticiones,
+  mensajetoast,
+  lasMayusculas} from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+/************************************************************************/
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const tokenCorto = ref('');
+/************************************************************************/
+const position = "top";
+/************************************************************************/
+const datoscampos = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+const todosLosCompras = ref([]);
+/************************************************************************/
+/************************************************************************/
+const fetchAllData = async () => {
+    const response = await enviarSolicitudGet(`${link.value+api.value}/datosarray/compras`,tokenCifrado.value);
+    const jsonData = response;
+    todosLosCompras.value = jsonData;
+    datoscampos.value = jsonData.find(datos=>datos.id == route.params.id)
+};
+/************************************************************************/
+function navigate(action) {
+    const currentIndex = todosLosCompras.value.findIndex(compras => compras.id == route.params.id);
+    if (currentIndex === -1) return;
+    let newIndex;
+    switch (action) {
+        case 'primero':
+            newIndex = 0;
+            break;
+        case 'anterior':
+            newIndex = currentIndex > 0 ? currentIndex - 1 : 0;
+            break;
+        case 'siguiente':
+            newIndex = currentIndex + 1 < todosLosCompras.value.length ? currentIndex + 1 : currentIndex;
+            break;
+        case 'ultimo':
+            newIndex = todosLosCompras.value.length - 1;
+            break;
+        default:
+            return;
+    }
+    datoscampos.value = todosLosCompras.value[newIndex];
+    router.push({ path: `/editarcompras/${todosLosCompras.value[newIndex].id}` });
+}
+/************************************************************************/
+onMounted(async() => {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+if (!datosEmpresa.empresa.nombre) {
+    await datosEmpresa.inicializarDatosEmpresa(link.value+api.value);
+  }
+fetchAllData()
+});
+/************************************************************************/
+async function funcionActualizar(e) {
+  e.preventDefault();
+  const url = link.value+api.value+"/actualizarcampos/compras";
+  if (!datoscampos.value) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+  if (datoscampos.value.hasOwnProperty('created_at')) {
+      datoscampos.value.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await enviarDatosPorPost(url, datoscampos.value,tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+const fnGenerarExcel = async () => {
+  // Parse productos field (string to array of objects)
+  let productosArray = [];
+  try {
+    productosArray = JSON.parse(datoscampos.value.productos);
+  } catch (error) {
+    console.error("Error parsing productos:", error);
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to parse products.', life: 3000 });
+    return;
+  }
+
+  // Create purchase details data
+  const purchaseData = [
+    { label: "ID", value: datoscampos.value.id },
+    { label: "Proveedor", value: datoscampos.value.proveedor },
+    { label: "RNC Proveedor", value: datoscampos.value.rnc_proveedor },
+    { label: "Fecha", value: datoscampos.value.fecha },
+    { label: "No Factura", value: datoscampos.value.no_factura },
+    { label: "NCF Proveedor", value: datoscampos.value.ncf_proveedor },
+    { label: "Estado", value: datoscampos.value.estado },
+    { label: "Subtotal", value: datoscampos.value.subtotal },
+    { label: "Descuento", value: datoscampos.value.descuento },
+    { label: "Impuesto", value: datoscampos.value.impuesto },
+    { label: "Total", value: datoscampos.value.total },
+    { label: "Abono", value: datoscampos.value.abono },
+    { label: "Saldo", value: datoscampos.value.saldo },
+    { label: "Nota", value: datoscampos.value.nota },
+  ];
+
+  // Prepare data for worksheet format
+  const purchaseSheetData = [
+    ["Compra Detalle"], // Title row
+    ...purchaseData.map((item) => [item.label, item.value]), // Purchase details
+    [],
+    ["Productos"], // Title for products section
+    [
+      "ID", 
+      "Código", 
+      "Nombre", 
+      "Categoría", 
+      "Marca", 
+      "Precio Compra", 
+      "Precio Venta", 
+      "Impuestos", 
+      "Stock", 
+      "Ubicación",
+    ], // Headers for products
+    ...productosArray.map((producto) => [
+      producto.id,
+      producto.codigo,
+      producto.nombre,
+      producto.categoria,
+      producto.marca,
+      producto.precio_compra,
+      producto.precio_venta,
+      producto.impuestos,
+      producto.stock,
+      producto.ubicacion,
+    ]),
+  ];
+
+  // Create the worksheet
+  const worksheet = XLSX.utils.aoa_to_sheet(purchaseSheetData);
+
+  // Add some styling if desired (using merges for headers and title)
+  const merges = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }, // Merge 'Compra Detalle' title
+    { s: { r: purchaseData.length + 2, c: 0 }, e: { r: purchaseData.length + 2, c: 9 } }, // Merge 'Productos' title
+  ];
+  worksheet["!merges"] = merges;
+
+  // Add worksheet to a new workbook
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Factura");
+
+  // Export to Excel file
+  XLSX.writeFile(workbook, `Factura_Compra_${datoscampos.value.id}.xlsx`);
+};
+/************************************************************************/
+const fnSaldarCxP = async()=>{
+          const response = await peticionesFetch(`${link.value}${api.value}`,`datoscampo/cuentasxpagar/no_factura/${datoscampos.value.no_factura}`,{},tokenCifrado.value,'GET');
+          if (response) {
+           router.push({ path: `/editarcuentasxpagar/${response.id}` });
+         }else{
+            toast.add({ severity: 'error', summary: 'Error', detail: 'No hay Existe la Compra', life: 3000 }); 
+         }
+}
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="container-fluid mt-5">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Compras</legend>
+    <div class="row">
+      <div class="col-sm-12">
+       <router-link to="/compras" class="btn btn-dark text-white "><i class="icon-home"></i></router-link>
+<router-link to="/crearcompras" class="btn btn-success text-white ms-1"><i class="icon-plus"></i></router-link>
+<a href="#" class="btn btn-danger btnaccion cartelito ms-1" data-toggle="tooltip" title="Borrar Entrada" id="borrador"><i class="icon-trash-4"></i></a>
+<a href="#" @click="navigate('primero')" class="btn btn-dark text-white ms-1" title="Primero"><i class="icon-to-start-alt"></i></a>
+<a href="#" @click="navigate('anterior')" class="btn btn-dark text-white ms-1" title="Anterior"><i class="icon-left-dir"></i></a>
+<a href="#" @click="navigate('siguiente')" class="btn btn-dark text-white ms-1" title="Siguiente"><i class="icon-right-dir"></i></a>
+<a href="#" @click="navigate('ultimo')" class="btn btn-dark text-white ms-1" title="Ultimo"><i class="icon-to-end-alt"></i></a>
+<a href="#" @click="fnGenerarExcel" class="btn btn-primary text-white ms-1" title="Generar Excel"><i class="pi pi-file-excel"></i></a>
+<a href="#" @click="fnSaldarCxP" class="btn btn-primary text-white ms-1" title="Saldar Cuenta"><i class="pi pi-money-bill"></i></a>
+      </div>
+    </div>
+</fieldset>
+<section>
+<fieldset class="border p-3 rounded mb-2">
+  <legend class="float-none w-auto px-2">Campos</legend>
+    <form id="formularioActualizar" action="" method="">
+         <div class="box-body">
+          <div class="row" id="campos">
+<div class="form-group col-12" hidden>
+<label for="id-Actualizador">ID</label>
+<input type="input" v-model="datoscampos.id" name="id"  class="form-control" id="id-Actualizador" readonly placeholder="id"  maxlength="11">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="proveedor-Actualizador">PROVEEDOR</label>
+<input type="input" v-model="datoscampos.proveedor" name="proveedor"  class="form-control" id="proveedor-Actualizador"  placeholder="proveedor" v-mayuscula maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="rnc_proveedor-Actualizador">RNC_PROVEEDOR</label>
+<input type="input" v-model="datoscampos.rnc_proveedor" name="rnc_proveedor"  class="form-control" id="rnc_proveedor-Actualizador"  placeholder="rnc_proveedor"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="fecha-Actualizador">FECHA</label>
+<input type="input" v-model="datoscampos.fecha" name="fecha"  class="form-control" id="fecha-Actualizador" v-datepicker placeholder="fecha"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="no_factura-Actualizador">NO_FACTURA</label>
+<input type="input" v-model="datoscampos.no_factura" name="no_factura"  class="form-control" id="no_factura-Actualizador"  placeholder="no_factura"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="ncf_proveedor-Actualizador">NCF_PROVEEDOR</label>
+<input type="input" v-model="datoscampos.ncf_proveedor" name="ncf_proveedor"  class="form-control" id="ncf_proveedor-Actualizador"  placeholder="ncf_proveedor"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="productos-Actualizador">PRODUCTOS</label>
+<!-- <textarea class="form-control " id="nota-Actualizador" name="nota" v-model="datoscampos.productos" cols="30" rows="3" ></textarea> -->
+
+<div class="table-responsive">
+  <div v-html="generarTablaFromStringJSON(datoscampos.productos)" class="border p-3 rounded mb-2"></div>
+</div>
+
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="estado-Actualizador">ESTADO</label>
+<select class="form-control " id="estado-Actualizador" v-model="datoscampos.estado" name="estado" >
+  
+  <option value="PENDIENTE">PENDIENTE</option>
+  <option value="PAGADO">PAGADO</option>
+  <option value="OTRO">OTRO</option>
+
+</select></div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="subtotal-Actualizador">SUBTOTAL</label>
+<input type="input" v-model="datoscampos.subtotal" name="subtotal"  class="form-control" id="subtotal-Actualizador" v-solonumeros v-numeroFocusinOut v-decimales placeholder="subtotal"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="descuento-Actualizador">DESCUENTO</label>
+<input type="input" v-model="datoscampos.descuento" name="descuento"  class="form-control" id="descuento-Actualizador" v-solonumeros v-numeroFocusinOut v-decimales placeholder="descuento"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="impuesto-Actualizador">IMPUESTO</label>
+<input type="input" v-model="datoscampos.impuesto" name="impuesto"  class="form-control" id="impuesto-Actualizador" v-solonumeros v-numeroFocusinOut v-decimales placeholder="impuesto"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="total-Actualizador">TOTAL</label>
+<input type="input" v-model="datoscampos.total" name="total"  class="form-control" id="total-Actualizador" v-solonumeros v-numeroFocusinOut v-decimales placeholder="total"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="abono-Actualizador">ABONO</label>
+<input type="input" v-model="datoscampos.abono" name="abono"  class="form-control" id="abono-Actualizador" v-solonumeros v-numeroFocusinOut v-decimales placeholder="abono"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="saldo-Actualizador">SALDO</label>
+<input type="input" v-model="datoscampos.saldo" name="saldo"  class="form-control" id="saldo-Actualizador" v-solonumeros v-numeroFocusinOut v-decimales placeholder="saldo"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="nota-Actualizador">NOTA</label>
+<textarea class="form-control " id="nota-Actualizador" name="nota" v-model="datoscampos.nota" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-6" hidden>
+<label for="created_at-Actualizador">CREATED_AT</label>
+<input type="input" v-model="datoscampos.created_at" name="created_at"  class="form-control" id="created_at-Actualizador"  placeholder="created_at"  maxlength="">
+</div>
+<div class="form-group col-6" hidden>
+<label for="updated_at-Actualizador">UPDATED_AT</label>
+<input type="input" v-model="datoscampos.updated_at" name="updated_at"  class="form-control" id="updated_at-Actualizador"  placeholder="updated_at"  maxlength="">
+</div>
+<div class="form-group col-12" hidden>
+<label for="usuario-Actualizador">USUARIO</label>
+<input type="input" v-model="datoscampos.usuario" name="usuario"  class="form-control" id="usuario-Actualizador"  placeholder="usuario"  maxlength="250">
+</div>
+<div class="form-group col-sm-12 mb-5 mt-5">
+<button type="submit" @click="funcionActualizar" class="btn btn-primary elboton w-100">Actualizar Datos</button>
+  </div>
+  </div>
+  </div>
+   </form>
+</fieldset>
+</section>
+  </div>
+   </main>
+<Toast />
+</template>
+<style>
+</style>

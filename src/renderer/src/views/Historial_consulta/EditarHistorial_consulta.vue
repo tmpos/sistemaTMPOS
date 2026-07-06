@@ -1,0 +1,156 @@
+
+<script setup>
+import { ref, onMounted, nextTick, watchEffect } from 'vue';
+import { useToast } from "primevue/usetoast";
+import { useRouter, useRoute } from 'vue-router';
+const router = useRouter();
+const route = useRoute(); 
+import { enviarDatosPorPost, eliminarDatos, obtenerIdsSeleccionados, borrarTodoslosDatos, lenguajeDataTable, nfecha, arrayToObjetoFromTabla, peticionesFetch, encryptarPassword, envioElectron, generarCodigoUnico, peticiones, enviarSolicitudGet, mensajetoast, lasMayusculas, peticionesFetchOffline, arrayToObjetoFromTablaOffline, crearTablaSiNoExisteOffline } from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const tokenCorto = ref('');
+/************************************************************************/
+const datoscampos = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+const position = "top";
+const todosLoshistorial_consulta = ref([]);
+/************************************************************************/
+const fetchAllData = async () => {
+    const response = await peticionesFetchOffline('getDataAsArray', 'historial_consulta');
+    const jsonData = response;
+    todosLoshistorial_consulta.value = response;
+    datoscampos.value = jsonData.find(datos=>datos.id == route.params.id)
+};
+/************************************************************************/
+function navigate(action) {
+    const currentIndex = todosLoshistorial_consulta.value.findIndex(notacredito => notacredito.id == route.params.id);
+    if (currentIndex === -1) return;
+    let newIndex;
+    switch (action) {
+        case 'primero':
+            newIndex = 0;
+            break;
+        case 'anterior':
+            newIndex = currentIndex > 0 ? currentIndex - 1 : 0;
+            break;
+        case 'siguiente':
+            newIndex = currentIndex + 1 < todosLoshistorial_consulta.value.length ? currentIndex + 1 : currentIndex;
+            break;
+        case 'ultimo':
+            newIndex = todosLoshistorial_consulta.value.length - 1;
+            break;
+        default:
+            return;
+    }
+    datoscampos.value = todosLoshistorial_consulta.value[newIndex];
+    router.push({ path: `/editarnotacredito/${todosLoshistorial_consulta.value[newIndex].id}` });
+}
+/************************************************************************/
+onMounted(async() => {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+await fetchAllData()
+});
+/************************************************************************/
+async function funcionActualizar(e) {
+  e.preventDefault();
+  const url = link.value+api.value+"/actualizarcampos/historial_consulta";
+  if (!datoscampos.value) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+  if (datoscampos.value.hasOwnProperty('created_at')) {
+      datoscampos.value.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await peticionesFetchOffline('updateData', 'historial_consulta', JSON.stringify(datoscampos.value));
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="w-full px-4 mt-5 card">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Historial_consulta</legend>
+    <div class="grid grid-cols-12 gap-4">
+      <div class="sm:col-span-12">
+       <router-link to="/historial_consulta" class="btn btn-dark text-white "><i class="icon-home"></i></router-link>
+      </div>
+    </div>
+</fieldset>
+<section>
+<fieldset class="border p-3 rounded mb-2">
+  <legend class="float-none w-auto px-2">Campos</legend>
+    <form id="formularioGenerar" action="" method="">
+         <div class="box-body">
+          <div class="grid grid-cols-12 gap-4 mt-4 text-blue-600" id="campos">
+
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-6 xl:col-span-6 2xl:col-span-6">
+                <label for="imei" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Imei</label>
+                <InputText type="text"  v-solonumeros class="form-input w-full " v-model="datoscampos.imei" name="imei" placeholder="imei" id="actualizarimei" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                    <label for="fecha" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Fecha</label>
+                   <DatePicker  v-model="datoscampos.fecha" showButtonBar fluid />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                    <label for="hora" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Hora</label>
+                   <DatePicker  v-model="datoscampos.hora" timeOnly fluid />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12 2xl:col-span-12">
+                    <label for="datos_recibidos" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Datos recibidos</label>
+                   <Textarea id="actualizardatos_recibidos"  v-model="datoscampos.datos_recibidos" name="datos_recibidos" rows="3" class="form-textarea w-full " placeholder="Enter Datos_recibidos"></textarea>
+                </div>
+
+        <div class="hidden col-span-12">
+          <label for="created_at-Actualizador" class="block text-sm font-medium text-gray-700">CREATED_AT</label>
+          <InputText v-model="datoscampos.created_at" name="created_at" id="created_at-Actualizador" placeholder="created_at" class="w-full" />
+        </div>
+        <div class="hidden col-span-12">
+          <label for="updated_at-Actualizador" class="block text-sm font-medium text-gray-700">UPDATED_AT</label>
+          <InputText v-model="datoscampos.updated_at" name="updated_at" id="updated_at-Actualizador" placeholder="updated_at" class="w-full" />
+        </div>
+        <div class="hidden col-span-12">
+          <label for="usuario-Actualizador" class="block text-sm font-medium text-gray-700">USUARIO</label>
+          <InputText v-model="datoscampos.usuario" name="usuario" id="usuario-Actualizador" placeholder="usuario" maxlength="250" class="w-full" />
+        </div>
+
+<div class="form-group sm:col-span-12 mb-5 mt-5">
+  <Button label="Save" outlined severity="primary" @click="funcionActualizar" autofocus />
+</div>
+
+
+
+  </div>
+  </div>
+   </form>
+   </fieldset>
+</section>
+  </div>
+   </main>
+<Toast />
+</template>
+<style scoped>
+</style>
+

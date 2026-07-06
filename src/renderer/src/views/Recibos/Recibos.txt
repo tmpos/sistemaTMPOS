@@ -1,0 +1,22 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Recibos",
+"to": "/recibos",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/recibos',
+        name: 'recibos',
+        component: () => import('../views/Recibos/Recibos.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********
+**********************|-CAMPOS-|******************
+"id, no_emision, empresa, fecha, hora, cantidad, concepto, pagadopor, recibidopor, created_at, updated_at, usuario"
+******************************************************

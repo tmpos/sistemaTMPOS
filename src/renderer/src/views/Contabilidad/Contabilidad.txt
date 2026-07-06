@@ -1,0 +1,19 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"name": "Contabilidad",
+"link": "/contabilidad",
+"icon": "fas fa-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/contabilidad',
+        name: 'contabilidad',
+        component: () => import('../views/Contabilidad/Contabilidad.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********

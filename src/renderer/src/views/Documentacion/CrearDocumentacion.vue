@@ -1,0 +1,167 @@
+
+<script setup>
+import { ref, onMounted, nextTick, watchEffect, watch } from 'vue';
+import { useToast } from "primevue/usetoast";
+import { useRouter, useRoute } from 'vue-router';
+const router = useRouter();
+const route = useRoute(); 
+import { enviarDatosPorPost, eliminarDatos, obtenerIdsSeleccionados, borrarTodoslosDatos, lenguajeDataTable, nfecha, arrayToObjetoFromTabla, peticionesFetch, encryptarPassword, envioElectron, generarCodigoUnico, peticiones, mensajetoast, lasMayusculas, peticionesFetchOffline, arrayToObjetoFromTablaOffline, crearTablaSiNoExisteOffline } from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+/************************************************************************/
+
+
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const tokenCorto = ref('');
+/************************************************************************/
+const datoscamposDocumentacion = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+const position = "top";
+/************************************************************************/
+const fetchAndSetupData = async () => {
+    const jsonData = await arrayToObjetoFromTablaOffline('documentacion');
+    datoscamposDocumentacion.value = jsonData;
+};
+/************************************************************************/
+onMounted(async() => {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+await fetchAndSetupData()
+});
+/************************************************************************/
+const actualizarUso = (valor) => {
+   const datos = valor.map(v => v.insert).join('');
+  // console.log("datos antes de codificar:", datos);
+   
+   // Codificar el texto para evitar errores con caracteres especiales
+   const datosEscapados = encodeURIComponent(datos);
+   
+   console.log("datos escapados:", datosEscapados);
+   datoscamposDocumentacion.value.uso = datosEscapados;
+};
+
+
+/************************************************************************/
+watch(() => datoscamposDocumentacion.value.uso, (nuevoValor) => {
+  console.log("El valor de 'uso' ha cambiado:", nuevoValor);
+});
+
+/************************************************************************/
+async function enviarDatos(event) {
+    event.preventDefault();
+  const url = link.value+api.value+"/insertar/documentacion";
+  if (!datoscamposDocumentacion.value) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Datos incompletos, no se puede Enviar.', life: 3000 });
+    return;
+  }
+  if (datoscamposDocumentacion.value.hasOwnProperty('created_at')) {
+     datoscamposDocumentacion.value.created_at = nfecha('timestamp')
+     datoscamposDocumentacion.value.updated_at = nfecha('timestamp')
+    }
+
+  const envioDatos = await peticionesFetchOffline('insertData', 'documentacion', JSON.stringify(datoscamposDocumentacion.value));
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Agregados con éxito.', life: 3000 });
+Swal.fire({
+  title: "Datos Agregados",
+  text: "Que hacemos ahora?",
+  icon: "warning",
+  showCancelButton: true,
+  confirmButtonText: "Agregar Otro!",
+  cancelButtonText: "No, Regresar al Inicio!",
+ }).then(async(result) => {
+  if (result.isConfirmed) {
+      fetchAndSetupData()
+} else if (result.dismiss === Swal.DismissReason.cancel) {
+    router.push({ path: `/documentacion` });
+  }
+})
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="w-full px-4 mt-5 card">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Documentacion</legend>
+    <div class="grid grid-cols-12 gap-4">
+      <div class="sm:col-span-12">
+        <Button as="router-link" icon="pi pi-home" to="/documentacion" />
+      </div>
+    </div>
+</fieldset>
+<section>
+<fieldset class="border p-3 rounded mb-2">
+  <legend class="float-none w-auto px-2">Campos</legend>
+    <form id="formularioGenerar" action="" method="">
+         <div class="box-body">
+          <div class="grid grid-cols-12 gap-4 mt-4 text-blue-600" id="campos">
+
+<div class="col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12 2xl:col-span-12">
+                    <label for="nombre" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Nombre</label>
+                    <InputText type="text" class="form-input w-full "  v-mayuscula v-model="datoscamposDocumentacion.nombre" placeholder="nombre" name="crearnombre" id="nombre" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12 2xl:col-span-12">
+                    <label for="uso" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Uso</label>
+<!--                    <Textarea id="crearuso" rows="3" class="form-textarea w-full "  v-model="datoscamposDocumentacion.uso" placeholder="Uso"></textarea> -->
+
+
+<QuillEditor 
+  :model-value="datoscamposDocumentacion.uso"
+  @update:content="actualizarUso"
+  theme="snow"
+  toolbar="minimal"
+  editorStyle="height: 320px" 
+/>
+
+                </div>
+
+<div class="form-group col-span-6" hidden>
+<label for="created_atAgregarDatos">CREATED_AT</label>
+<input type="input" v-model="datoscamposDocumentacion.created_at" name="created_at"  class="form-control " id="created_atAgregarDatos"  placeholder="created_at" maxlength="">
+</div>
+<div class="form-group col-span-6" hidden>
+<label for="updated_atAgregarDatos">UPDATED_AT</label>
+<input type="input" v-model="datoscamposDocumentacion.updated_at" name="updated_at"  class="form-control " id="updated_atAgregarDatos"  placeholder="updated_at" maxlength="">
+</div>
+
+<div class="form-group col-span-12" hidden>
+<label for="usuarioAgregarDatos">USUARIO</label>
+<input type="input" v-model="datoscamposDocumentacion.usuario" name="usuario"  class="form-control " id="usuarioAgregarDatos"  placeholder="usuario" maxlength="250">
+</div>
+
+<div class="form-group col-span-12 mb-5 mt-5">
+  <Button label="Enviar Datos" fluid  @click="enviarDatos" autofocus />
+</div>
+
+  </div>
+  </div>
+   </form>
+   </fieldset>
+</section>
+  </div>
+   </main>
+<Toast />
+</template>
+<style scoped>
+</style>
+

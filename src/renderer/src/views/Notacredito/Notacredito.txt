@@ -1,0 +1,29 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"name": "Notacredito",
+"link": "/notacredito",
+"icon": "fas icon-docs-1"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/notacredito',
+        name: 'notacredito',
+        component: () => import('../views/Notacredito/Notacredito.vue'),
+    },
+    {
+        path: '/crearnotacredito',
+        name: 'crearnotacredito',
+        component: () => import('../views/Notacredito/CrearNotacredito.vue'),
+    },
+    {
+        path: '/editarnotacredito/:id',
+        name: 'editarnotacredito',
+        component: () => import('../views/Notacredito/EditarNotacredito.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********

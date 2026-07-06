@@ -1,0 +1,194 @@
+
+<script setup>
+import { ref, onMounted, nextTick, watchEffect } from 'vue';
+import { useToast } from "primevue/usetoast";
+import { useRouter, useRoute } from 'vue-router';
+const router = useRouter();
+const route = useRoute(); 
+import {enviarDatosPorPost,
+  eliminarDatos, 
+  obtenerIdsSeleccionados,
+  borrarTodoslosDatos,
+  lenguajeDataTable,
+  nfecha,
+  arrayToObjetoFromTabla,
+  peticionesFetch,
+  encryptarPassword,
+  envioElectron,
+  generarCodigoUnico,
+  peticiones,
+  generarTablaFromStringJSON,
+  mensajetoast,
+  lasMayusculas} from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const tokenCorto = ref('');
+/************************************************************************/
+const datoscamposConduce = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+const position = "top";
+/************************************************************************/
+const fetchAndSetupData = async () => {
+    const jsonData = await arrayToObjetoFromTabla(link.value+api.value,tokenCifrado.value,'conduce');
+    datoscamposConduce.value = jsonData;
+};
+/************************************************************************/
+onMounted(async() => {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+await fetchAndSetupData()
+});
+/************************************************************************/
+async function enviarDatos(event) {
+    event.preventDefault();
+  const url = link.value+api.value+"/insertar/conduce";
+  if (!datoscamposConduce.value) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Datos incompletos, no se puede Enviar.', life: 3000 });
+    return;
+  }
+  if (datoscamposConduce.value.hasOwnProperty('created_at')) {
+     datoscamposConduce.value.created_at = nfecha('timestamp')
+     datoscamposConduce.value.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await enviarDatosPorPost(url, datoscamposConduce.value,tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Agregados con éxito.', life: 3000 });
+Swal.fire({
+  title: "Datos Agregados",
+  text: "Que hacemos ahora?",
+  icon: "warning",
+  showCancelButton: true,
+  confirmButtonText: "Agregar Otro!",
+  cancelButtonText: "No, Regresar al Inicio!",
+ }).then(async(result) => {
+  if (result.isConfirmed) {
+      fetchAndSetupData()
+} else if (result.dismiss === Swal.DismissReason.cancel) {
+    router.push({ path: `/conduce` });
+  }
+})
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="container-fluid mt-5 card">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Conduce</legend>
+    <div class="row">
+      <div class="col-sm-12">
+        <Button as="router-link" icon="pi pi-home" to="/conduce" />
+      </div>
+    </div>
+</fieldset>
+<section>
+<fieldset class="border p-3 rounded mb-2">
+  <legend class="float-none w-auto px-2">Campos</legend>
+    <form id="formularioGenerar" action="" method="">
+         <div class="box-body">
+          <div class="grid grid-cols-12 gap-4 mt-4 text-blue-600" id="campos">
+
+<div class="col-span-12 sm:col-span-12 md:col-span-2 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="no_conduce" class="block text-sm font-medium text-gray-700 dark:text-gray-400">No conduce</label>
+                    <InputText type="text" class="form-input w-full "  v-solonumeros readonly v-model="datoscamposConduce.no_conduce" placeholder="no_conduce" name="crearno_conduce" id="no_conduce" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-2 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="no_factura" class="block text-sm font-medium text-gray-700 dark:text-gray-400">No factura</label>
+                    <InputText type="text" class="form-input w-full "  v-solonumeros readonly v-model="datoscamposConduce.no_factura" placeholder="no_factura" name="crearno_factura" id="no_factura" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-2 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="cod_cliente" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Cod cliente</label>
+                    <InputText type="text" class="form-input w-full "   readonly v-model="datoscamposConduce.cod_cliente" placeholder="cod_cliente" name="crearcod_cliente" id="cod_cliente" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-4 lg:col-span-4 xl:col-span-4 2xl:col-span-4">
+                    <label for="cliente" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Cliente</label>
+                    <InputText type="text" class="form-input w-full "   readonly v-model="datoscamposConduce.cliente" placeholder="cliente" name="crearcliente" id="cliente" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-2 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="telefono" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Telefono</label>
+                    <InputText type="text" class="form-input w-full "  v-maska="patronTelefono" v-model="datoscamposConduce.telefono" placeholder="telefono" name="creartelefono" id="telefono" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12 2xl:col-span-12">
+                    <label for="direccion" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Direccion</label>
+                   <Textarea id="creardireccion" rows="3" class="form-textarea w-full "  v-model="datoscamposConduce.direccion" placeholder="Direccion"></textarea>
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                    <label for="fecha" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Fecha</label>
+                   <DatePicker  v-model="datoscamposConduce.fecha" showButtonBar fluid />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                    <label for="vencimiento" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Vencimiento</label>
+                   <DatePicker  v-model="datoscamposConduce.vencimiento" showButtonBar fluid />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-6 xl:col-span-6 2xl:col-span-6">
+                    <label for="chofer" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Chofer</label>
+                    <InputText type="text" class="form-input w-full "   v-mayuscula v-model="datoscamposConduce.chofer" placeholder="chofer" name="crearchofer" id="chofer" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-4 lg:col-span-4 xl:col-span-4 2xl:col-span-4">
+                    <label for="placa" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Placa</label>
+                    <InputText type="text" class="form-input w-full "  v-model="datoscamposConduce.placa" placeholder="placa" name="crearplaca" id="placa" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-4 lg:col-span-4 xl:col-span-4 2xl:col-span-4">
+                    <label for="entrega" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Entrega</label>
+
+              <Dropdown v-model="datoscamposConduce.entrega" :options="['PARCIAL','TOTAL']" placeholder="Seleccione entrega" class="w-full" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-4 lg:col-span-4 xl:col-span-4 2xl:col-span-4">
+                    <label for="total" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Total</label>
+                    <InputText type="text" class="form-input w-full "  v-solonumeros v-model="datoscamposConduce.total" placeholder="total" name="creartotal" id="total" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12 2xl:col-span-12">
+                    <label for="productos" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Productos</label>
+                   <Textarea id="crearproductos" rows="3" class="form-textarea w-full "  v-model="datoscamposConduce.productos" placeholder="Productos"></textarea>
+                </div>
+
+<div class="form-group col-6" hidden>
+<label for="created_atAgregarDatos">CREATED_AT</label>
+<input type="input" v-model="datoscamposConduce.created_at" name="created_at"  class="form-control " id="created_atAgregarDatos"  placeholder="created_at" maxlength="">
+</div>
+<div class="form-group col-6" hidden>
+<label for="updated_atAgregarDatos">UPDATED_AT</label>
+<input type="input" v-model="datoscamposConduce.updated_at" name="updated_at"  class="form-control " id="updated_atAgregarDatos"  placeholder="updated_at" maxlength="">
+</div>
+
+<div class="form-group col-12" hidden>
+<label for="usuarioAgregarDatos">USUARIO</label>
+<input type="input" v-model="datoscamposConduce.usuario" name="usuario"  class="form-control " id="usuarioAgregarDatos"  placeholder="usuario" maxlength="250">
+</div>
+
+<div class="form-group col-span-12 mb-5 mt-5">
+  <Button label="Enviar Datos" fluid  @click="enviarDatos" autofocus />
+</div>
+
+  </div>
+  </div>
+   </form>
+   </fieldset>
+</section>
+  </div>
+   </main>
+<Toast />
+</template>
+<style scoped>
+</style>
+

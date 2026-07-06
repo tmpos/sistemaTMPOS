@@ -1,0 +1,220 @@
+<script setup >
+import { ref, onMounted, nextTick, watchEffect } from 'vue';
+import router from '../../router';
+import axios from 'axios';
+
+import {enviarDatosPorPost,
+  eliminarDatos, 
+  obtenerIdsSeleccionados,
+  borrarTodoslosDatos,
+  lenguajeDataTable,
+  nfecha,
+  arrayToObjetoFromTabla,
+  peticionesFetch,
+  encryptarPassword,
+  envioElectron,
+  transformarFechaTimestamp,
+  formatearFecha,
+  mensajetoast,
+  lasMayusculas} from '../../funciones/funciones.js';
+  import bcrypt from 'bcryptjs';
+import Swal from 'sweetalert2'
+import { useToast } from "primevue/usetoast";
+const toast = useToast();
+/************************************************************************/
+const position = ref('top')
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref(null);
+/************************************************************************/
+document.body.classList.add('sidebar-close');
+/************************************************************************/
+watchEffect(() => {
+    //Aqui para vigilar eventos
+});
+/************************************************************************/
+/************************************************************************/
+onMounted(async() => {
+
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+    if (!datosEmpresa.empresa.nombre) {
+    await datosEmpresa.inicializarDatosEmpresa(link.value+api.value);
+  }
+});
+/************************************************************************/
+const visibleRango = ref(false)
+const fechasHoy = nfecha('timestampcompleta')
+
+const rangoFecha = ref([])
+const tipo = ref('rango')
+/************************************************************************/
+const fnBuscarRango = ()=>{
+  const fechaInicioN = transformarFechaTimestamp(formatearFecha(rangoFecha.value[0]),false);
+  const fechaFinN = transformarFechaTimestamp(formatearFecha(rangoFecha.value[1]),false);
+
+  if (rangoFecha.value.length > 0) {
+    router.push(`/${tipo.value}/${fechaInicioN} 00:00:00/${fechaFinN} 23:59:59`)
+  }else{
+    router.push(`/${tipo.value}/${fechasHoy.fechainicio}/${fechasHoy.fechafin}`)
+  }
+
+
+}
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="container-fluid mt-5">
+    <div class="row">
+      <div class="col-md-12">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Reportes</legend>
+            <div class="row">
+              <div class="col-sm-12">
+
+
+ <div class="mt-4">
+              <Card>
+                <template #title>REPORTE DE VENTAS</template>
+                <template #content>
+<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-4">
+  <!-- REPORTE DE VENTAS -->
+  <Button label="Ventas Generales" raised outlined severity="secondary" as="router-link" to="/informes" icon="pi pi-chart-bar" iconPos="top" />
+
+  <Button label="Reporte Anual" raised outlined severity="secondary" as="router-link" to="/graficos" icon="pi pi-chart-bar" iconPos="top" />
+
+  <Button label="Reporte Mensual" raised outlined severity="secondary" as="router-link" to="/reporte-mes" icon="pi pi-chart-bar" iconPos="top" />
+
+
+  <Button label="Reporte Semanal" raised outlined severity="secondary" as="router-link" to="/reporte-semana" icon="pi pi-chart-bar" iconPos="top" />
+
+  <Button label="Reporte de Hoy" raised outlined severity="secondary" as="router-link" to="/reporte-hoy" icon="pi pi-chart-bar" iconPos="top" />
+
+  <Button label="Reporte Ultimos 7 días" raised outlined severity="secondary" as="router-link" to="/ultimos7dias" icon="pi pi-chart-bar" iconPos="top" />
+
+  <Button label="Reporte Rango Fecha" raised outlined severity="secondary" @click="visibleRango = true; tipo = 'rango'" icon="pi pi-chart-bar" iconPos="top" />
+
+  <Button label="Ventas por Rango" raised outlined severity="secondary" @click="visibleRango = true; tipo = 'ventas'" icon="pi pi-chart-bar" iconPos="top" />
+
+</div>
+                </template>
+              </Card>
+</div>
+ <div class="mt-4">
+
+
+              <Card>
+                <template #title>OTROS REPORTES</template>
+                <template #content>
+<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-4 mt-4">
+  <!-- OTROS REPORTES -->
+  <Button label="Comisiones" raised outlined severity="secondary" as="router-link" to="/comisiones" icon="pi pi-money-bill" iconPos="top" />
+  <Button label="Reporte Por Vendedores" raised outlined severity="secondary" as="router-link" to="/reporte-vendedores" icon="pi pi-users" iconPos="top" />
+  <Button label="Reporte Por Cajeros" raised outlined severity="secondary" as="router-link" to="/reporte-cajeros" icon="pi pi-users" iconPos="top" />
+  <Button label="Reporte Por Clientes" raised outlined severity="secondary" as="router-link" to="/reporte-clientes" icon="pi pi-users" iconPos="top" />
+  <Button label="Reporte Por Delivery" raised outlined severity="secondary" as="router-link" to="/reporte-delivery" icon="pi pi-motorcycle" iconPos="top" />
+  <Button label="Reporte Por Instaladores" raised outlined severity="secondary" as="router-link" to="/reporte-instaladores" icon="pi pi-tools" iconPos="top" />
+  <Button label="Reporte Por Técnicos" raised outlined severity="secondary" as="router-link" to="/reporte-tecnicos" icon="pi pi-tools" iconPos="top" />
+</div>
+                </template>
+              </Card>
+</div>
+ <div class="mt-4">
+
+              <Card>
+                <template #title>REPORTE DE CUENTAS</template>
+                <template #content>
+<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-4 mt-4">
+  <!-- REPORTE DE CUENTAS -->
+  <Button label="Cuentas Por Cobrar" raised outlined severity="secondary" as="router-link" to="/cuentas-cobrar" icon="pi pi-dollar" iconPos="top" />
+  <Button label="Cuentas Por Pagar" raised outlined severity="secondary" as="router-link" to="/cuentas-pagar" icon="pi pi-money-bill" iconPos="top" />
+  <Button label="Transacciones" raised outlined severity="secondary" as="router-link" to="/transacciones" icon="pi pi-money-bill" iconPos="top" />
+  <Button label="Compras" raised outlined severity="secondary" as="router-link" to="/compras" icon="pi pi-shopping-cart" iconPos="top" />
+</div>
+                </template>
+              </Card>
+</div>
+ <div class="mt-4">
+
+              <Card>
+                <template #title>REPORTE DE CONTABILIDAD</template>
+                <template #content>
+<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-4 mt-4">
+  <!-- REPORTE DE CONTABILIDAD -->
+  <Button label="Estado de Resultados" raised outlined severity="secondary" as="router-link" to="/estado-resultados" icon="pi pi-file" iconPos="top" />
+  <Button label="Estado de Situación" raised outlined severity="secondary" as="router-link" to="/estado-situacion" icon="pi pi-file" iconPos="top" />
+  <Button label="Libro Diario" raised outlined severity="secondary" as="router-link" to="/libro-diario" icon="pi pi-file" iconPos="top" />
+  <Button label="Balance de Comprobación" raised outlined severity="secondary" as="router-link" to="/balance-comprobacion" icon="pi pi-file" iconPos="top" />
+  <Button label="Movimientos de Cuentas" raised outlined severity="secondary" as="router-link" to="/movimientos-cuentas" icon="pi pi-exchange" iconPos="top" />
+  <Button label="Impuestos y Retenciones" raised outlined severity="secondary" as="router-link" to="/impuestos-retenciones" icon="pi pi-file" iconPos="top" />
+</div>
+                </template>
+              </Card>
+</div>
+ <div class="mt-4">
+
+              <Card>
+                <template #title>REPORTE FISCALES</template>
+                <template #content>
+<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-4 mt-4">
+  <!-- REPORTE FISCALES -->
+  <Button label="Reporte 606" raised outlined severity="secondary" as="router-link" to="/reporte-606" icon="pi pi-wpforms" iconPos="top" />
+  <Button label="Reporte 607" raised outlined severity="secondary" as="router-link" to="/reporte-607" icon="pi pi-wpforms" iconPos="top" />
+  <Button label="Reporte 608" raised outlined severity="secondary" as="router-link" to="/reporte-608" icon="pi pi-wpforms" iconPos="top" />
+</div>
+
+                </template>
+              </Card>
+            </div>
+
+
+              </div>
+            </div>
+        </fieldset>
+      </div>
+
+
+
+        <!-- Modal de Productos -->
+        <Dialog v-model:visible="visibleRango" :position="position" modal header="Productos" :style="{ width: '50rem' }" :breakpoints="{ '1199px': '75vw', '575px': '90vw' }">
+          <template #header>
+            <div class="inline-flex align-items-center justify-content-center gap-2">
+              <span class="font-bold white-space-nowrap">Buscar por Rango</span>
+            </div>
+          </template>
+          
+          <fieldset class="border p-3 rounded mb-2">
+            <legend class="float-none w-auto px-2">Buscar por Rango</legend>
+            <div class="card flex justify-center">
+              <DatePicker v-model="rangoFecha" dateFormat="dd/mm/yy" :showIcon="true" selectionMode="range" :manualInput="false" />
+           </div>
+          </fieldset>
+
+          <template #footer>
+            <Button label="Buscar" text severity="secondary" @click="fnBuscarRango" />
+            <Button label="Cerrar" text severity="secondary" @click="visibleRango = false" />
+          </template>
+        </Dialog>
+
+
+<Toast />
+  </div>
+  </div>
+</main>
+</template>
+<style scoped>
+</style>

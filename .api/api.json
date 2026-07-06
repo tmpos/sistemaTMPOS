@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "apis": [
+    {
+      "identifier": "e-api-a-la-nube-dom",
+      "source": "@e-api-a-la-nube-dom/v1.0-DOM#5xemrh2cmfppj4ct",
+      "integrity": "sha512-HPaB9Zkn8sYnBBq5OxpWXi3rV0dBmbdxlGxrVkv3xLTjkkOM2cbjyb60osKoY5i/TENxM/Q9IFpq/2IiZzB57A==",
+      "installerVersion": "6.1.3"
+    }
+  ]
+}

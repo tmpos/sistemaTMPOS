@@ -1,0 +1,60 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Inventario_celular",
+"to": "/inventario_celular",
+"permiso": "Administrador,Soporte",
+"icon": "pi pi-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/inventario_celular',
+        name: 'inventario_celular',
+        component: () => import('../views/Inventario_celular/Inventario_celular.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/crearinventario_celular',
+        name: 'crearinventario_celular',
+        component: () => import('@/views/Inventario_celular/CrearInventario_celular.vue'),
+    },
+    {
+        path: '/editarinventario_celular/:id',
+        name: 'editarinventario_celular',
+        component: () => import('@/views/Inventario_celular/EditarInventario_celular.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'fecha', 'hora', 'total_celulares', 'total_inventario', 'celulares_iventariados'"
+******************************************************
+{
+        
+      "fecha": "fecha",
+      "FECHA": "FECHA",
+      "Fecha": "Fecha",
+     
+      "hora": "hora",
+      "HORA": "HORA",
+      "Hora": "Hora",
+     
+      "total_celulares": "total_celulares",
+      "TOTAL_CELULARES": "TOTAL_CELULARES",
+      "Total_celulares": "Total_celulares",
+     
+      "total_inventario": "total_inventario",
+      "TOTAL_INVENTARIO": "TOTAL_INVENTARIO",
+      "Total_inventario": "Total_inventario",
+     
+      "celulares_iventariados": "celulares_iventariados",
+      "CELULARES_IVENTARIADOS": "CELULARES_IVENTARIADOS",
+      "Celulares_iventariados": "Celulares_iventariados",
+}
+

@@ -1,0 +1,539 @@
+<script setup>
+import { ref, onMounted, nextTick, watchEffect,computed } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
+const router = useRouter();
+import axios from 'axios';
+import { enviarDatosPorPost, eliminarDatos, obtenerIdsSeleccionados, borrarTodoslosDatos, lenguajeDataTable, nfecha, arrayToObjetoFromTabla, peticionesFetch, encryptarPassword, envioElectron, mensajetoast, crearTablaSiNoExiste, peticiones,agregarDiasalaFechaActual, lasMayusculas } from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+import { useToast } from "primevue/usetoast";
+const toast = useToast();
+/************************************************************************/
+/************************************************************************/
+const usuarioLocal = ref({})
+/************************************************************************/
+const camposArray = ["nombre","prefijo","secuencia","aprobados","fecha","expiracion","contador","usuario"];
+/************************************************************************/
+import { useDatosEmpresa } from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const tokenCorto = ref('');
+/************************************************************************/
+const selectedItems = ref([]);
+/************************************************************************/
+const position = ref('top');
+const openPosition = (pos) => {
+    position.value = pos;
+    visible.value = true;
+}
+/************************************************************************/
+const datoscamposConfiscal = ref({})
+/************************************************************************/
+const visible = ref(false);
+const visibleComprobantes = ref(false);
+const visiblecrear = ref(false);
+const value = ref(null);
+const id = ref(null);
+const datoscampos = ref({});
+const data = ref([]);
+const searchQuery = ref('');
+const ConfiscalEditar = ref(null);
+/************************************************************************/
+const tipoComprobante = ref('B01')
+const cantidadComprobante = ref('1')
+const fechaExpiracion = ref(agregarDiasalaFechaActual(90))
+/************************************************************************/
+async function limpiarCamposCrear() {
+datoscamposConfiscal.value = {}
+await campos();
+}
+/************************************************************************/
+watchEffect(() => {
+  if (visiblecrear.value) {
+  }
+});
+/************************************************************************/
+const fetchAndSetupData = async () => {
+const response = await peticionesFetch(`${link.value}${api.value}`, `datosarray/confiscal`, {}, tokenCifrado.value, 'GET');
+    const jsonData = response;
+    data.value = jsonData;
+};
+/************************************************************************/
+async function campos() {
+  const campos = await arrayToObjetoFromTabla(link.value+api.value, tokenCifrado.value, 'confiscal', true,camposArray,'usuario');
+  datoscamposConfiscal.value = campos;
+}
+/************************************************************************/
+onMounted(async () => {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCorto.value = datosJSON.VITE_TOKEN_CORTO;
+
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+await crearTablaSiNoExiste(link.value, api.value, 'confiscal', camposArray, tokenCifrado.value,toast);
+usuarioLocal.value = JSON.parse(window.localStorage.getItem('usuarioLocal'))[0] || {};
+await campos();
+await fetchAndSetupData();
+});
+/************************************************************************/
+  async function borrarTodo() {
+    Swal.fire({
+        title: "¿Estás seguro?",
+        text: "¡Se borrarán los datos!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, de acuerdo",
+        cancelButtonText: "No, cancelar"
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            const { value: password } = await Swal.fire({
+                title: 'Introduce la contraseña',
+                input: 'password',
+                inputPlaceholder: 'Contraseña',
+                showCancelButton: true,
+                confirmButtonText: 'Confirmar',
+                cancelButtonText: 'Cancelar'
+            });
+            if (password) {
+               if (password === token.value || password === tokenCorto.value) {
+                    const envioDatos = await borrarTodoslosDatos(link.value + api.value + '/borrartodo', 'confiscal', tokenCifrado.value);
+                    if (envioDatos[0] == 'ok') {
+                        fetchAndSetupData();
+                        toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos borrados', life: 3000 });
+                    } else {
+                        toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al borrar datos.', life: 3000 });
+                   }
+                } else {
+                    toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+                }
+            }
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+            toast.add({ severity: 'success', summary: 'No te preocupes', detail: 'Datos seguros', life: 3000 });
+        }
+    });
+}
+/************************************************************************/
+async function funcionActualizar() {
+  const url = link.value+api.value+"/actualizarcampos/confiscal";
+  if (!datoscampos.value) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+  if (datoscampos.value.hasOwnProperty('created_at')) {
+    datoscampos.value.updated_at = nfecha('timestamp');
+  }
+  const envioDatos = await enviarDatosPorPost(url, datoscampos.value, tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+    visible.value = false;
+    fetchAndSetupData();
+    toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+async function funcionCrear() {
+  const url = link.value+api.value+"/insertar/confiscal";
+  if (datoscamposConfiscal.value.hasOwnProperty('created_at')) {
+    datoscamposConfiscal.value.created_at = nfecha('timestamp');
+    datoscamposConfiscal.value.updated_at = nfecha('timestamp');
+  }
+  const envioDatos = await enviarDatosPorPost(url, datoscamposConfiscal.value, tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+    fetchAndSetupData();
+    toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Agregados', life: 3000 });
+    limpiarCamposCrear();
+    visiblecrear.value = false;
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+async function borrarSeleccionados() {
+  const ids = obtenerIdsSeleccionados(selectedItems.value);
+    Swal.fire({
+        title: "¿Estas Seguro?",
+        text: "Se Borraran los Datos!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, de acuerdo!",
+        cancelButtonText: "No, cancelar!",
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            const { value: password } = await Swal.fire({
+                title: 'Introduce la contraseña',
+                input: 'password',
+                inputPlaceholder: 'Contraseña',
+                showCancelButton: true,
+                confirmButtonText: 'Confirmar',
+                cancelButtonText: 'Cancelar'
+            });
+            if (password) {
+                if (password === token.value || password === tokenCorto.value) {
+                    let exitoTotal = true;
+                    if (ids.length > 0) {
+                        for (const id of ids) {
+                            try {
+                                const envioDatos = await eliminarDatos(`${link.value}${api.value}/borrar/confiscal`, id, tokenCifrado.value);
+                            } catch (error) {
+                                console.error(`Error al eliminar datos para ID: ${id}`, error);
+                                exitoTotal = false;
+                            }
+                        }
+                        if (exitoTotal) {
+                            fetchAndSetupData();
+                            toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Borrados', life: 3000 });
+                        } else {
+                            toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Borrar los datos.', life: 3000 });
+                        }
+                    } else {
+                        toast.add({ severity: 'error', summary: 'Error', detail: 'No hay datos para borrar', life: 3000 });
+                    }
+                } else {
+                    toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+                }
+            }
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+            toast.add({ severity: 'success', summary: 'No te preocupes', detail: 'Datos Seguros', life: 3000 });
+        }
+    });
+}
+/************************************************************************/
+const itemsConfiscal = ref([]);
+const menu = ref(null);
+const currentRowData = ref(null);
+const toggleConfiscal = (event, rowData) => {
+currentRowData.value = rowData;
+itemsConfiscal.value = [
+{ label: 'Editar', icon: 'pi pi-pencil', command: () => { 
+visible.value = true;
+datoscampos.value = currentRowData.value;
+} },
+{ label: 'Eliminar', icon: 'pi pi-trash', command: () => {
+            Swal.fire({
+                title: 'Introduce la contraseña',
+                input: 'password',
+                inputPlaceholder: 'Contraseña',
+                showCancelButton: true,
+                confirmButtonText: 'Eliminar',
+                cancelButtonText: 'Cancelar'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    const contrasenaIngresada = result.value;
+                    if (contrasenaIngresada === token.value || contrasenaIngresada === tokenCorto.value) {
+                        const datosFactura = await peticionesFetch(`${link.value}${api.value}`, `borrarporcampo/confiscal`, { campo: 'id', valor: rowData.id }, tokenCifrado.value, 'POST');
+                        if (datosFactura[0] == 'ok') {
+                            toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos eliminados correctamente', life: 3000 });
+                            await fetchAndSetupData()
+                        } else {
+                            toast.add({ severity: 'error', summary: 'Error', detail: 'Error al eliminar los datos', life: 3000 });
+                        }
+                    } else {
+                        toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+                    }
+                }
+            });
+        } 
+    },
+];
+menu.value.toggle(event);
+};
+/************************************************************************/
+const filteredConfiscal = computed(() => {
+if (!searchQuery.value) return data.value;
+return data.value.filter(busqueda => {
+  return Object.values(busqueda).some(value =>
+    String(value).toLowerCase().includes(searchQuery.value.toLowerCase())
+   );
+  });
+});
+/************************************************************************/
+const fnAwesomplete = ()=>{
+}
+const handleSelectComplete = async(selected)=>{
+}
+/************************************************************************/
+const fnRouter = (ruta) => {
+  router.push(ruta);
+};
+/************************************************************************/
+const fnAgregarComprobantes = async()=>{
+const datosComprobante = data.value.find(comprobante => comprobante.prefijo === tipoComprobante.value)
+
+datosComprobante.aprobados = (Number(datosComprobante.aprobados) + Number(cantidadComprobante.value))
+datosComprobante.expiracion = fechaExpiracion.value;
+
+  const url = link.value+api.value+"/actualizarcampos/confiscal";
+
+  if (datosComprobante.hasOwnProperty('created_at')) {
+    datosComprobante.updated_at = nfecha('timestamp');
+  }
+
+  const envioDatos = await enviarDatosPorPost(url, datosComprobante, tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+    visibleComprobantes.value = false;
+    fetchAndSetupData();
+    toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+
+
+}
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="container-fluid mt-5">
+<Card>
+<template #content>
+    <div class="row">
+      <div class="col-md-12">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Confiscal</legend>
+            <div class="row">
+              <div class="col-sm-12">
+  <Button icon="pi pi-sync" raised rounded severity="warn" @click="fetchAndSetupData" aria-label="Recargar" />
+            <Button icon="pi pi-plus" raised rounded severity="success" @click="visiblecrear = true" aria-label="Agregar Nuevo" class="ml-1" />
+<Button icon="pi pi-trash" raised rounded severity="danger" @click="borrarSeleccionados" aria-label="Agregar Nuevo" class="ml-1" />
+
+<Button label="Agregar Comprobantes" icon="pi pi-plus" raised rounded severity="warn" @click="visibleComprobantes = true" aria-label="Agregar Comprobantes" class="ml-1" />
+
+
+<Button icon="pi pi-trash" v-if="usuarioLocal.usuario =='Soporte'" raised rounded severity="danger" label="Borrar Todo" class="float-end" @click="borrarTodo" aria-label="Borrar Todo" />
+    
+              </div>
+            </div>
+        </fieldset>
+      </div>
+      <div class="col-md-12">
+ <div style="display: flex; justify-content: flex-end;">
+ <input v-model="searchQuery" placeholder="Buscar confiscal..." class="p-inputtext p-component" style="margin-bottom: 10px;" />
+</div>
+<DataTable 
+    :value="filteredConfiscal"  
+    scrollable 
+    scrollHeight="600px"  
+    dataKey="id" 
+    paginator 
+    :rows="10" 
+    v-model:selection="selectedItems" 
+    selectionMode="single" 
+    :rowsPerPageOptions="[5, 10, 20, 50]" 
+    tableStyle="min-width: 50rem">
+    <Column selectionMode="multiple" headerStyle="width: 3rem"></Column>
+    <Column header="Options">
+        <template #body="slotProps">
+            <Button 
+                icon="pi pi-cog" 
+                @click="toggleConfiscal($event, slotProps.data)"
+                aria-haspopup="true"
+                aria-controls="overlay_menu_factura"
+            />
+            <Menu 
+                ref="menu" 
+                id="overlay_menu_Confiscal" 
+                :model="itemsConfiscal" 
+                :popup="true"
+            />
+        </template>
+    </Column>
+    <Column field="nombre" header="Nombre"></Column>
+<Column field="prefijo" header="Prefijo"></Column>
+<Column field="secuencia" header="Secuencia"></Column>
+<Column field="aprobados" header="Aprobados"></Column>
+<Column field="fecha" header="Fecha"></Column>
+<Column field="expiracion" header="Expiracion"></Column>
+<Column field="contador" header="Contador"></Column>
+<Column field="usuario" header="Usuario"></Column>
+
+</DataTable>
+      </div>
+    </div>
+  </template>
+</Card>
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Dialog v-model:visible="visible" :position="position" modal header="Modificar Confiscal" :style="{ width: '50rem' }" :breakpoints="{ '1199px': '75vw', '575px': '90vw' }">
+            <template #header>
+                <div class="inline-flex align-items-center justify-content-center gap-2">
+                    <span class="font-bold white-space-nowrap">Modal Editar</span>
+                </div>
+            </template>
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">Confiscal</legend>
+     <form id="formularioActualizarConfiscal" action="" method="">
+         <div  style="margin-top: 15px;color: #34AAB2;" class="row">
+<div class="form-group col-12" hidden>
+<label for="id-Actualizador">ID</label>
+<input type="input" v-model="datoscampos.id" name="id"  class="form-control" id="id-Actualizador" readonly placeholder="id"  maxlength="11">
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="nombre-Actualizador">NOMBRE</label>
+<input type="input" v-model="datoscampos.nombre" name="nombre"  class="form-control" id="nombre-Actualizador"  placeholder="nombre"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="prefijo-Actualizador">PREFIJO</label>
+<input type="input" v-model="datoscampos.prefijo" name="prefijo"  class="form-control" id="prefijo-Actualizador"  placeholder="prefijo" v-mayuscula maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="secuencia-Actualizador">SECUENCIA</label>
+<input type="input" v-model="datoscampos.secuencia" name="secuencia"  class="form-control" id="secuencia-Actualizador"  placeholder="secuencia"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="aprobados-Actualizador">APROBADOS</label>
+<input type="input" v-model="datoscampos.aprobados" name="aprobados"  class="form-control" id="aprobados-Actualizador"  placeholder="aprobados" v-solonumeros maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="fecha-Actualizador">FECHA</label>
+<input type="input" v-model="datoscampos.fecha" name="fecha"  class="form-control" id="fecha-Actualizador" v-datepicker placeholder="fecha"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="expiracion-Actualizador">EXPIRACION</label>
+<input type="input" v-model="datoscampos.expiracion" name="expiracion"  class="form-control" id="expiracion-Actualizador" v-datepicker placeholder="expiracion"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="contador-Actualizador">CONTADOR</label>
+<input type="input" v-model="datoscampos.contador" name="contador"  class="form-control" id="contador-Actualizador"  placeholder="contador" v-solonumeros maxlength="250">
+</div>
+<div class="form-group col-6" hidden>
+<label for="created_at-Actualizador">CREATED_AT</label>
+<input type="input" v-model="datoscampos.created_at" name="created_at"  class="form-control" id="created_at-Actualizador"  placeholder="created_at"  maxlength="">
+</div>
+<div class="form-group col-6" hidden>
+<label for="updated_at-Actualizador">UPDATED_AT</label>
+<input type="input" v-model="datoscampos.updated_at" name="updated_at"  class="form-control" id="updated_at-Actualizador"  placeholder="updated_at"  maxlength="">
+</div>
+<div class="form-group col-12" hidden>
+<label for="usuario-Actualizador">USUARIO</label>
+<input type="input" v-model="datoscampos.usuario" name="usuario"  class="form-control" id="usuario-Actualizador"  placeholder="usuario"  maxlength="250">
+</div>
+
+        </div>
+        </form>
+</fieldset>
+            <template #footer>
+                <Button label="Cancel" text severity="secondary" @click="visible = false" autofocus />
+                <Button label="Save" outlined severity="secondary" @click="funcionActualizar" autofocus />
+            </template>
+        </Dialog>
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Dialog v-model:visible="visiblecrear" :position="position" modal header="Crear Confiscal" :style="{ width: '50rem' }" :breakpoints="{ '1199px': '75vw', '575px': '90vw' }">
+            <template #header>
+                <div class="inline-flex align-items-center justify-content-center gap-2">
+                    <span class="font-bold white-space-nowrap">Modal Crear</span>
+                </div>
+            </template>
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">Confiscal</legend>
+     <form id="formularioActualizarConfiscal" action="" method="">
+         <div  style="margin-top: 15px;color: #34AAB2;" class="row">
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="nombreAgregarDatos">NOMBRE</label>
+<input type="input" v-model="datoscamposConfiscal.nombre" name="nombre"  class="form-control " id="nombreAgregarDatos"  placeholder="nombre" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="prefijoAgregarDatos">PREFIJO</label>
+<input type="input" v-model="datoscamposConfiscal.prefijo" name="prefijo"  class="form-control mayusc" id="prefijoAgregarDatos" v-mayuscula placeholder="prefijo" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="secuenciaAgregarDatos">SECUENCIA</label>
+<input type="input" v-model="datoscamposConfiscal.secuencia" name="secuencia"  class="form-control " id="secuenciaAgregarDatos"  placeholder="secuencia" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="aprobadosAgregarDatos">APROBADOS</label>
+<input type="input" v-model="datoscamposConfiscal.aprobados" name="aprobados"  class="form-control soloNumero" id="aprobadosAgregarDatos" v-solonumeros placeholder="aprobados" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="fechaAgregarDatos">FECHA</label>
+<input type="input" v-model="datoscamposConfiscal.fecha" name="fecha"  class="form-control " id="fechaAgregarDatos"  placeholder="fecha" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="expiracionAgregarDatos">EXPIRACION</label>
+<input type="input" v-model="datoscamposConfiscal.expiracion" name="expiracion"  class="form-control " id="expiracionAgregarDatos"  placeholder="expiracion" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="contadorAgregarDatos">CONTADOR</label>
+<input type="input" v-model="datoscamposConfiscal.contador" name="contador"  class="form-control soloNumero" id="contadorAgregarDatos" v-solonumeros placeholder="contador" maxlength="250">
+</div>
+<div class="form-group col-6" hidden>
+<label for="created_atAgregarDatos">CREATED_AT</label>
+<input type="input" v-model="datoscamposConfiscal.created_at" name="created_at"  class="form-control " id="created_atAgregarDatos"  placeholder="created_at" maxlength="">
+</div>
+<div class="form-group col-6" hidden>
+<label for="updated_atAgregarDatos">UPDATED_AT</label>
+<input type="input" v-model="datoscamposConfiscal.updated_at" name="updated_at"  class="form-control " id="updated_atAgregarDatos"  placeholder="updated_at" maxlength="">
+</div>
+<div class="form-group col-12" hidden>
+<label for="usuarioAgregarDatos">USUARIO</label>
+<input type="input" v-model="datoscamposConfiscal.usuario" name="usuario"  class="form-control " id="usuarioAgregarDatos"  placeholder="usuario" maxlength="250">
+</div>
+
+        </div>
+        </form>
+</fieldset>
+            <template #footer>
+                <Button label="Cancel" text severity="secondary" @click="visiblecrear = false" autofocus />
+                <Button label="Crear" outlined severity="secondary" @click="funcionCrear" autofocus />
+            </template>
+        </Dialog>
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Dialog v-model:visible="visibleComprobantes" :position="position" modal header="Agregar Comprobante" :style="{ width: '50rem' }" :breakpoints="{ '1199px': '75vw', '575px': '90vw' }">
+            <template #header>
+                <div class="inline-flex align-items-center justify-content-center gap-2">
+                    <span class="font-bold white-space-nowrap">Agregar Comprobante</span>
+                </div>
+            </template>
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">Comprobante</legend>
+     <form id="formularioActualizarConfiscal" action="" method="">
+         <div  style="margin-top: 15px;color: #34AAB2;" class="row">
+          <div class="col-12 col-md-6 form-group">
+          <label for="inputagregarb01">Elegir Cambio</label>
+          <select name="seleccionarb0" v-model="tipoComprobante" id="seleccionarb0" class="form-control">
+           <option value="B01">B01</option>
+            <option value="B02">B02</option> 
+            <option value="B03">B03</option> 
+            <option value="B04">B04</option> 
+            <option value="B11">B11</option> 
+            <option value="B13">B13</option> 
+            <option value="B14">B14</option> 
+            <option value="B15">B15</option> 
+          </select>
+        </div>
+
+          <div class="col-12 col-md-6 form-group">
+          <label for="inputagregarb01">Nueva Cant. Aprobada</label>
+          <input type="number" v-model="cantidadComprobante" v-solonumeros class="form-control" id="inputagregar" min="1" value="1">
+        </div> 
+
+          <div class="col-12 form-group">
+          <label for="fechaexpiracion">Fecha de Expiración</label>
+          <input type="text" v-model="fechaExpiracion" class="form-control" v-datepicker id="fechaexpiracion"  >
+        </div>
+
+
+        </div>
+        </form>
+</fieldset>
+            <template #footer>
+                <Button label="Cancel" text severity="secondary" @click="visibleComprobantes = false" autofocus />
+                <Button label="Actualizar" outlined severity="secondary" @click="fnAgregarComprobantes" autofocus />
+            </template>
+        </Dialog>
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Toast />
+  </div>
+</main>
+</template>
+<style scoped>
+</style>

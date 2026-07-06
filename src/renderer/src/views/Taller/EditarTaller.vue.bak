@@ -1,0 +1,1839 @@
+<script setup>
+import { ref, onMounted, nextTick, watchEffect,watch,computed } from 'vue';
+import { useToast } from "primevue/usetoast";
+import EnviarWhatsApp from '../../components/WhatsappModal.vue';
+import Patron from '../Patron/Patron.vue';
+import { useRouter, useRoute } from 'vue-router';
+const route = useRoute();
+const router = useRouter();
+import {enviarDatosPorPost,
+  eliminarDatos,
+  obtenerIdsSeleccionados,
+  borrarTodoslosDatos,
+  lenguajeDataTable,
+  nfecha,
+  arrayToObjetoFromTabla,
+  peticionesFetch,
+  encryptarPassword,
+  envioElectron,
+  enviarSolicitudGet,
+  generarCodigoUnico,
+  peticionesFetchOffline,
+  mensajetoast,
+  arrayToObjetoFromTablaOffline,
+  enviarDatosLocalStorage,
+  generarTablaFromStringJSON,
+  convertirStringAArrayDeObjetos,
+  variableEnString,
+  generadorCodigo,
+  cajeroACtivo,
+  peticiones,
+  lasMayusculas} from '../../funciones/funciones.js';
+
+import { facturaNueva,cotizacionNueva,facturaActualizar,restarStock } from '../../funciones/funcionesVentas.js';
+
+import Swal from 'sweetalert2'
+const toast = useToast();
+/************************************************************************/
+import { useVueToPrint } from "vue-to-print";
+/************************************************************************/
+import LoadingOverlay from '../../Loading/LoadingOverlay.vue';
+//import config from '../../../../../resources/config.json';
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+//const production = config.VITE_PRODUCTION;
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const tokenCorto = ref(null);
+const loading = ref(false)
+/************************************************************************/
+const visibleIA = ref(false);
+const datoscamposIa = ref({});
+const visibleAverias = ref(false);
+const visibleCostoPiezas = ref(false);
+const costoPieza = ref(0);
+const fallasChips = ref([]);
+const datosProductoBuscado = ref({})
+/************************************************************************/
+const visiblePiezas = ref(false);
+const visiblePedidos = ref(false);
+const visiblePedidoIndividual = ref(false);
+const datoscamposPedido = ref({});
+const proveedorWhatsapp = ref({});
+const proveedorWhatsappIndividual = ref({});
+/************************************************************************/
+const datosUsuarioLocal = ref({})
+const productosArray = ref([])
+const menuModel = ref('')
+const selectedProduct = ref(null);
+const cm = ref(null);
+  const columns = [
+    { field: 'codigo', header: 'Código' },
+    { field: 'nombre', header: 'Nombre' },
+    { field: 'stock', header: 'Stock' },
+    { field: 'precio_venta', header: 'Precio' },
+  ];
+/************************************************************************/
+const searchQuery = ref('')
+/************************************************************************/
+const datoscampos = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+const todosLosTaller = ref([]);
+/************************************************************************/
+const enviarWhatsAppRef = ref(null);
+const datosWhatsApp = ref({
+  nombre: 'John Doe',
+  numero: '123456789',
+  texto: 'Hola, este es un mensaje predefinido.'
+});
+/****************************************************/
+const showWhatsAppModal = async () => {
+  if (enviarWhatsAppRef.value) {
+          enviarWhatsAppRef.value.updateDatosWhatsApp(datosWhatsApp.value);
+          enviarWhatsAppRef.value.visible = true;
+  }
+};
+
+const abrirWhatsapp = ()=>{
+     showWhatsAppModal()
+}
+
+/***************************************************** */
+const mensaje = ref('')
+const showWhatsapp = ref(false);
+const closeWhatsapp = () => {
+    showWhatsapp.value = false;
+};
+watchEffect(() => {
+  if (showWhatsapp.value) {
+    datosWhatsApp.value.nombre = datoscampos.value.nombre;
+    datosWhatsApp.value.numero = datoscampos.value.whatsapp || datoscampos.value.telefono
+    datosWhatsApp.value.texto = `Hola ${datoscampos.value.nombre} le escribimos de  *${datosEmpresa.empresa.nombre}* para informarle que su equipo se encuentra *${datoscampos.value.estado}*`;
+    showWhatsAppModal()
+  }
+});
+/************************************************************************/
+const abono = ref('0.00');
+const prioridad = ref('3');
+/************************************************************************/
+const fetchAllData = async () => {
+    const response = await peticionesFetchOffline('getDataAsArray', 'taller');
+    const jsonData = response;
+    todosLosTaller.value = jsonData;
+    datoscampos.value = jsonData.find(datos=>datos.id == route.params.id)
+    const datosJSON = JSON.parse(datoscampos.value.abono)
+    abono.value = datosJSON.reduce((total, item) => {
+    return total + parseFloat(item.abono || '0.00');
+}, 0).toFixed(2);
+    prioridad.value = datosJSON[0].prioridad || '3';
+};
+/************************************************************************/
+/************************************************************************/
+function navigate(action) {
+    const currentIndex = todosLosTaller.value.findIndex(taller => taller.id == route.params.id);
+    if (currentIndex === -1) return;
+    let newIndex;
+    switch (action) {
+        case 'primero':
+            newIndex = 0;
+            break;
+        case 'anterior':
+            newIndex = currentIndex > 0 ? currentIndex - 1 : 0;
+            break;
+        case 'siguiente':
+            newIndex = currentIndex + 1 < todosLosTaller.value.length ? currentIndex + 1 : currentIndex;
+            break;
+        case 'ultimo':
+            newIndex = todosLosTaller.value.length - 1;
+            break;
+        default:
+            return;
+    }
+    datoscampos.value = todosLosTaller.value[newIndex];
+    const datosJSON = JSON.parse(datoscampos.value.abono)
+    abono.value = datosJSON.reduce((total, item) => {
+    return total + parseFloat(item.abono || '0.00');
+}, 0).toFixed(2);
+    router.push({ path: `/editartaller/${todosLosTaller.value[newIndex].id}` });
+}
+/************************************************************************/
+const fallas = ref([])
+const proveedoresData = ref([])
+/************************************************************************/
+
+const fetchProveedores = async () => {
+  try {
+    const response = await peticionesFetchOffline('getDataAsArray', 'proveedores');
+    proveedoresData.value = response;
+  } catch (error) {
+    toast.add({ 
+      severity: 'error', 
+      summary: 'Error', 
+      detail: 'Failed to fetch data from proveedores', 
+      life: 3000 
+    });
+  }
+};
+
+/************************************************************************/
+const datosBarcode = ref({})
+/************************************************************************/
+const fetchDataBarcode = async () => {
+const response = await peticionesFetchOffline('getDataAsArray', 'barcode');
+    const jsonData = response[0];
+    datosBarcode.value = jsonData;
+};
+/************************************************************************/
+
+const fetchProductosDatosarraypost = async () => {
+  try {
+    const response = await peticionesFetchOffline('getDataAsArray', 'productos');
+    productosArray.value = response;
+    //productosDataNames.value = response.map(productos=>productos.name);
+  } catch (error) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to fetch data from productos',
+      life: 3000
+    });
+  }
+};
+
+/************************************************************************/
+onMounted(async() => {
+
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+tokenCorto.value = datosJSON.VITE_TOKEN_CORTO;
+
+datosUsuarioLocal.value = JSON.parse(window.localStorage.getItem('usuarioLocal'))[0];
+
+await fetchAllData()
+await fetchProveedores()
+await fetchDataBarcode()
+await fetchProductosDatosarraypost()
+
+
+});
+/************************************************************************/
+const funcionActualizar = async ()=> {
+  const url = link.value+api.value+"/actualizarcampos/taller";
+  if (!datoscampos.value) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+  if (datoscampos.value.hasOwnProperty('created_at')) {
+      datoscampos.value.updated_at = nfecha('timestamp')
+    }
+
+  const datosJSON = JSON.parse(datoscampos.value.abono)
+  datosJSON[0].prioridad = prioridad.value
+
+ //prioridad
+
+ datoscampos.value.abono = JSON.stringify(datosJSON)
+  
+  const envioDatos = await peticionesFetchOffline('updateData','taller', JSON.stringify(datoscampos.value));
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+const calcularTotalYSaldo = () => {
+  const manoDeObra = parseFloat(datoscampos.value.manodeobra) || 0;
+  const precioPiezas = parseFloat(datoscampos.value.preciopiezas) || 0;
+  const abono2 = parseFloat(abono.value) || 0;
+
+  const total = manoDeObra + precioPiezas;
+  const saldo = total - abono2;
+
+  datoscampos.value.total = total.toFixed(2);
+  datoscampos.value.saldo = saldo.toFixed(2);
+/*  const datos = {"abono":abono.value,"prioridad":prioridad.value,"recibidopor":"Soporte","turno":"280420241514073","cajero":"soporte@versatframework.com","metodo_pago":datoscampos.value.metodopago,"hora":nfecha('hora'),"fecha":nfecha('fecha')};
+  datoscampos.value.abono = JSON.stringify([datos]);*/
+
+
+};
+/*watch(
+  () => [datoscampos.value.manodeobra, abono.value],
+  calcularTotalYSaldo
+);*/
+/************************************************************************/
+const completar = async ()=>{
+   datoscampos.value.estado = 'Reparado';
+   await funcionActualizar();
+   showWhatsapp.value = true;
+}
+/************************************************************************/
+const fnAbonar = async () => {
+  // Obtener el saldo total
+  const saldoTotal = Number(datoscampos.value.saldo);
+
+   if(saldoTotal === 0){
+     toast.add({ severity: 'error', summary: 'Error', detail: 'Debe agregar Costo de Reparación.', life: 3000 });
+    return
+   }
+
+  // Mostrar el SweetAlert con input para la cantidad de abono y método de pago
+  const { value: formValues, isDenied } = await Swal.fire({
+    title: 'Abonar',
+    html:
+      `<input id="swal-input-abono" class="swal2-input" placeholder="Cantidad a abonar" type="number" step="0.01" min="0">` +
+      `<select id="swal-input-metodo-pago" class="swal2-input">
+         <option value="EFECTIVO">Efectivo</option>
+         <option value="TARJETA">Tarjeta</option>
+         <option value="TRANSFERENCIA">Transferencia</option>
+       </select>`,
+    focusConfirm: false,
+    showCancelButton: true,
+    showDenyButton: true,
+    confirmButtonText: 'Abonar',
+    denyButtonText: 'Pagar Completo',
+    preConfirm: () => {
+      const abono = document.getElementById('swal-input-abono').value;
+      const metodoPago = document.getElementById('swal-input-metodo-pago').value;
+      
+      if (!abono || abono <= 0) {
+        Swal.showValidationMessage('Debes ingresar una cantidad válida de abono');
+      }
+      
+      return { abono, metodoPago };
+    }
+  });
+
+  if (!formValues) {
+    // Si el usuario cancela, no hacemos nada
+    Swal.fire('Cancelado', 'No se realizó ningún abono', 'info');
+    return;
+  }
+
+  let cantidadAbono = Number(formValues.abono);
+  const metodoPago = formValues.metodoPago;
+
+  if (isDenied) {
+    // Si el usuario selecciona "Pagar Completo", el abono es el saldo total
+    cantidadAbono = saldoTotal;
+    datoscampos.value.saldo = '0.00';
+  }
+
+  // Actualizamos el JSON de abonos con el nuevo abono
+  const abonoJSON = JSON.parse(datoscampos.value.abono);
+  
+  abonoJSON.push({
+    "abono": cantidadAbono,
+    "turno": datosUsuarioLocal.value.token,
+    "cajero": datosUsuarioLocal.value.email,
+    "recibidopor": datosUsuarioLocal.value.email,
+    "prioridad": 3,
+    "metodo_pago": metodoPago,
+    "hora": nfecha('hora'),
+    "fecha": nfecha('fecha')
+  });
+
+  const calcularSaldo = (Number(datoscampos.value.total) - cantidadAbono)
+
+
+  // Convertir el abono actualizado a cadena JSON
+  datoscampos.value.saldo = calcularSaldo.toFixed(2);
+  datoscampos.value.abono = JSON.stringify(abonoJSON);
+
+  // Llamar a la función para actualizar y mostrar un mensaje de éxito
+  await funcionActualizar();
+  imrpimirOrden();
+
+  // Mostrar confirmación de que el abono se realizó con éxito
+  Swal.fire({
+    title: 'Abono realizado',
+    text: `Has abonado ${cantidadAbono} mediante ${metodoPago}.`,
+    icon: 'success'
+  });
+};
+
+/************************************************************************/
+const fnCostoreparacion = async()=>{
+    const facturaTaller = datoscampos.value;
+  if (!facturaTaller) {
+    Swal.fire("Error", "No hay una factura seleccionada", "error");
+    return;
+  }
+
+
+  const { value: precioReparacion } = await Swal.fire({
+    title: "Ingrese el costo de reparación",
+    input: "number",
+    inputAttributes: {
+      min: 0,
+      step: "any",
+    },
+    showCancelButton: true,
+    confirmButtonText: "Aceptar",
+    cancelButtonText: "Cancelar",
+    inputValidator: (value) => {
+      if (!value || isNaN(value) || value <= 0) {
+        return "Debe ingresar un número válido";
+      }
+    },
+  });
+
+  if (precioReparacion) {
+    facturaTaller.total = parseFloat(precioReparacion);
+    facturaTaller.manodeobra = parseFloat(precioReparacion);
+    facturaTaller.saldo = parseFloat(precioReparacion);
+    toast.add({ severity: 'success', summary: 'OK', detail: 'Orden Actualizada con éxito', life: 3000 });
+
+  const url = link.value+api.value+"/actualizarcampos/taller";
+  if (!facturaTaller) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+  if (facturaTaller.hasOwnProperty('created_at')) {
+      facturaTaller.updated_at = nfecha('timestamp')
+    }
+
+  const envioDatos = await peticionesFetchOffline('updateData','taller', JSON.stringify(facturaTaller));
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+
+
+
+  }
+}
+/************************************************************************/
+const entregar = async () => {
+
+   if(Number(datoscampos.value.total) === 0){
+     toast.add({ severity: 'error', summary: 'Error', detail: 'Debe agregar Costo de Reparación.', life: 3000 });
+    return
+   }
+
+  // Mostrar SweetAlert para seleccionar el método de pago antes de proceder
+  const { value: metodoPago } = await Swal.fire({
+    title: 'Selecciona el método de pago',
+    input: 'select',
+    inputOptions: {
+      'EFECTIVO': 'Efectivo',
+      'TARJETA': 'Tarjeta',
+      'TRANSFERENCIA': 'Transferencia'
+    },
+    inputPlaceholder: 'Selecciona el método de pago',
+    showCancelButton: true,
+    inputValidator: (value) => {
+      if (!value) {
+        return 'Debes seleccionar un método de pago';
+      }
+    }
+  });
+
+  if (!metodoPago) {
+    // Si el usuario cancela, no hacemos nada
+    Swal.fire('Cancelado', 'No se realizó la entrega', 'error');
+    return;
+  }
+
+  // Si el método de pago fue seleccionado correctamente, procedemos
+  datoscampos.value.estado = 'Entregado';
+  
+  // Parsear el JSON del abono existente
+  const abonoJSON = JSON.parse(datoscampos.value.abono);
+  
+  // Agregar el nuevo abono con el método de pago seleccionado
+  abonoJSON.push({
+    "abono": datoscampos.value.saldo,
+    "turno": datosUsuarioLocal.value.token,
+    "cajero": datosUsuarioLocal.value.email,
+    "metodo_pago": metodoPago,  // Método de pago seleccionado
+    "hora": nfecha('hora'),
+    "fecha": nfecha('fecha')
+  });
+
+  // Convertir el abono actualizado a una cadena JSON
+  datoscampos.value.abono = JSON.stringify(abonoJSON);
+  datoscampos.value.saldo = '0.00';
+  datoscampos.value.fecha_entrega = nfecha('fecha');
+
+  // Llamar a la función de actualización y luego imprimir la orden
+  await funcionActualizar();
+  imrpimirOrden();
+  
+  // Mostrar confirmación de que se ha realizado la entrega
+  Swal.fire({
+    title: 'Entregado',
+    text: `La entrega se ha realizado con éxito mediante ${metodoPago}.`,
+    icon: 'success'
+  });
+};
+
+/************************************************************************/
+const imrpimirOrden = async ()=>{
+ //window.electron.ipcRenderer.invoke('open-new-window', link.value+'/vista/tallertermica?factura='+datoscampos.value.no_factura,'url',false,true)
+ const datosEmpresa = JSON.stringify(enviarDatosLocalStorage())
+ const datos = JSON.stringify(datoscampos.value)
+await window.electron.ipcRenderer.invoke('recibotaller',datos,datosEmpresa,false,true,true);
+}
+/************************************************************************/
+const printBarcode = (barcode,texto) => {
+    const content = {
+        barcodeData: {
+            barcodetype: datosBarcode.value.barcodetype,
+            barwidth: parseInt(datosBarcode.value.barwidth),
+            barheight: parseInt(datosBarcode.value.barheight),
+            labelwidth: parseInt(datosBarcode.value.labelwidth),
+            labelheight: parseInt(datosBarcode.value.labelheight),
+            fontsize: parseInt(datosBarcode.value.fontsize),
+            margen_izq: parseInt(datosBarcode.value.margen_izq),
+            margen_der: parseInt(datosBarcode.value.margen_der),
+            margen_sup: parseInt(datosBarcode.value.margen_sup),
+            margen_inf: parseInt(datosBarcode.value.margen_inf),
+            codigo: barcode,
+        },
+        labelWidth: parseInt(datosBarcode.value.labelwidth),
+        labelHeight: parseInt(datosBarcode.value.labelheight),
+        margins: {
+            top: parseInt(datosBarcode.value.margen_sup),
+            right: parseInt(datosBarcode.value.margen_der),
+            bottom: parseInt(datosBarcode.value.margen_inf),
+            left: parseInt(datosBarcode.value.margen_izq)
+        },
+        incluirCabecera:true,
+        incluirTexto:true,
+        incluirCodigo:false,
+        incluirOtro:false,
+        incluirPrecio:false,
+        headerText: datosEmpresa.empresa.nombre,
+        code: barcode,
+        text: texto,
+        precio: '',
+        width: parseInt(datosBarcode.value.barwidth),
+        height: parseInt(datosBarcode.value.barheight),
+        fontSize: parseInt(datosBarcode.value.fontsize),
+        cantidad: 1,
+        tipo: datosBarcode.value.barcodetype,
+        printerName: 'Zebra'
+    };
+    window.electron.ipcRenderer.invoke('print-barcode', content);
+
+};
+/************************************************************************/
+const imrpimirEtiqueta = async ()=>{
+
+await printBarcode(datoscampos.value.no_factura,datoscampos.value.nombre)
+
+/* window.electron.ipcRenderer.invoke('open-new-window', link.value+'/vista/impresoraequipo?factura='+datoscampos.value.no_factura,'url',true,false)*/
+}
+/************************************************************************/
+const imprimirMicrosoldadura = async ()=>{
+   var datosMicroSoldadura = await peticionesFetchOffline('getDataArrayByCondition', 'documentos','nombre','MICRO SOLDADURA');
+   var logo = datosEmpresa.empresa.imagen
+   var id = datoscampos.value.id;
+   var cedula = datoscampos.value.cedula;
+   var datosOrden = datoscampos.value;
+
+   var equipo = '['+datosOrden.equipo+',- Marca:'+datosOrden.marca+',- Modelo:'+datosOrden.modelo+', - Serial:'+datosOrden.serial+']';
+
+   var datosCliente = await peticionesFetchOffline('getDataArrayByCondition', 'clientes','cedula',cedula);
+
+   const mensaje = variableEnString(datosMicroSoldadura[0].cuerpo, {'fecha':nfecha('fecha'),'cliente':datosCliente[0].nombre,'cedula':cedula,'direccion':datosCliente[0].direccion,'empresa':datosEmpresa.nombre,'equipo':equipo});
+       // Crear una nueva ventana emergente
+    const htmlContent = `
+        <html>
+        <head>
+            <title>Contrato de Servicio</title>
+            <style scoped>
+                @page {
+                    size: 80mm 297mm;
+                    margin: 0;
+                    }
+                body {
+                    font-family: 'Times New Roman', serif;
+                    margin: 40px;
+                    line-height: 1.4;
+                    font-size: 14px;
+                    text-align: justify; /* Texto justificado */
+                }
+                h1 {
+                    text-align: center;
+                    font-size: 20px;
+                }
+                pre {
+                    white-space: pre-wrap;
+                    word-wrap: break-word;
+                }
+                img {
+                    display: block;
+                    margin: 0 auto 20px auto; /* Centra la imagen y agrega un espacio antes del título */
+                    width: 250px; /* O ajusta según el tamaño deseado */
+                }
+            </style>
+        </head>
+        <body>
+            <img src="${logo}" alt="Logo de la Empresa">
+            <h1>Contrato de Servicio de Micro Soldadura</h1>
+            <pre>${mensaje}</pre>
+        </body>
+        </html>`;
+
+
+
+window.electron.ipcRenderer.send('print-document', { html: htmlContent })
+
+}
+/************************************************************************/
+
+const fnEditarAbono = (index, item, tableId) => {
+  console.log("tableId", tableId);
+  console.log("item", item);
+  console.log("index", index);
+  if (tableId === 'abonosTable') {
+    // Lógica para editar abono
+    console.log("Editar abono en índice:", index, "Item:", item);
+  }
+};
+
+
+
+const fnBorrarAbono = (index,tableId)=>{
+  console.log("index", index);
+  if (tableId === 'abonosTable') {
+  Swal.fire({
+    title: 'Introduce la contraseña',
+    input: 'password',
+    inputPlaceholder: 'Contraseña',
+    showCancelButton: true,
+    confirmButtonText: 'Eliminar',
+    cancelButtonText: 'Cancelar'
+  }).then(async(result) => {
+    if (result.isConfirmed) {
+
+      const contrasenaIngresada = result.value;
+
+      if (contrasenaIngresada === token.value || contrasenaIngresada === tokenCorto.value ) {
+         //const index = event;
+         const abonoJSON = JSON.parse(datoscampos.value.abono)
+         const nuevoAbono = abonoJSON.filter((abono,i)=> i !== index)
+         datoscampos.value.abono = JSON.stringify(nuevoAbono);
+         await funcionActualizar();
+        } else {
+         toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+        }
+      
+    }
+  })
+}
+}
+/************************************************************************/
+const fnAgregarFalla = async()=>{
+
+  const fallasArray = JSON.parse(datoscampos.value.fallas)
+  const fallasN = convertirStringAArrayDeObjetos(fallasChips.value)
+  const nuevasFallas = fallasArray.concat(fallasN)
+  datoscampos.value.fallas = JSON.stringify(nuevasFallas)
+toast.add({ severity: 'success', summary: 'OK', detail: 'Fallas Agregadas', life: 3000 });
+fallasChips.value = []
+visibleAverias.value = false
+await funcionActualizar();
+}
+/************************************************************************/
+const fnEditarFalla = (index, item, tableId) => {
+  if (tableId === 'fallasTable') {
+    // Lógica para editar fallas
+    console.log("Editar falla en índice:", index, "Item:", item);
+   datoscamposPedido.value.pieza_pedido = item.propiedad
+   visiblePedidoIndividual.value = true
+
+  }
+};
+
+
+const fnBorrarFalla = (index, tableId) => {
+  if (tableId === 'fallasTable') {
+    Swal.fire({
+      title: 'Introduce la contraseña',
+      input: 'password',
+      inputPlaceholder: 'Contraseña',
+      showCancelButton: true,
+      confirmButtonText: 'Eliminar',
+      cancelButtonText: 'Cancelar',
+      preConfirm: (password) => {
+        // Aquí puedes agregar la lógica para verificar la contraseña
+        // Por ejemplo, puedes comparar la contraseña ingresada con una contraseña almacenada
+        const correctPassword = '1234'; // Reemplaza esto con tu lógica de verificación de contraseña
+        if (password === correctPassword) {
+          return true;
+        } else {
+          Swal.showValidationMessage('Contraseña incorrecta');
+          return false;
+        }
+      }
+    }).then((result) => {
+      if (result.isConfirmed) {
+        // Lógica para borrar fallas
+        console.log("Borrar falla en índice:", index);
+        // Aquí puedes agregar la lógica para eliminar la falla del array de datos
+        // Por ejemplo:
+        const fallasArray = JSON.parse(datoscampos.value.fallas);
+        const nuevoAbono = fallasArray.filter((falla, i) => i !== index);
+        datoscampos.value.fallas = JSON.stringify(nuevoAbono);
+        // Llamar a la función de actualización si es necesario
+        funcionActualizar();
+      }
+    });
+  }
+};
+
+/************************************************************************/
+const parsedFallas = computed(() => {
+  return JSON.parse(datoscampos.value.fallas);
+});
+/************************************************************************/
+const piezasPedido = ref([])
+const fnRealizarPedido = () => {
+    const proveedor = proveedorWhatsapp.value;
+
+    if (!proveedor || !proveedor.nombre || !proveedor.telefono) {
+        console.error('Datos del proveedor no válidos');
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Datos del proveedor no válidos', life: 3000 });
+        return;
+    }
+
+    if (!datoscampos.value.equipo || !datoscampos.value.marca || !datoscampos.value.modelo) {
+        console.error('Datos del equipo no válidos');
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Datos del equipo no válidos', life: 3000 });
+        return;
+    }
+
+    if (piezasPedido.value.length === 0) {
+        console.error('No hay piezas seleccionadas');
+        toast.add({ severity: 'error', summary: 'Error', detail: 'No hay piezas seleccionadas', life: 3000 });
+        return;
+    }
+
+    datosWhatsApp.value.nombre = proveedor.nombre;
+    datosWhatsApp.value.numero = proveedor.telefono;
+    datosWhatsApp.value.texto = `Hola, quiero cotizar las siguientes piezas para un *${datoscampos.value.equipo}, ${datoscampos.value.marca}, ${datoscampos.value.modelo}*: ${piezasPedido.value.join(', ')}`;
+
+    showWhatsAppModal();
+};
+/************************************************************************/
+const fnPedidoIndividual = async()=>{
+    const proveedor = proveedorWhatsappIndividual.value;
+
+    if (!proveedor || !proveedor.nombre || !proveedor.telefono) {
+        console.error('Datos del proveedor no válidos');
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Datos del proveedor no válidos', life: 3000 });
+        return;
+    }
+
+    if (!datoscampos.value.equipo || !datoscampos.value.marca || !datoscampos.value.modelo) {
+        console.error('Datos del equipo no válidos');
+         toast.add({ severity: 'error', summary: 'Error', detail: 'Datos del equipo no válidos', life: 3000 });
+        return;
+    }
+
+
+    datosWhatsApp.value.nombre = proveedor.nombre;
+    datosWhatsApp.value.numero = proveedor.telefono;
+    datosWhatsApp.value.texto = `Hola, quiero cotizar las siguientes piezas para un *${datoscampos.value.equipo}, ${datoscampos.value.marca}, ${datoscampos.value.modelo}*: ${datoscamposPedido.value.pieza_pedido}`;
+
+    showWhatsAppModal();
+}
+/************************************************************************/
+const messages = ref([
+  { sender: 'ia', text: 'Hola, ¿en qué puedo ayudarte hoy?' }
+]);
+const newMessage = ref('');
+const chatMessages = ref(null);
+
+/************************************************************************/
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (chatMessages.value) {
+      chatMessages.value.scrollTop = chatMessages.value.scrollHeight;
+    }
+  });
+};
+/************************************************************************/
+const fnConsultaIA = async()=>{
+  visiblePedidoIndividual.value = false
+  loading.value = true
+  const falla = datoscamposPedido.value.pieza_pedido;
+  const consulta = `Tengo un ${datoscampos.value.equipo} ${datoscampos.value.marca} ${datoscampos.value.modelo} con la falla de ${falla}`;
+    messages.value.push({ sender: 'user', text: consulta });
+    try {
+    const result = await window.electron.ipcRenderer.invoke('chatGpt',consulta);
+    loading.value = false
+     toast.add({ severity: 'success', summary: 'Ok', detail: 'Respuesta del Bot', life: 3000 });
+    datoscamposIa.value.contexto = result
+    messages.value.push({ sender: 'ia', text: result });
+    visibleIA.value = true;
+     scrollToBottom();
+
+  } catch (error) {
+    loading.value = false
+     toast.add({ severity: 'error', summary: 'Error', detail: 'Error de consulta', life: 3000 });
+  }
+}
+/************************************************************************/
+const fnEnvioIA = async () => {
+  const contexto = datoscamposIa.value.contexto;
+  const consulta = datoscamposIa.value.consulta;
+  try {
+    loading.value = true;
+    const result = await window.electron.ipcRenderer.invoke('chatGpt', consulta);
+    loading.value = false;
+    toast.add({ severity: 'success', summary: 'Ok', detail: 'Respuesta del Bot', life: 3000 });
+    datoscamposIa.value.contexto = result;
+    visibleIA.value = true;
+    // Agregar la respuesta de la IA al chat
+    messages.value.push({ sender: 'ia', text: result });
+     scrollToBottom();
+  } catch (error) {
+    loading.value = false;
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Error de consulta', life: 3000 });
+  }
+};
+
+const sendMessage = () => {
+  if (newMessage.value.trim() === '') return;
+
+  // Agregar el mensaje del usuario
+  messages.value.push({ sender: 'user', text: newMessage.value });
+
+  // Actualizar el campo de consulta
+  datoscamposIa.value.consulta = newMessage.value;
+
+  // Llamar a la función para enviar la consulta a la IA
+  fnEnvioIA();
+
+  // Limpiar el campo de entrada
+  newMessage.value = '';
+};
+/************************************************************************/
+const reciboPrint = ref();
+const { imprimirRecibo } = useVueToPrint({
+  content: reciboPrint,
+  documentTitle: "Impresion",
+});
+/************************************************************************/
+const fnQuitarReadOnly = async () => {
+  // Mostrar SweetAlert para pedir la contraseña
+  const { value: password } = await Swal.fire({
+    title: 'Introduce la contraseña',
+    input: 'password',
+    inputPlaceholder: 'Contraseña',
+    showCancelButton: true,
+    confirmButtonText: 'Aceptar',
+    cancelButtonText: 'Cancelar',
+    inputValidator: (value) => {
+      if (!value) {
+        return 'Por favor, introduce una contraseña';
+      }
+    },
+  });
+
+  // Verificar si se ingresó una contraseña
+  if (password) {
+    // Comprobar si la contraseña es correcta
+    const validPassword = token.value; // Puedes reemplazar esto con la lógica que necesites
+    if (password === validPassword || password === tokenCorto.value) {
+      // Selecciona todos los inputs y textareas dentro del formulario
+      const formElements = document.querySelectorAll("#formularioActualizar input[readonly], #formularioActualizar textarea[readonly]");
+      
+      // Remueve el atributo readonly de cada elemento encontrado
+      formElements.forEach((element) => {
+        element.removeAttribute("readonly");
+      });
+
+      // Mostrar una notificación de éxito
+      toast.add({
+        severity: "success",
+        summary: "Éxito",
+        detail: "Campos habilitados para edición",
+        life: 3000,
+      });
+    } else {
+      // Mostrar mensaje de error si la contraseña no es válida
+      toast.add({
+        severity: "error",
+        summary: "Error",
+        detail: "Contraseña incorrecta",
+        life: 3000,
+      });
+    }
+  } else {
+    // Si se cancela, mostrar un mensaje opcional
+    Swal.fire('Cancelado', 'No se realizó ninguna acción', 'info');
+  }
+};
+
+/************************************************************************/
+const fnModificarBeneficios = async () => {
+  // Clonamos los datos para trabajar sin modificar otros campos (como total)
+  const clone = JSON.parse(JSON.stringify(datoscampos.value));
+
+  // Obtenemos y convertimos los valores a números
+  const total = parseFloat(clone.total) || 0;
+  const porcentajeTecnico = parseFloat(clone.porcentaje_tecnico) || 0;
+  const preciopiezas = parseFloat(clone.preciopiezas) || 0;
+
+  // Mostrar en consola el valor actual de total (para debug)
+  console.log("Valor de total antes:", total);
+
+  // Validar que el precio de las piezas sea menor que el total
+  if (preciopiezas >= total) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'El precio de las piezas no puede superar el costo total de la reparación',
+      life: 3000
+    });
+
+  datoscampos.value.preciopiezas = 0.00;
+  datoscampos.value.beneficio_tecnico = 0.00;
+  datoscampos.value.beneficio_empresa = 0.00;
+
+    return;
+  }
+
+  // Calcular el beneficio para el técnico
+  const beneficioTecnicoCalc = (total - preciopiezas) * (porcentajeTecnico / 100);
+  // Calcular el beneficio para la empresa como el resto de la diferencia
+  const beneficioEmpresaCalc = (total - preciopiezas) - beneficioTecnicoCalc;
+
+  // Actualizar únicamente los campos de beneficios en datoscampos.value
+  datoscampos.value.beneficio_tecnico = beneficioTecnicoCalc.toFixed(2);
+  datoscampos.value.beneficio_empresa = beneficioEmpresaCalc.toFixed(2);
+
+  // Volver a mostrar en consola el valor de total para verificar que no se modificó
+  console.log("Valor de total después:", datoscampos.value.total);
+};
+
+/************************************************************************/
+const fnPagarTecnico = async()=>{
+
+}
+/************************************************************************/
+/************************************************************************/
+const fnAplicarPrecioPieza = async()=>{
+   const data = datoscampos.value;
+
+
+   if(Number(data.total) === 0){
+     toast.add({ severity: 'error', summary: 'Error', detail: 'Debe agregar Costo de Reparación.', life: 3000 });
+     costoPieza.value = '0.00'
+    return
+   }
+
+   const total = Number(data.total)
+   const porcentajeTecnico = Number(data.porcentaje_tecnico)
+   const preciopiezas = Number(costoPieza.value)
+
+   const beneficioTecnico = ((total - preciopiezas) * (porcentajeTecnico / 100)).toFixed(2);
+   const beneficioEmpresa = ((total - preciopiezas)  - beneficioTecnico).toFixed(2);
+
+   if(preciopiezas >= total){
+    toast.add({ severity: 'error', summary: 'Error', detail: 'la Pieza no puede superar el costo de la Reparación', life: 3000 });
+    return
+   }
+
+
+   data.preciopiezas = preciopiezas
+   data.beneficio_empresa = beneficioEmpresa
+   data.beneficio_tecnico = beneficioTecnico
+
+  const url = link.value+api.value+"/actualizarcampos/taller";
+  if (!datoscampos.value) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+  if (data.hasOwnProperty('created_at')) {
+      data.updated_at = nfecha('timestamp')
+    }
+
+  const envioDatos = await peticionesFetchOffline('updateData','taller', JSON.stringify(data));
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+
+
+
+}
+/************************************************************************/
+const filteredProducts = computed(() => {
+  if (!searchQuery.value) {
+    // Devuelve solo los productos con categoría "PIEZAS" si no hay búsqueda activa
+    return productosArray.value.filter(product => product.categoria === "PIEZAS");
+  }
+
+  return productosArray.value.filter(product => {
+    return (
+      product.categoria === "PIEZAS" && // Filtra solo productos con categoría "PIEZAS"
+      Object.values(product).some(value =>
+        String(value).toLowerCase().includes(searchQuery.value.toLowerCase())
+      )
+    );
+  });
+});
+
+/************************************************************************/
+  const fnVenta = async(producto)=>{
+
+  const ultimaFactura = await peticiones(`${link.value}${api.value}/datosmax`, {"tabla":'facturas',"campo":'no_factura'},'POST',tokenCifrado.value);
+  
+/*  let camposCliente = await peticionesFetch(`${link.value}${api.value}`,`datoscampo/clientes/nombre/${datoscampos.value.nombre}`,{},tokenCifrado.value,'GET');*/
+  let camposCliente = await peticionesFetchOffline('getDataByField', 'clientes','nombre',datoscampos.value.nombre);
+
+   if(!camposCliente){
+     camposCliente = await arrayToObjetoFromTablaOffline('clientes');
+     camposCliente.codigo = generarCodigoUnico()
+   }
+
+  camposCliente.nombre = datoscampos.value.nombre
+  camposCliente.telefono = datoscampos.value.telefono
+  camposCliente.cedula = datoscampos.value.cedula
+  camposCliente.email = datoscampos.value.email
+  camposCliente.direccion = datoscampos.value.direccion
+
+  const ganancia = (Number(producto.precio_venta) - Number(producto.precio_compra))
+
+  const noFactura = generadorCodigo(ultimaFactura[0], '', 7);
+
+   const prodArray = []
+
+   producto.cantidad = 1
+   producto.ganancia = ganancia
+   producto.ganancia_pura = ganancia
+   prodArray.push(producto)
+
+    const datosFN = {
+    nofactura: noFactura,
+    cliente: camposCliente,
+    canalventa: datosEmpresa.empresa.nombre,
+    comprobanteFN: 'SIN COMPROBANTE',
+    tipocomprobanteFN: 'SIN COMPROBANTE',
+    estadoFN: 'Pendiente',
+    metodoPagoFN: 'EFECTIVO',
+    efectivoFN: producto.precio_venta,
+    tarjetaFN: '0.00',
+    transferenciaFN: '0.00',
+    vendedorFN: datosEmpresa.usuario.nombre,
+    cajeroFN: datosEmpresa.usuario.nombre,
+    instaladorFN: '',
+    meseroFN: '',
+    mesaFN: '',
+    pagaCon: producto.precio_venta,
+    suCambio: '0.00',
+    noCheque:'',
+    bancoCheque:'',
+    chequeFN:'0.00',
+    deliveryFN: '',
+    subtotal: producto.precio_venta,
+    total: producto.precio_venta,
+    impuesto: '0.00',
+    ganancia: ganancia,
+    descuento: '0.00',
+    nota: 'Se compra '+producto.nombre+' para el cliente '+ camposCliente.nombre+' de parte de taller con la orden '+datoscampos.value.no_factura,
+    productosArray: prodArray
+  };
+
+  const url = `${link.value}${api.value}/insertar/facturas`;
+  const retorno = await facturaNueva(url, datosFN, 'POST', tokenCifrado.value);
+  if (retorno[0] == 'ok') {
+      const urlE = link.value+api.value+"/actualizarcampos/productos";
+      producto.stock = (Number(producto.stock) - producto.cantidad)
+
+      delete producto.cantidad
+      delete producto.ganancia
+      delete producto.ganancia_pura
+      const envioDatos = await peticionesFetchOffline('updateData','productos', JSON.stringify(producto));
+        if (retorno[0] == 'ok') {
+          toast.add({ severity: 'success', summary: 'Éxito', detail: 'Stock Actualizado correctamente', life: 3000 });
+        }
+  }
+
+  }
+/************************************************************************/
+const onRowSelect = (event) => {
+    visiblePiezas.value = false;
+    Swal.fire({
+        title: 'Producto Seleccionado',
+        text: 'Nombre: ' + event.data.nombre,
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonText: 'Agregar Producto',
+        cancelButtonText: 'Cancelar'
+    }).then(async(result) => {
+        if (result.isConfirmed) {
+            datosProductoBuscado.value = event.data;
+            console.log("datosProductoBuscado.value", datosProductoBuscado.value);
+
+            let piezas = datoscampos.value.piezas ? datoscampos.value.piezas.split(',') : [];
+            console.log("datoscampos.value", datoscampos.value);
+            piezas.push(datosProductoBuscado.value.nombre);
+            datoscampos.value.piezas = piezas.join(',');
+            await fnVenta(datosProductoBuscado.value)
+            await funcionActualizar();
+            // Uncomment if needed
+            // fnagregarProductoBuscado();
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+            visiblePiezas.value = true;
+        }
+    });
+};
+
+/************************************************************************/
+const handleFocus = (keyboardType, inputElement) => {
+/*  if (virtualKeyboard.value) {
+    virtualKeyboard.value.show(inputElement, keyboardType);
+  }*/
+};
+/************************************************************************/
+
+const fnDevolucion = async () => {
+  const { value: formValues } = await Swal.fire({
+    title: 'Devolución',
+    html: `
+      <div class="flex flex-col space-y-4 text-left">
+        <div>
+          <label for="swal-cost" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Costo del Chequeo</label>
+          <input id="swal-cost" type="number" step="0.01" min="0" 
+            class="w-full p-2 border rounded-lg focus:ring focus:ring-blue-300 outline-none shadow-sm 
+                   dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:focus:ring-blue-500" 
+            placeholder="0.00" value="0.00">
+        </div>
+        <div>
+          <label for="swal-comment" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Comentario</label>
+          <textarea id="swal-comment" 
+            class="w-full p-2 border rounded-lg focus:ring focus:ring-blue-300 outline-none shadow-sm resize-none 
+                   dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:focus:ring-blue-500" 
+            placeholder="Ingrese su comentario..." rows="3"></textarea>
+        </div>
+      </div>
+    `,
+    customClass: {
+      popup: 'rounded-xl shadow-lg border border-gray-200 bg-white dark:bg-gray-900 dark:border-gray-700', // Fondo adaptable
+      title: 'text-lg font-semibold text-gray-800 dark:text-gray-200', // Título con modo oscuro
+      confirmButton: 'bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-all',
+      cancelButton: 'bg-gray-400 hover:bg-gray-500 text-white font-medium py-2 px-4 rounded-lg transition-all'
+    },
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: 'Guardar',
+    cancelButtonText: 'Cancelar',
+    preConfirm: () => {
+      const cost = document.getElementById('swal-cost').value;
+      const comment = document.getElementById('swal-comment').value;
+
+      if (!cost || isNaN(cost)) {
+        Swal.showValidationMessage('El costo debe ser un número válido');
+        return false;
+      }
+
+      return { cost: parseFloat(cost).toFixed(2), comment };
+    }
+  });
+
+  if (formValues) {
+    datoscampos.value.estado = 'Devolucion';
+    datoscampos.value.total = formValues.cost;
+    datoscampos.value.saldo = (Number(formValues.cost) - Number(abono.value));
+    datoscampos.value.observaciones = datoscampos.value.observaciones + "\n" + formValues.comment;
+
+    await funcionActualizar();
+  }
+};
+
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="container-fluid mt-5 card">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto h-auto px-2">Datos de Taller</legend>
+    <div class="row">
+<div class="col-sm-12">
+
+<div class="flex flex-wrap gap-2">
+
+<Button as="router-link" class="h-full min-h-[50px]" icon="pi pi-home" to="/taller" />
+<Button as="router-link" label="Crear" icon="pi pi-wrench" class="ms-1" to="/creartaller" />
+
+<!--   <Button
+    icon="pi pi-trash"
+    class="ms-1"
+    title="Borrar Entrada"
+    id="borrador"
+    severity="primary"
+    @click="borrarEntrada"
+  /> -->
+  <Button
+    icon="pi pi-step-backward"
+    class=""
+    title="Primero"
+    severity="contrast"
+    @click="navigate('primero')"
+  />
+  <Button
+    icon="pi pi-chevron-left"
+    class=""
+    title="Anterior"
+    severity="contrast"
+    @click="navigate('anterior')"
+  />
+  <Button
+    icon="pi pi-chevron-right"
+    class=""
+    title="Siguiente"
+    severity="contrast"
+    @click="navigate('siguiente')"
+  />
+  <Button
+    icon="pi pi-step-forward"
+    class=""
+    title="Ultimo"
+    severity="contrast"
+    @click="navigate('ultimo')"
+  /> 
+  <Button
+    icon="pi pi-whatsapp"
+    class=" h-full min-h-[50px]"
+    @click="showWhatsapp = true"
+  />
+  <Button
+    icon="pi pi-check"
+    class="h-full min-h-[50px]"
+    label="Completar"
+    @click="completar"
+  />
+  <Button
+    icon="pi pi-dollar"
+    class="h-full min-h-[50px]"
+    label="Abonar"
+    @click="fnAbonar"
+  />
+  <Button
+    icon="pi pi-mobile"
+    class="h-full min-h-[50px]"
+    label="Entregar"
+    @click="entregar"
+  />
+
+    <Button
+    icon="icon pi icon-microchip"
+    class="h-full min-h-[50px]"
+    label="Micro"
+    severity="primary"
+    @click="imprimirMicrosoldadura"
+  />
+
+
+
+  <Button
+    icon="pi pi-print"
+    class=" h-full min-h-[50px]"
+    severity="primary"
+    @click="imrpimirOrden"
+  />
+  <Button
+    icon="pi pi-file"
+    class=" h-full min-h-[50px]"
+    severity="primary"
+    @click="imrpimirEtiqueta"
+  />
+
+  <Button
+    icon="pi pi-plus-circle"
+    class="h-full min-h-[50px]"
+    severity="primary"
+    label="Fallas"
+    @click="visibleAverias = true"
+  />
+
+  <Button
+    icon="pi pi-arrow-right-arrow-left"
+    class="h-full min-h-[50px]"
+    severity="primary"
+    label="Transf. Invent"
+    @click="visiblePiezas = true"
+  />
+
+  <Button
+    icon="pi pi-cart-plus"
+    class="h-full min-h-[50px]"
+    severity="primary"
+    label="Pedido"
+    @click="visiblePedidos = true"
+  />
+
+    <Button
+    icon="pi pi-comments"
+    class="h-full min-h-[50px]"
+    severity="primary"
+    label="IA"
+    @click="visibleIA = true"
+  />
+
+    <Button
+    icon="pi pi-dollar"
+    class=""
+    severity="primary"
+    label="Costo Reparación"
+    @click="fnCostoreparacion"
+  />
+
+    <Button
+    icon="pi pi-dollar"
+    class=""
+    severity="primary"
+    label="Costo Piezas"
+    @click="visibleCostoPiezas = true"
+  />
+
+
+    <Button
+    icon="pi pi-lock-open"
+    class=" h-full min-h-[50px]"
+    severity="primary"
+    @click="fnQuitarReadOnly"
+  />
+
+    <Button
+    icon="pi pi-undo"
+    class=" h-full min-h-[50px]"
+    severity="warn"
+    label="Devolución"
+    @click="fnDevolucion"
+  />
+
+      </div>
+      </div>
+    </div>
+</fieldset>
+<section>
+    <form id="formularioActualizar" action="" method="">
+         <div class="box-body">
+          <div class="row" id="campos">
+
+<TabView>
+    <TabPanel header="CLIENTE">
+    <div class="row">
+
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" hidden>
+<label for="id-Actualizador">ID</label>
+<input type="input" v-model="datoscampos.id" name="id"  class="form-control" id="id-Actualizador"  placeholder="id"  maxlength="11">
+</div>
+
+
+<div class="form-group col-12 col-sm-8 col-md-6 col-lg-4 col-xl-4" >
+<label for="nombre-Actualizador">NOMBRE</label>
+
+<InputText v-model="datoscampos.nombre" fluid />
+
+</div>
+<div class="form-group col-12 col-sm-4 col-md-6 col-lg-2 col-xl-2" >
+<label for="cedula-Actualizador">CEDULA</label>
+
+<InputText v-model="datoscampos.cedula" fluid />
+
+</div>
+<div class="form-group col-12 col-sm-6 col-md-4 col-lg-2 col-xl-2" >
+<label for="telefono-Actualizador">TELEFONO</label>
+<InputMask id="telefono-Actualizador" class="form-control" v-model="datoscampos.telefono" :mask="patronTelefono" :placeholder="patronTelefono" />
+</div>
+<div class="form-group col-12 col-sm-6 col-md-4 col-lg-2 col-xl-2" >
+<label for="whatsapp-Actualizador">WHATSAPP</label>
+<InputMask id="whatsapp-Actualizador" class="form-control" v-model="datoscampos.whatsapp" :mask="patronTelefono" :placeholder="patronTelefono" />
+</div>
+<div class="form-group col-12 col-sm-12 col-md-4 col-lg-2 col-xl-2" >
+<label for="email-Actualizador">EMAIL</label>
+
+<InputText v-model="datoscampos.email" fluid />
+
+
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="direccion-Actualizador">DIRECCION</label>
+<textarea class="form-control " id="direccion-Actualizador" name="direccion" v-model="datoscampos.direccion" cols="30" rows="3" ></textarea>
+</div>
+    </div>
+    </TabPanel>
+    <TabPanel header="EQUIPO">
+    <div class="row">
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="equipo-Actualizador">EQUIPO</label>
+<input type="input" v-model="datoscampos.equipo" name="equipo"  class="form-control" id="equipo-Actualizador"  placeholder="equipo" v-mayuscula maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="marca-Actualizador">MARCA</label>
+<input type="input" v-model="datoscampos.marca" name="marca"  class="form-control" id="marca-Actualizador"  placeholder="marca" v-mayuscula maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="modelo-Actualizador">MODELO</label>
+<input type="input" v-model="datoscampos.modelo" name="modelo"  class="form-control" id="modelo-Actualizador"  placeholder="modelo"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="serial-Actualizador">SERIAL</label>
+<input type="input" v-model="datoscampos.serial" name="serial"  class="form-control" id="serial-Actualizador"  placeholder="serial"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="imei-Actualizador">IMEI</label>
+<input type="input" v-model="datoscampos.imei" name="imei"  class="form-control" id="imei-Actualizador"  placeholder="imei"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="clave-Actualizador">CLAVE</label>
+<input type="input" v-model="datoscampos.clave" name="clave"  class="form-control" id="clave-Actualizador"  placeholder="clave"  maxlength="250">
+</div>
+</div>
+    </TabPanel>
+    <TabPanel header="ACCESORIOS">
+<div class="row">
+
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="accesorios-Actualizador">ACCESORIOS</label>
+<textarea class="form-control " id="accesorios-Actualizador" name="accesorios" v-model="datoscampos.accesorios" cols="30" rows="3" ></textarea>
+</div>
+</div>
+    </TabPanel>
+
+    <TabPanel header="FALLAS">
+<div class="row">
+
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<!-- <label for="fallas-Actualizador">FALLAS</label> -->
+<!-- <textarea class="form-control " id="fallas-Actualizador" name="fallas" v-model="datoscampos.fallas" cols="30" rows="3" ></textarea> -->
+
+<div class="table-responsive">
+  <div v-html="generarTablaFromStringJSON(datoscampos.fallas,true,fnEditarFalla,fnBorrarFalla,true,'fallasTable')" class="border p-3 rounded mb-2">
+  </div>
+</div>
+
+
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="observaciones-Actualizador">OBSERVACIONES</label>
+<textarea class="form-control " id="observaciones-Actualizador" name="observaciones" v-model="datoscampos.observaciones" cols="30" rows="6" ></textarea>
+</div>
+
+</div>
+</div>
+    </TabPanel>
+    <TabPanel header="REPARACION">
+<div class="row">
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="reparacion-Actualizador">REPARACION</label>
+<textarea class="form-control " id="reparacion-Actualizador" name="reparacion" v-model="datoscampos.reparacion" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="piezas-Actualizador">PIEZAS</label>
+<textarea class="form-control " id="piezas-Actualizador" name="piezas" v-model="datoscampos.piezas" cols="30" rows="3" ></textarea>
+</div>
+</div>
+    </TabPanel>
+    <TabPanel header="FINALIZAR">
+<div class="row">
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="tecnico-Actualizador">TECNICO</label>
+<input type="input" v-model="datoscampos.tecnico" name="tecnico"  class="form-control" id="tecnico-Actualizador"  placeholder="tecnico"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="metodopago-Actualizador">METODOPAGO</label>
+<input type="input" v-model="datoscampos.metodopago" name="metodopago"  class="form-control" id="metodopago-Actualizador"  placeholder="metodopago"  maxlength="250" readonly>
+</div>
+        <div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+        <label for="metodopagoAgregarDatos">PRIORIDAD</label>
+
+        <select v-model="prioridad" name="metodopago"  class="form-control " id="prioridadAgregarDatos">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+        </select>
+        </div>
+
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="fecha_entrada-Actualizador">FECHA_ENTRADA</label>
+<input type="input" v-model="datoscampos.fecha_entrada" name="fecha_entrada"  class="form-control" id="fecha_entrada-Actualizador"  placeholder="fecha_entrada"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="fecha_entrega-Actualizador">FECHA_ENTREGA</label>
+<input type="input" v-model="datoscampos.fecha_entrega" name="fecha_entrega"  class="form-control" id="fecha_entrega-Actualizador"  placeholder="fecha_entrega"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="no_factura-Actualizador">NO_FACTURA</label>
+<input type="input" v-model="datoscampos.no_factura" name="no_factura"  class="form-control" id="no_factura-Actualizador"  placeholder="no_factura"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="estado-Actualizador">ESTADO</label>
+<select class="form-control " id="estado-Actualizador" v-model="datoscampos.estado" name="estado" >
+          <option value="En Revision">En Revision</option>
+        <option value="Reparado">Reparado</option>
+        <option value="Entregado">Entregado</option>
+        <option value="Devolucion">Devolucion</option>
+        <option value="Sin Solucion">Sin Solucion</option>
+        <option value="Garantia">Garantia</option>
+</select></div>
+<!-- <div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="preciopiezas-Actualizador">PRECIOPIEZAS</label>
+<input type="input" v-numeroFocusinOut v-decimales v-model="datoscampos.preciopiezas" name="preciopiezas"  class="form-control" id="preciopiezas-Actualizador"  placeholder="preciopiezas" v-solonumeros maxlength="250">
+</div> -->
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="manodeobra-Actualizador">MANODEOBRA</label>
+<input type="input" v-numeroFocusinOut v-decimales v-model="datoscampos.manodeobra" name="manodeobra"  class="form-control" id="manodeobra-Actualizador"  placeholder="manodeobra" v-solonumeros maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="abono-Actualizador">ABONO</label>
+<input type="input" v-numeroFocusinOut v-decimales v-model="abono" name="abono"  class="form-control" id="abono-Actualizador"  placeholder="abono" v-solonumeros maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="saldo-Actualizador">SALDO</label>
+<input type="input" v-numeroFocusinOut v-decimales v-model="datoscampos.saldo" name="saldo"  class="form-control" id="saldo-Actualizador"  placeholder="saldo" v-solonumeros maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="total-Actualizador">TOTAL</label>
+<input type="input" v-model="datoscampos.total" name="total"  class="form-control" id="total-Actualizador"  placeholder="total" v-solonumeros maxlength="250" readonly>
+</div>
+<div class="form-group col-6" hidden>
+<label for="created_at-Actualizador">CREATED_AT</label>
+<input type="input" v-model="datoscampos.created_at" name="created_at"  class="form-control" id="created_at-Actualizador"  placeholder="created_at"  maxlength="">
+</div>
+<div class="form-group col-6" hidden>
+<label for="updated_at-Actualizador">UPDATED_AT</label>
+<input type="input" v-model="datoscampos.updated_at" name="updated_at"  class="form-control" id="updated_at-Actualizador"  placeholder="updated_at"  maxlength="">
+</div>
+<div class="form-group col-12" hidden>
+<label for="usuario-Actualizador">USUARIO</label>
+<input type="input" v-model="datoscampos.usuario" name="usuario"  class="form-control" id="usuario-Actualizador"  placeholder="usuario"  maxlength="250">
+</div>
+</div>
+    </TabPanel>
+
+    <TabPanel header="ABONOS">
+<div class="row">
+
+
+
+<div class="col-12">
+  <div class="table-responsive">
+  <div v-html="generarTablaFromStringJSON(datoscampos.abono,true,true,fnEditarAbono,fnBorrarAbono,'abonosTable')" class="border p-3 rounded mb-2"></div>
+</div>
+</div>
+
+</div>
+    </TabPanel>
+<!-- /**************************************************************/ -->
+    <TabPanel header="TECNICO">
+<div class="row">
+
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="preciopiezas-Actualizador">PRECIOPIEZAS</label>
+<input type="input" v-numeroFocusinOut v-decimales v-model="datoscampos.preciopiezas" name="preciopiezas"  class="form-control" id="preciopiezas-Actualizador" @keyup="fnModificarBeneficios" placeholder="preciopiezas" v-solonumeros maxlength="250">
+</div>
+
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="porcentaje_tecnico-Actualizador">PORCENTAJE TECNICO</label>
+<input type="input" v-numeroFocusinOut v-decimales v-model="datoscampos.porcentaje_tecnico" name="porcentaje_tecnico"  class="form-control" id="porcentaje_tecnico-Actualizador"  placeholder="porcentaje_tecnico" v-solonumeros maxlength="250" readonly>
+</div>
+
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="beneficio_tecnico-Actualizador">BENEFICIO TECNICO</label>
+<input type="input" v-numeroFocusinOut v-decimales v-model="datoscampos.beneficio_tecnico" name="beneficio_tecnico"  class="form-control" id="beneficio_tecnico-Actualizador"  placeholder="beneficio_tecnico" v-solonumeros maxlength="250" readonly>
+</div>
+
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="beneficio_empresa-Actualizador">BENEFICIO EMPRESA</label>
+<input type="input" v-numeroFocusinOut v-decimales v-model="datoscampos.beneficio_empresa" name="beneficio_empresa"  class="form-control" id="beneficio_empresa-Actualizador"  placeholder="beneficio_empresa" v-solonumeros maxlength="250" readonly>
+</div>
+
+
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="pago_tecnico-Actualizador">ESTADO DE PAGO</label>
+<input type="input" v-model="datoscampos.pago_tecnico" name="pago_tecnico"  class="form-control" id="pago_tecnico-Actualizador"  placeholder="pago_tecnico" maxlength="250" readonly>
+</div>
+
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<Button label="Pagar al Técnico" @click="fnPagarTecnico" icon="pi pi-check" severity="contrast" iconPos="right" class="mt-3" />
+</div>
+
+
+</div>
+    </TabPanel>
+<!-- /**************************************************************/ -->
+
+</TabView>
+
+
+
+
+<div class="form-group col-sm-12 mb-5 mt-5">
+<!-- <a href="#" @click="funcionActualizar" class="btn btn-primary elboton w-100">Actualizar Datos</a> -->
+  <Button
+    icon="pi pi-check"
+    class="ms-1 w-100"
+    severity="primary"
+    label="Actualizar Datos"
+    @click="funcionActualizar"
+  />
+  </div>
+  </div>
+  </div>
+   </form>
+</section>
+  </div>
+   </main>
+<Toast />
+
+<EnviarWhatsApp ref="enviarWhatsAppRef" :initialDatosWhatsApp="datosWhatsApp" />
+
+<!-- /**************************************************************************************/ -->
+
+<Dialog v-model:visible="visibleAverias" position="top" modal :style="{ width: '50rem' }" header="Averias">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">Averias</span>
+    </div>
+  </template>
+
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">Averias</legend>
+    <div class="grid grid-cols-1  gap-4">
+      <div>
+        <label>Las Fallas se agregan separadas por coma ( , )</label>
+        <Chips v-model="fallasChips" class="w-full" separator="," :allowDuplicate="false"  />
+      </div>
+    </div>
+  </fieldset>
+
+  <template #footer>
+      <Button label="Agregar Falla" outlined severity="secondary" @click="fnAgregarFalla"  />
+      <Button label="Cerrar" outlined severity="secondary" @click="visibletaller = false"  />
+  </template>
+</Dialog>
+<!-- /**************************************************************************************/ -->
+
+<Dialog v-model:visible="visiblePedidos" position="top" modal :style="{ width: '50rem' }" header="Pedidos">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">Pedidos</span>
+    </div>
+  </template>
+
+    <fieldset class="border p-3 rounded mb-2">
+      <legend class="float-none w-auto px-2">Pedidos</legend>
+      <div class="grid grid-cols-1 gap-4">
+        <div v-for="category in parsedFallas" :key="category.key" class="flex items-center gap-2">
+          <Checkbox v-model="piezasPedido" :inputId="category.key" name="category" :value="category.propiedad" />
+          <label :for="category.key">{{ category.propiedad }}</label>
+        </div>
+
+        <div>
+          <Select name="proveedor" v-model="proveedorWhatsapp" :options="proveedoresData" optionLabel="nombre" placeholder="Selecciones proveedor" fluid />
+        </div>
+      </div>
+    </fieldset>
+
+  <template #footer>
+      <Button label="Realizar Pedido" outlined severity="secondary" @click="fnRealizarPedido" />
+      <Button label="Cerrar" outlined severity="secondary" @click="visibletaller = false" />
+  </template>
+</Dialog>
+
+
+<!-- /**************************************************************************************/ -->
+
+
+<Dialog v-model:visible="visiblePedidoIndividual" position="top" modal :style="{ width: '30rem' }" header="PedidoIndividual">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">PedidoIndividual</span>
+    </div>
+  </template>
+
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">PedidoIndividual</legend>
+    <div class="grid grid-cols-1 gap-4">
+      <div>
+        <label for="pieza_pedido" class="block text-sm font-medium text-gray-700 dark:text-gray-400">PIEZA_PEDIDO</label>
+          <InputText type="text" class="form-input w-full "  v-model="datoscamposPedido.pieza_pedido" placeholder="pieza_pedido" name="crearpieza_pedido" id="pieza_pedido" readonly />
+      </div>
+
+        <div>
+          <Select name="proveedor" :options="proveedoresData" v-model="proveedorWhatsappIndividual"  optionLabel="nombre" placeholder="Selecciones proveedor" fluid />
+        </div>
+
+    </div>
+  </fieldset>
+
+  <template #footer>
+      <Button label="Realizar Pedido" outlined severity="secondary" @click="fnPedidoIndividual" autofocus />
+      <Button label="Consulta IA" outlined severity="secondary" @click="fnConsultaIA"  />
+      <Button label="Cerrar" outlined severity="secondary" @click="visiblePedidoIndividual = false" autofocus />
+  </template>
+</Dialog>
+
+
+
+
+<!-- /**************************************************************************************/ -->
+
+<Dialog v-model:visible="visibleIA" position="top" modal :style="{ width: '75rem' }" header="IA">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">IA</span>
+    </div>
+  </template>
+
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">IA</legend>
+
+
+<div class="chat-container p-4 bg-gray-100 h-screen flex flex-col">
+  <!-- Mensajes del chat -->
+  <div ref="chatMessages" class="chat-messages space-y-4 overflow-y-auto flex-1">
+    <div v-for="(message, index) in messages" :key="index" class="message flex">
+      <!-- Mensaje del usuario -->
+      <template v-if="message.sender === 'user'">
+        <div class="ml-auto bg-blue-500 text-white py-2 px-4 rounded-lg max-w-2xl shadow">
+          <p class="text-lg">{{ message.text }}</p>
+        </div>
+      </template>
+      <!-- Mensaje de la IA -->
+      <template v-else>
+        <div class="mr-auto bg-gray-300 text-gray-800 py-2 px-4 rounded-lg max-w-2xl shadow">
+          <p class="text-lg">{{ message.text }}</p>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- Input del chat -->
+  <div class="chat-input mt-4">
+    <input
+      type="text"
+      v-model="newMessage"
+      @keydown.enter="sendMessage"
+      placeholder="Escribe tu mensaje..."
+      class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+    />
+  </div>
+</div>
+
+
+  </fieldset>
+
+  <template #footer>
+      <Button label="Cerrar" outlined severity="secondary" @click="visibleIA = false" autofocus />
+  </template>
+</Dialog>
+
+
+<!-- /**************************************************************************************/ -->
+<Dialog v-model:visible="visibleCostoPiezas" position="top" modal :style="{ width: '30rem' }" header="CostoPiezas">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">CostoPiezas</span>
+    </div>
+  </template>
+
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">CostoPiezas</legend>
+    <div class="grid grid-cols-1 gap-4">
+      <div>
+<div class="form-group " >
+<label for="emailAgregarDatos">COSTO PIEZA</label><br>
+     <InputText v-model="costoPieza" fluid @change="fnAplicarPrecioPieza" v-solonumeros v-focus-in-focus-out />
+</div>
+      </div>
+    </div>
+  </fieldset>
+
+  <template #footer>
+      <Button label="Aplicar Precio" outlined severity="secondary" @click="fnAplicarPrecioPieza"  />
+      <Button label="Cerrar" outlined severity="secondary" @click="visibleCostoPiezas = false"  />
+  </template>
+</Dialog>
+<!-- /********************************************************************************************/ -->
+
+<Dialog v-model:visible="visiblePiezas" position="top" modal :style="{ width: '75rem' }" header="Piezas">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">Piezas</span>
+    </div>
+  </template>
+
+      <fieldset class="border p-3 rounded mb-2">
+        <legend class="float-none w-auto px-2">LISTADO DE PRODUCTOS</legend>
+          <div class="card">
+          <input v-model="searchQuery" placeholder="Buscar productos..." class="p-inputtext p-component" style="margin-bottom: 10px;" />
+            <ContextMenu ref="cm" :model="menuModel" @hide="selectedProduct = null" />
+            <DataTable :value="filteredProducts"  scrollable scrollHeight="600px" @rowSelect="onRowSelect" selectionMode="single" dataKey="id" paginator :rows="10" :rowsPerPageOptions="[5, 10, 20, 50]" tableStyle="min-width: 50rem">
+              <Column sortable v-for="col of columns" :key="col.field" :field="col.field" :header="col.header"></Column>
+            </DataTable>
+
+          </div>
+        </fieldset>
+
+  <template #footer>
+      <Button label="Cerrar" outlined severity="secondary" @click="visiblePiezas = false" autofocus />
+  </template>
+</Dialog>
+
+
+<!-- /********************************************************************************************/ -->
+
+
+  <LoadingOverlay :visible="loading" />
+
+</template>
+<style scoped>
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 50vh;
+}
+
+.chat-messages {
+  flex-grow: 1;
+  overflow-y: auto;
+}
+
+.message {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.user-message {
+  background-color: #dcf8c6;
+  border-radius: 8px;
+  padding: 10px;
+  max-width: 75%;
+  align-self: flex-end;
+}
+
+.ia-message {
+  background-color: #f1f0f0;
+  border-radius: 8px;
+  padding: 10px;
+  max-width: 75%;
+  align-self: flex-start;
+}
+
+</style>

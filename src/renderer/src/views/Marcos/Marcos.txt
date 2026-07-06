@@ -1,0 +1,52 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Marcos",
+"to": "/marcos",
+"permiso": "Administrador,Soporte",
+"icon": "pi pi-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/marcos',
+        name: 'marcos',
+        component: () => import('../views/Marcos/Marcos.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/crearmarcos',
+        name: 'crearmarcos',
+        component: () => import('@/views/Marcos/CrearMarcos.vue'),
+    },
+    {
+        path: '/editarmarcos/:id',
+        name: 'editarmarcos',
+        component: () => import('@/views/Marcos/EditarMarcos.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'nombre', 'precio_full', 'precio_sin_marco'"
+******************************************************
+{
+        
+      "nombre": "nombre",
+      "NOMBRE": "NOMBRE",
+      "Nombre": "Nombre",
+     
+      "precio_full": "precio_full",
+      "PRECIO_FULL": "PRECIO_FULL",
+      "Precio_full": "Precio_full",
+     
+      "precio_sin_marco": "precio_sin_marco",
+      "PRECIO_SIN_MARCO": "PRECIO_SIN_MARCO",
+      "Precio_sin_marco": "Precio_sin_marco",
+}
+

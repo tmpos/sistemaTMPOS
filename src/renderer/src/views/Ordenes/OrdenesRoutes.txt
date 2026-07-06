@@ -1,0 +1,276 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                    VUE ROUTER - CONFIGURACIÓN DE RUTAS                     ║
+║                                                                            ║
+║  Copia y pega estas rutas en tu archivo de configuración de Vue Router    ║
+║  Archivo típico: src/router/index.js                                      ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 RUTAS PARA: Ordenes
+Tabla: ordenes
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+OPCIÓN 1: Rutas sin Layout (Rutas Independientes)
+────────────────────────────────────────────────────────────────────────────
+
+Copia esto dentro del array 'routes' en tu router:
+
+{
+  path: '/ordenes',
+  name: 'OrdenesList',
+  component: () => import('@/views/ordenes/OrdenesList.vue'),
+  meta: {
+    title: 'ordenes',
+    requiresAuth: true  // Cambia a false si no requiere autenticación
+  }
+},
+{
+  path: '/crearOrdenes',
+  name: 'OrdenesCreate',
+  component: () => import('@/views/ordenes/OrdenesCreate.vue'),
+  meta: {
+    title: 'Nuevo Ordenes',
+    requiresAuth: true
+  }
+},
+{
+  path: '/editarOrdenes/:id',
+  name: 'OrdenesEdit',
+  component: () => import('@/views/ordenes/OrdenesEdit.vue'),
+  meta: {
+    title: 'Editar Ordenes',
+    requiresAuth: true
+  }
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+OPCIÓN 2: Rutas con Layout (Agrupadas bajo un layout)
+────────────────────────────────────────────────────────────────────────────
+
+Si tienes un componente de Layout (ej: DashboardLayout.vue):
+
+{
+  path: '/',
+  component: () => import('@/layouts/DashboardLayout.vue'),
+  children: [
+    {
+      path: 'ordenes',
+      name: 'OrdenesList',
+      component: () => import('@/views/ordenes/OrdenesList.vue'),
+      meta: {
+        title: 'ordenes',
+        requiresAuth: true
+      }
+    },
+    {
+      path: 'crearOrdenes',
+      name: 'OrdenesCreate',
+      component: () => import('@/views/ordenes/OrdenesCreate.vue'),
+      meta: {
+        title: 'Nuevo Ordenes',
+        requiresAuth: true
+      }
+    },
+    {
+      path: 'editarOrdenes/:id',
+      name: 'OrdenesEdit',
+      component: () => import('@/views/ordenes/OrdenesEdit.vue'),
+      meta: {
+        title: 'Editar Ordenes',
+        requiresAuth: true
+      }
+    }
+  ]
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+OPCIÓN 3: Ejemplo Completo de router/index.js
+────────────────────────────────────────────────────────────────────────────
+
+import { createRouter, createWebHistory } from 'vue-router'
+
+const routes = [
+  // Otras rutas...
+
+  // Rutas de Ordenes
+  {
+    path: '/ordenes',
+    name: 'OrdenesList',
+    component: () => import('@/views/ordenes/OrdenesList.vue'),
+    meta: {
+      title: 'ordenes',
+      requiresAuth: true
+    }
+  },
+  {
+    path: '/crearOrdenes',
+    name: 'OrdenesCreate',
+    component: () => import('@/views/ordenes/OrdenesCreate.vue'),
+    meta: {
+      title: 'Nuevo Ordenes',
+      requiresAuth: true
+    }
+  },
+  {
+    path: '/editarOrdenes/:id',
+    name: 'OrdenesEdit',
+    component: () => import('@/views/ordenes/OrdenesEdit.vue'),
+    meta: {
+      title: 'Editar Ordenes',
+      requiresAuth: true
+    }
+  }
+]
+
+const router = createRouter({
+  history: createWebHistory(import.meta.env.BASE_URL),
+  routes
+})
+
+// Guard de navegación (opcional)
+router.beforeEach((to, from, next) => {
+  // Cambiar título de la página
+  if (to.meta.title) {
+    document.title = to.meta.title
+  }
+
+  // Verificar autenticación
+  if (to.meta.requiresAuth) {
+    // TODO: Implementar lógica de autenticación
+    // const isAuthenticated = checkAuth()
+    // if (!isAuthenticated) {
+    //   next({ name: 'Login' })
+    //   return
+    // }
+  }
+
+  next()
+})
+
+export default router
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📝 RUTAS DISPONIBLES
+────────────────────────────────────────────────────────────────────────────
+
+1. Lista de ordenes:
+   URL: /ordenes
+   Nombre: OrdenesList
+   Componente: ordenes/OrdenesList.vue
+
+2. Crear Ordenes:
+   URL: /crearOrdenes
+   Nombre: OrdenesCreate
+   Componente: ordenes/OrdenesCreate.vue
+
+3. Editar Ordenes:
+   URL: /editarOrdenes/:id
+   Nombre: OrdenesEdit
+   Componente: ordenes/OrdenesEdit.vue
+   Parámetro: id (ID del registro a editar)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔗 NAVEGACIÓN PROGRAMÁTICA
+────────────────────────────────────────────────────────────────────────────
+
+Desde cualquier componente, puedes navegar usando:
+
+// Ir a la lista
+router.push({ name: 'OrdenesList' })
+
+// Ir a crear
+router.push({ name: 'OrdenesCreate' })
+
+// Ir a editar (con ID)
+router.push({ name: 'OrdenesEdit', params: { id: '123' } })
+
+// Ir a editar (con objeto completo)
+const Ordenes = { id: 123, nombre: 'Juan' }
+router.push({ name: 'OrdenesEdit', params: { id: Ordenes.id } })
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎨 MENÚ DE NAVEGACIÓN (Ejemplo)
+────────────────────────────────────────────────────────────────────────────
+
+Agrega esto a tu menú de navegación:
+
+<template>
+  <nav>
+    <!-- Opción 1: Con router-link -->
+    <router-link :to="{ name: 'OrdenesList' }">
+      <i class="pi pi-list"></i>
+      ordenes
+    </router-link>
+
+    <!-- Opción 2: Con botón y @click -->
+    <Button
+      label="ordenes"
+      icon="pi pi-list"
+      @click="router.push({ name: 'OrdenesList' })"
+    />
+  </nav>
+</template>
+
+<script setup>
+import { useRouter } from 'vue-router'
+const router = useRouter()
+</script>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚙️ CONFIGURACIÓN ADICIONAL
+────────────────────────────────────────────────────────────────────────────
+
+1. Alias de importación:
+   Si usas '@/views/...', asegúrate de tener configurado el alias en:
+   - vite.config.js (Vite)
+   - tsconfig.json (TypeScript)
+
+2. Meta fields:
+   - title: Título de la página (para <title>)
+   - requiresAuth: Si requiere autenticación
+   - breadcrumb: Breadcrumb personalizado
+   - permissions: Permisos necesarios
+
+3. Guards de navegación:
+   - beforeEach: Se ejecuta antes de cada navegación
+   - afterEach: Se ejecuta después de cada navegación
+   - beforeEnter: Se ejecuta solo para estas rutas
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ CHECKLIST DE INTEGRACIÓN
+────────────────────────────────────────────────────────────────────────────
+
+[ ] 1. Copiar las rutas al archivo router/index.js
+[ ] 2. Verificar que los paths de importación sean correctos
+[ ] 3. Ajustar meta.requiresAuth según tus necesidades
+[ ] 4. Implementar guard de autenticación si es necesario
+[ ] 5. Agregar enlaces en el menú de navegación
+[ ] 6. Probar la navegación entre las vistas
+[ ] 7. Verificar que los parámetros de ruta funcionen (/:id)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 RECURSOS ADICIONALES
+────────────────────────────────────────────────────────────────────────────
+
+- Documentación de Vue Router: https://router.vuejs.org/
+- Navegación programática: https://router.vuejs.org/guide/essentials/navigation.html
+- Guards de navegación: https://router.vuejs.org/guide/advanced/navigation-guards.html
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎉 ¡Listo! Copia la configuración que necesites y pégala en tu router.
+
+Generado por: Generador CRUD - Modo Página
+Fecha: 22/11/2025, 10:42:09
+
+╚════════════════════════════════════════════════════════════════════════════╝

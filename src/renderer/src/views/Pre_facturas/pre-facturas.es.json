@@ -1,0 +1,109 @@
+{
+  "title": "pre_facturas",
+  "entityName": "PreFacturas",
+  "entityNamePlural": "PreFacturass",
+  "actions": {
+    "new": "Nuevo PreFacturas",
+    "create": "Crear",
+    "edit": "Editar",
+    "update": "Actualizar",
+    "delete": "Eliminar",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "search": "Buscar",
+    "back": "Volver",
+    "view": "Ver",
+    "viewDetails": "Ver Detalles",
+    "confirmDelete": "Confirmar eliminación",
+    "actions": "Acciones",
+    "first": "Primero",
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "last": "Último"
+  },
+  "list": {
+    "title": "pre_facturas",
+    "subtitle": "Gestión completa de pre_facturas",
+    "empty": "No hay registros disponibles",
+    "createFirst": "Crear Primero",
+    "total": "Total PreFacturass",
+    "active": "Registros Activos",
+    "lastUpdate": "Última Actualización"
+  },
+  "create": {
+    "title": "Crear PreFacturas",
+    "subtitle": "Complete el formulario para agregar un nuevo registro",
+    "generalInfo": "Información General",
+    "successTitle": "Datos Agregados",
+    "successMessage": "¿Qué hacemos ahora?",
+    "addAnother": "Agregar Otro!",
+    "backToList": "No, Regresar al Inicio!"
+  },
+  "edit": {
+    "title": "Editar PreFacturas",
+    "subtitle": "Modifique los campos que desee actualizar",
+    "loading": "Cargando datos...",
+    "notFound": "No se encontró el registro"
+  },
+  "detail": {
+    "title": "Detalles de PreFacturas",
+    "subtitle": "Información completa del registro"
+  },
+  "messages": {
+    "createSuccess": "PreFacturas creado correctamente",
+    "updateSuccess": "PreFacturas actualizado correctamente",
+    "deleteSuccess": "PreFacturas eliminado correctamente",
+    "createError": "Error al crear el registro",
+    "updateError": "Error al actualizar el registro",
+    "deleteError": "Error al eliminar el registro",
+    "loadError": "Error al cargar datos",
+    "deleteConfirm": "¿Está seguro que desea eliminar este registro?",
+    "deleteWarning": "Esta acción no se puede deshacer"
+  },
+  "fields": {
+    "no_orden": {
+      "label": "No_orden",
+      "placeholder": "Ingrese no_orden"
+    },
+    "fecha": {
+      "label": "Fecha",
+      "placeholder": "Ingrese fecha"
+    },
+    "estado": {
+      "label": "Estado",
+      "placeholder": "Ingrese estado"
+    },
+    "total": {
+      "label": "Total",
+      "placeholder": "Ingrese total"
+    },
+    "no_factura": {
+      "label": "No_factura",
+      "placeholder": "Ingrese no_factura"
+    },
+    "cod_cliente": {
+      "label": "Cod_cliente",
+      "placeholder": "Ingrese cod_cliente"
+    },
+    "cliente": {
+      "label": "Cliente",
+      "placeholder": "Ingrese cliente"
+    },
+    "productos": {
+      "label": "Productos",
+      "placeholder": "Ingrese productos"
+    },
+    "nota": {
+      "label": "Nota",
+      "placeholder": "Ingrese nota"
+    },
+    "created_at": {
+      "label": "Created_at",
+      "placeholder": "Ingrese created_at"
+    },
+    "updated_at": {
+      "label": "Updated_at",
+      "placeholder": "Ingrese updated_at"
+    }
+  }
+}

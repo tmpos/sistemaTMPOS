@@ -1,0 +1,275 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                    CONFIGURACIÓN DE INTERNACIONALIZACIÓN (i18n)            ║
+║                                                                            ║
+║  Instrucciones para integrar los archivos de traducción generados         ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 ARCHIVOS GENERADOS
+────────────────────────────────────────────────────────────────────────────
+
+Los siguientes archivos de traducción han sido generados:
+
+  - menu.es.json (ES)
+  - menu.en.json (EN)
+
+Idioma predeterminado: ES
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📦 PASO 1: Instalar vue-i18n
+────────────────────────────────────────────────────────────────────────────
+
+Ejecuta el siguiente comando en tu proyecto:
+
+npm install vue-i18n@9
+# o
+yarn add vue-i18n@9
+# o
+pnpm add vue-i18n@9
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📁 PASO 2: Organizar archivos de traducción
+────────────────────────────────────────────────────────────────────────────
+
+Crea la siguiente estructura de carpetas en tu proyecto:
+
+src/
+  locales/
+    es/
+      menu.json
+    en/
+      menu.json
+    index.js
+
+Mueve los archivos .json generados a las carpetas correspondientes.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚙️ PASO 3: Configurar vue-i18n
+────────────────────────────────────────────────────────────────────────────
+
+Crea el archivo src/locales/index.js:
+
+import { createI18n } from 'vue-i18n'
+
+// Import translations
+import es from './es/menu.json'
+import en from './en/menu.json'
+
+// Create i18n instance
+const i18n = createI18n({
+  legacy: false, // Use Composition API mode
+  locale: 'es', // Default language
+  fallbackLocale: 'es',
+  messages: {
+    es: {
+      menu: es
+    },
+    en: {
+      menu: en
+    }
+  }
+})
+
+export default i18n
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔌 PASO 4: Integrar en tu aplicación Vue
+────────────────────────────────────────────────────────────────────────────
+
+Modifica tu archivo main.js:
+
+import { createApp } from 'vue'
+import App from './App.vue'
+import i18n from './locales'
+
+const app = createApp(App)
+app.use(i18n)
+app.mount('#app')
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📝 PASO 5: Usar traducciones en tus componentes
+────────────────────────────────────────────────────────────────────────────
+
+En tus componentes generados, usa el composable useI18n:
+
+<script setup>
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
+// Usar traducciones
+console.log(t('menu.title'))
+console.log(t('menu.actions.new'))
+console.log(t('menu.fields.nombre.label'))
+</script>
+
+<template>
+  <div>
+    <h1>{{ t('menu.list.title') }}</h1>
+    <button>{{ t('menu.actions.new') }}</button>
+  </div>
+</template>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🌐 PASO 6: Cambiar idioma dinámicamente (Opcional)
+────────────────────────────────────────────────────────────────────────────
+
+Crea un componente de selector de idioma:
+
+<script setup>
+import { useI18n } from 'vue-i18n'
+
+const { locale, availableLocales } = useI18n()
+
+function changeLanguage(lang) {
+  locale.value = lang
+  // Opcional: guardar en localStorage
+  localStorage.setItem('language', lang)
+}
+</script>
+
+<template>
+  <select v-model="locale">
+    <option v-for="lang in availableLocales" :key="lang" :value="lang">
+      {{ lang.toUpperCase() }}
+    </option>
+  </select>
+</template>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔑 CLAVES DE TRADUCCIÓN DISPONIBLES
+────────────────────────────────────────────────────────────────────────────
+
+Todas las claves están bajo el namespace 'menu':
+
+- menu.title
+- menu.entityName
+- menu.entityNamePlural
+
+Acciones:
+- menu.actions.new
+- menu.actions.create
+- menu.actions.edit
+- menu.actions.update
+- menu.actions.delete
+- menu.actions.cancel
+- menu.actions.save
+- menu.actions.search
+- menu.actions.back
+- menu.actions.view
+- menu.actions.viewDetails
+
+Lista:
+- menu.list.title
+- menu.list.subtitle
+- menu.list.empty
+- menu.list.total
+- menu.list.active
+
+Crear:
+- menu.create.title
+- menu.create.subtitle
+- menu.create.generalInfo
+
+Editar:
+- menu.edit.title
+- menu.edit.subtitle
+- menu.edit.loading
+
+Mensajes:
+- menu.messages.createSuccess
+- menu.messages.updateSuccess
+- menu.messages.deleteSuccess
+- menu.messages.deleteConfirm
+
+Campos (ejemplo):
+- menu.fields.{nombre_campo}.label
+- menu.fields.{nombre_campo}.placeholder
+- menu.fields.{nombre_campo}.required
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 EJEMPLO DE INTEGRACIÓN COMPLETA
+────────────────────────────────────────────────────────────────────────────
+
+<template>
+  <div>
+    <h1>{{ t('menu.list.title') }}</h1>
+    <p>{{ t('menu.list.subtitle') }}</p>
+
+    <Button :label="t('menu.actions.new')" />
+
+    <DataTable>
+      <Column :header="t('menu.actions.actions')" />
+    </DataTable>
+  </div>
+</template>
+
+<script setup>
+import { useI18n } from 'vue-i18n'
+import { useToast } from 'primevue/usetoast'
+
+const { t } = useI18n()
+const toast = useToast()
+
+async function createItem() {
+  try {
+    // ... crear item
+    toast.add({
+      severity: 'success',
+      summary: t('menu.messages.createSuccess'),
+      life: 3000
+    })
+  } catch (error) {
+    toast.add({
+      severity: 'error',
+      summary: t('menu.messages.createError'),
+      life: 3000
+    })
+  }
+}
+</script>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ CHECKLIST DE INTEGRACIÓN
+────────────────────────────────────────────────────────────────────────────
+
+[ ] 1. Instalar vue-i18n
+[ ] 2. Crear estructura de carpetas locales/
+[ ] 3. Mover archivos .json a carpetas correspondientes
+[ ] 4. Crear archivo locales/index.js
+[ ] 5. Integrar i18n en main.js
+[ ] 6. Actualizar componentes para usar useI18n()
+[ ] 7. Reemplazar textos hardcoded con claves t()
+[ ] 8. Probar cambio de idioma
+[ ] 9. Verificar todas las traducciones
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 RECURSOS ADICIONALES
+────────────────────────────────────────────────────────────────────────────
+
+- Documentación vue-i18n: https://vue-i18n.intlify.dev/
+- Composition API: https://vue-i18n.intlify.dev/guide/advanced/composition.html
+- Pluralización: https://vue-i18n.intlify.dev/guide/essentials/pluralization.html
+- Formateo de fechas: https://vue-i18n.intlify.dev/guide/essentials/datetime.html
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎉 ¡Listo! Ahora tu aplicación está lista para ser traducida a múltiples idiomas.
+
+Generado por: Generador CRUD - Sistema i18n
+Fecha: 19/11/2025, 8:37:54
+
+╚════════════════════════════════════════════════════════════════════════════╝

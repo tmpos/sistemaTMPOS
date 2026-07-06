@@ -1,0 +1,48 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Tokens",
+"to": "/tokens",
+"permiso": "Administrador,Soporte",
+"icon": "pi pi-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/tokens',
+        name: 'tokens',
+        component: () => import('../views/Tokens/Tokens.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/creartokens',
+        name: 'creartokens',
+        component: () => import('@/views/Tokens/CrearTokens.vue'),
+    },
+    {
+        path: '/editartokens/:id',
+        name: 'editartokens',
+        component: () => import('@/views/Tokens/EditarTokens.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'nombre', 'token'"
+******************************************************
+{
+        
+      "nombre": "nombre",
+      "NOMBRE": "NOMBRE",
+      "Nombre": "Nombre",
+     
+      "token": "token",
+      "TOKEN": "TOKEN",
+      "Token": "Token",
+}
+

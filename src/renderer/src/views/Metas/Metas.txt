@@ -1,0 +1,76 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Metas",
+"to": "/metas",
+"permiso": "Administrador,Soporte",
+"icon": "pi pi-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/metas',
+        name: 'metas',
+        component: () => import('../views/Metas/Metas.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/crearmetas',
+        name: 'crearmetas',
+        component: () => import('@/views/Metas/CrearMetas.vue'),
+    },
+    {
+        path: '/editarmetas/:id',
+        name: 'editarmetas',
+        component: () => import('@/views/Metas/EditarMetas.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'titulo', 'descripcion', 'tipo_meta', 'valor_objetivo', 'fecha_inicio', 'fecha_fin', 'valor_actual', 'porcentaje_avance', 'estado'"
+******************************************************
+{
+        
+      "titulo": "titulo",
+      "TITULO": "TITULO",
+      "Titulo": "Titulo",
+     
+      "descripcion": "descripcion",
+      "DESCRIPCION": "DESCRIPCION",
+      "Descripcion": "Descripcion",
+     
+      "tipo_meta": "tipo_meta",
+      "TIPO_META": "TIPO_META",
+      "Tipo_meta": "Tipo_meta",
+     
+      "valor_objetivo": "valor_objetivo",
+      "VALOR_OBJETIVO": "VALOR_OBJETIVO",
+      "Valor_objetivo": "Valor_objetivo",
+     
+      "fecha_inicio": "fecha_inicio",
+      "FECHA_INICIO": "FECHA_INICIO",
+      "Fecha_inicio": "Fecha_inicio",
+     
+      "fecha_fin": "fecha_fin",
+      "FECHA_FIN": "FECHA_FIN",
+      "Fecha_fin": "Fecha_fin",
+     
+      "valor_actual": "valor_actual",
+      "VALOR_ACTUAL": "VALOR_ACTUAL",
+      "Valor_actual": "Valor_actual",
+     
+      "porcentaje_avance": "porcentaje_avance",
+      "PORCENTAJE_AVANCE": "PORCENTAJE_AVANCE",
+      "Porcentaje_avance": "Porcentaje_avance",
+     
+      "estado": "estado",
+      "ESTADO": "ESTADO",
+      "Estado": "Estado",
+}
+

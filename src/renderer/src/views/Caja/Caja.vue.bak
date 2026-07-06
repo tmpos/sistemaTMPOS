@@ -1,0 +1,4132 @@
+<template>
+  <main class="content-wrapper">
+    <div class="containerS mx-auto ">
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 card">
+    <div class="col-span-2">
+      <fieldset class="border p-3 rounded mb-2">
+        <legend class="px-2">CAJA</legend>
+        <Card>
+          <template #title>DATOS DEL USUARIO</template>
+          <template #content>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+  <div>
+    <label for="fechafacturas">Fecha</label>
+    <InputText type="text" class="w-full" v-model="fechaHoy" id="fechafacturas" readonly />
+  </div>
+
+  
+  <div>
+    <label for="vendedoresdeldiaSelect">Vendedor</label>
+    <InputText type="text" v-model="usuarioLocal.nombre" class="w-full" readonly />
+  </div>
+  <div>
+    <label for="vendedoresdeldiatoken">Turno</label>
+    <InputText type="text" v-model="usuarioLocal.token" class="w-full" id="vendedoresdeldiatoken" readonly />
+  </div>
+</div>
+
+          </template>
+        </Card>
+      </fieldset>
+
+      <fieldset class="border p-3 rounded mb-2">
+        <legend class="px-2">FACTURAS NUEVAS</legend>
+      <Card>
+        <template #title>
+          ACCIONES COMPLETAS
+        </template>
+        <template #content>
+          <div style="display: flex; justify-content: flex-end;">
+            <Button label="Cobrar Todo" @click="fnCobrarTodo" icon="pi pi-file" iconPos="top" />
+            <Button label="Eliminar Todo" @click="fnEliminarTodo" class="ml-2" severity="danger" icon="pi pi-trash" iconPos="top" />
+            <Button label="Recargar Facturas" @click="recargarFacturasFull" class="ml-2" icon="pi pi-refresh" iconPos="top" />
+          </div>
+        </template>
+      </Card>
+
+
+        <Card class="mt-2">
+          <template #title>FACTURAS PENDIENTES</template>
+          <template #content>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div v-for="factura in facturasSinCobrar" :key="factura.id" class="border p-3 rounded">
+                <div class="flex justify-between mb-3">
+                  <div>
+                    <span class="block text-gray-500 font-medium mb-3" style="word-wrap: break-word; white-space: normal;">
+                      {{ factura.nombre_cliente }} ({{ factura.no_factura }})
+                    </span>
+                    <div class="text-gray-900 font-medium text-xl">{{ factura.total }}</div>
+                  </div>
+                  <div class="flex items-center justify-center bg-blue-100 border-round" style="width: 2.5rem; height: 2.5rem">
+                    <i class="pi text-blue-500 text-xl" :class="'icon-' + tipoFactura[factura.metodo_pago].icono"></i>
+                  </div>
+                </div>
+                <div>
+                  <span class="info-box-number">
+               <ButtonGroup>
+                      <Button label="Cobrar" @click="cobrarFactura(factura)" icon="pi pi-check" severity="success" />
+                      <Button label="Prods" @click="fnProductos(factura)" icon="pi pi-eye" severity="secondary" />
+                      <Button label="Imprimir" @click="fnImprimirFactura(factura)" icon="pi pi-print" severity="secondary" />
+                      <Button label="Quitar" @click="eliminarFactura(factura.no_factura, factura.id)" icon="pi pi-times" severity="danger" />
+                    </ButtonGroup>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </template>
+        </Card>
+      </fieldset>
+    </div>
+
+    <div class="col-span-1">
+      <fieldset class="border p-3 rounded mb-2">
+        <legend class="px-2">ACCIONES DE CAJA</legend>
+        <Card>
+          <template #title>Botones de Acción</template>
+          <template #content>
+            <div class="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+              <Button label="AGREGAR ABONO" @click="visibleabono = true" icon="pi pi-money-bill" iconPos="top" />
+              <Button label="AGREGAR ENTRADA" @click="visiblentrada = true" icon="pi pi-shopping-bag" iconPos="top" />
+              <Button label="AGREGAR GASTO" @click="visiblegastos = true" icon="pi pi-wallet" iconPos="top" />
+              <Button label="C. POR COBRAR" as="router-link" to="/cuentas_cobrar" icon="pi pi-wallet" iconPos="top" />
+              <Button label="FACTURAS" @click="visibleimprimirfactura = true" icon="pi pi-print" iconPos="top" />
+              <Button label="TALLER" v-if="datosDefault.modo === 'CELULAR' || datosDefault.modo === 'FULL'" @click="visibletaller = true" icon="pi pi-wrench" iconPos="top" />
+              <Button label="TRANSACCIONES"  @click="visibleTransacciones = true" icon="pi pi-arrow-right-arrow-left" iconPos="top" />
+              <Button label="PRODUCTOS" as="router-link" to="/productos" icon="pi pi-th-large" iconPos="top" />
+              <Button label="VENDER" as="router-link" to="/vender" icon="pi pi-cart-plus" iconPos="top" />
+              <Button label="CUADRAR CAJA" @click="cuadrarCaja = true" icon="pi pi-file" iconPos="top" />
+          <!--     <Button label="REGISTRAR SOCIOS" @click="registrarSocios = true" icon="pi pi-users" iconPos="top" /> -->
+              <Button label="REALIZAR CIERRE" @click="fnRealizarCierre" icon="pi pi-times-circle" iconPos="top" />
+              <Button label="CONSULTA IA" @click="visibleIA = true" v-if="datosDefault.modo === 'CELULAR' || datosDefault.modo === 'FULL'" icon="pi pi-comments" iconPos="top" />
+            </div>
+          </template>
+        </Card>
+      </fieldset>
+    </div>
+
+
+    <div class="col-span-3">
+      <fieldset class="border p-3 rounded mb-2">
+        <legend class="px-2">COBRO DE FACTURAS</legend>
+      </fieldset>
+    </div>
+  </div>
+</div>
+
+
+   <Toast />
+
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+
+<Dialog v-model:visible="registrarSocios" position="top" modal :style="{ width: '50rem' }" header="registrarSocios">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">Registrar Socios</span>
+    </div>
+  </template>
+
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">Registrar Socios</legend>
+    <div class="grid grid-cols-12  gap-4">
+      <div class="col-span-12 md:col-span-4">
+        <label >CODIGO</label>
+        <InputText
+          type="text"
+          v-model="registroSocios.codigo"
+          placeholder="Codigo"
+          v-solonumeros
+          @keyup="verificaCodigoSocio"
+          @keydown.enter="verificaCodigoSocio"
+          class="w-full"
+        />
+      </div>
+      <div class="col-span-12 md:col-span-8">
+        <label >NOMBRE</label>
+        <InputText
+          type="text"
+          v-model="registroSocios.nombre"
+          placeholder="Nombre"
+          v-mayuscula
+          class="w-full"
+        />
+      </div>
+
+      <div class="col-span-12 md:col-span-6 lg:col-span-4">
+        <label >CEDULA</label>
+        <InputText
+          type="text"
+          v-model="registroSocios.cedula"
+          placeholder="Cedula"
+          v-solonumeros
+          fluid
+          @keydown.enter="cobrandoFactura"
+        />
+      </div>
+
+      <div class="col-span-12 md:col-span-6 lg:col-span-4">
+        <label >TELEFONO</label>
+        <InputText
+          type="text"
+          v-model="registroSocios.telefono"
+          placeholder="Telefono"
+          v-solonumeros
+          class="w-full"
+        />
+      </div>
+
+
+      <div class="col-span-12 md:col-span-6 lg:col-span-4">
+        <label >EMAIL</label>
+        <InputText
+          type="text"
+          v-model="registroSocios.email"
+          placeholder="Email"
+          class="w-full"
+        />
+      </div>
+
+
+      <div class="col-span-12 md:col-span-6 lg:col-span-4">
+        <label >SEXO</label>
+        <Select v-model="registroSocios.sexo"
+         :options="['HOMBRE','MUJER']"
+         fluid
+           />
+      </div>
+
+      <div class="col-span-12 md:col-span-6 lg:col-span-4">
+        <label >CUMPLEAÑO</label>
+        <InputText
+          type="text"
+          v-model="registroSocios.fecha_nacimiento"
+          placeholder="Fecha de Nacimiento"
+          class="w-full"
+        />
+      </div>
+
+      <div class="col-span-12 md:col-span-6 lg:col-span-4">
+        <label >EDAD</label>
+        <InputText
+          type="text"
+          v-model="registroSocios.edad"
+          placeholder="Edad"
+          class="w-full"
+        />
+      </div>
+
+      <div class="col-span-12 ">
+        <label >DIRECCION</label>
+        <InputText
+          type="text"
+          v-model="registroSocios.direccion"
+          placeholder="Direccion"
+          class="w-full"
+        />
+      </div>
+
+    </div>
+  </fieldset>
+
+  <template #footer>
+      <Button label="Agregar Socio" outlined severity="secondary" @click="fnAgregarSocio"  />
+      <Button label="Cerrar" outlined severity="secondary" @click="registrarSocios = false"  />
+  </template>
+</Dialog>
+
+
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Dialog v-model:visible="visiblecobrar" modal :style="{ width: '50rem' }" header="Cobrar Factura">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">Cobrar Factura</span>
+    </div>
+  </template>
+
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">Cobrar</legend>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label for="moneyrecibido">RECIBIDO</label>
+        <InputText
+          type="text"
+          ref="moneyrecibidoRef"
+          id="dineroRecibido"
+          v-model="recibidoFactura"
+          style="height: 5rem; font-size: 2.5rem; padding: 0.5rem;"
+          placeholder="moneyrecibido"
+          v-solonumeros
+          v-numeroFocusinOut
+          v-tecladovirtual="(event) => handleFocus('number', event.target)"
+          @keyup="calcularVuelto"
+          @keydown.enter="cobrandoFactura"
+          class="w-full"
+        />
+      </div>
+
+      <div>
+        <label for="moneyrecibido">TOTAL</label>
+        <InputText
+          type="text"
+          style="height: 5rem; font-size: 2.5rem; padding: 0.5rem;"
+          v-model="totalFactura"
+          readonly
+          class="w-full"
+        />
+      </div>
+
+      <div>
+        <label for="moneyrecibido">DEVUELTA</label>
+        <InputText
+          type="text"
+          style="height: 5rem; font-size: 2.5rem; padding: 0.5rem;"
+          v-model="devueltaFactura"
+          readonly
+          class="w-full"
+        />
+      </div>
+
+      <div>
+        <label for="moneyrecibido">EFECTIVO</label>
+        <InputText
+          type="text"
+          style="height: 5rem; font-size: 2.5rem; padding: 0.5rem;"
+          v-model="facturaEfectivo"
+          v-tecladovirtual="(event) => handleFocus('number', event.target)"
+          v-solonumeros
+          v-decimales
+          v-numeroFocusinOut
+          @blur="handleEfectivoChange"
+          class="w-full"
+        />
+      </div>
+
+      <div>
+        <label for="moneyrecibido">TARJETA</label>
+        <InputText
+          type="text"
+          style="height: 5rem; font-size: 2.5rem; padding: 0.5rem;"
+          v-model="facturaTarjeta"
+          v-tecladovirtual="(event) => handleFocus('number', event.target)"
+          v-solonumeros
+          v-decimales
+          v-numeroFocusinOut
+          @blur="handleTarjetaChange"
+          class="w-full"
+        />
+      </div>
+
+      <div>
+        <label for="moneyrecibido">TRANSFERENCIA</label>
+        <InputText
+          type="text"
+          style="height: 5rem; font-size: 2.5rem; padding: 0.5rem;"
+          v-model="facturaTransferencia"
+          v-tecladovirtual="(event) => handleFocus('number', event.target)"
+          v-solonumeros
+          v-decimales
+          v-numeroFocusinOut
+          @blur="handleTransferenciaChange"
+          class="w-full"
+        />
+      </div>
+
+      <!-- Campo agregado para Propina -->
+      <div>
+        <label for="moneyrecibido">PROPINA</label>
+        <InputText
+          type="text"
+          style="height: 5rem; font-size: 2.5rem; padding: 0.5rem;"
+          v-model="propinaFactura"
+          v-tecladovirtual="(event) => handleFocus('number', event.target)"
+          v-solonumeros
+          v-decimales
+          v-numeroFocusinOut
+          @keyup="handlePropinaChange"
+          @keydown.enter="cobrandoFactura"
+          class="w-full"
+        />
+      </div>
+    </div>
+  </fieldset>
+
+  <template #footer>
+    <Button label="Deja el cambio de Propina (F1)" text severity="secondary" @click="fnDejaCambioPropina" />
+    <Button label="Cobrar Por Tarjeta (F2)" text severity="secondary" @click="fnCobrarPorTarjeta" />
+    <Button label="Cobrar Por Transferencia (F3)" text severity="secondary" @click="fnCobrarPorTransferencia" />
+    <Button label="Cancel" text severity="secondary" @click="visiblecobrar = false" />
+    <Button label="Cobrar" outlined severity="secondary" @click="cobrandoFactura" />
+  </template>
+</Dialog>
+
+
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Dialog v-model:visible="visibleimprimirfactura" modal :style="{ width: '50rem' }" header="Imprimir Factura">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">Imprimir Factura</span>
+    </div>
+  </template>
+
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">Impresión</legend>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label for="ingresenumeroModifcarfactura">INGRESE # FACTURA</label>
+        <InputGroup>
+          <Dropdown
+            v-model="campoFactura"
+            @change="facturaSeleccionada"
+            filter
+            editable
+            :options="facturas"
+            optionLabel="no_factura"
+            placeholder="Seleccione una Factura"
+            class="w-full"
+          />
+          <Button icon="pi pi-sync" @click="recargarFacturas" severity="success" />
+        </InputGroup>
+      </div>
+
+      <div>
+        <label for="elegirimpresora">Elige la Impresora</label>
+        <Dropdown
+          v-model="impresoraSeleccionada"
+          :options="[
+            { label: 'Impresora Normal', value: 'Impresora Normal' },
+            { label: 'Impresora Térmica', value: 'Impresora Ticket' },
+            { label: 'Impresora Térmica 2', value: 'Offline' }
+          ]"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="Seleccione una Impresora"
+          class="w-full"
+        />
+      </div>
+
+      <div class="col-span-2">
+        <label for="elegircliente">Nombre de Cliente</label>
+        <InputText
+          type="text"
+          v-model="campoNombreFactura"
+          class="w-full"
+          id="elegircliente"
+        />
+      </div>
+    </div>
+  </fieldset>
+
+  <template #footer>
+    <Button label="Cancel" text severity="secondary" @click="visibleimprimirfactura = false" autofocus />
+    <Button label="Imprimir" outlined severity="secondary" @click="imprimirFactura" autofocus />
+  </template>
+</Dialog>
+
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Dialog v-model:visible="visiblegastos" modal :style="{ width: '50rem' }" header="Gastos">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">Gastos</span>
+    </div>
+  </template>
+
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">Gastos</legend>
+    <div class="grid grid-cols-12  gap-4">
+      <div class="col-span-3">
+        <label for="cantidadAgregarDatos">CANTIDAD</label>
+        <InputText
+          v-model="camposGastos.cantidad"
+          v-solonumeros
+          v-numeroFocusinOut
+          v-decimales
+          class="w-full"
+          id="cantidadAgregarDatos"
+          placeholder="cantidad"
+          maxlength="250"
+        />
+      </div>
+
+      <div class="col-span-3">
+        <label for="fechaAgregarDatos">FECHA</label>
+        <Calendar
+          v-model="camposGastos.fecha"
+          class="w-full"
+          id="fechaAgregarDatos"
+          placeholder="fecha"
+          maxlength="250"
+        />
+      </div>
+
+
+      <div class="col-span-3">
+        <label for="horaAgregarDatos">HORA</label>
+        <InputText
+          type="text"
+          v-model="camposGastos.hora"
+          class="w-full"
+          id="horaAgregarDatos"
+          placeholder="hora"
+          maxlength="250"
+        />
+      </div>
+
+      <div class="col-span-3">
+        <label for="metodoAgregarDatos">METODO</label>
+        <Select v-model="camposGastos.metodo" fluid :options="['EFECTIVO','TRANSFERENCIA']"  />
+      </div>
+
+      <div class="col-span-4" hidden>
+        <label for="turnoAgregarDatos">TURNO</label>
+        <InputText
+          type="text"
+          v-model="camposGastos.turno"
+          class="w-full"
+          id="turnoAgregarDatos"
+          readonly
+          placeholder="turno"
+          maxlength="250"
+        />
+      </div>
+
+
+      <div class="col-span-4" hidden>
+        <label for="mesAgregarDatos">MES</label>
+        <InputText
+          v-model="camposGastos.mes"
+          v-solonumeros
+          v-numeroFocusinOut
+          class="w-full"
+          id="mesAgregarDatos"
+          placeholder="mes"
+          maxlength="250"
+        />
+      </div>
+
+      <div class="col-span-4" hidden>
+        <label for="yearAgregarDatos">YEAR</label>
+        <InputText
+          v-model="camposGastos.year"
+          v-solonumeros
+          v-numeroFocusinOut
+          class="w-full"
+          id="yearAgregarDatos"
+          placeholder="year"
+          maxlength="250"
+        />
+      </div>
+      <div class="col-span-12">
+        <label for="descripcionAgregarDatos">DESCRIPCION</label>
+        <Textarea
+          v-model="camposGastos.descripcion"
+          class="w-full"
+          id="descripcionAgregarDatos"
+          name="descripcion"
+          rows="3"
+        />
+      </div>
+    </div>
+  </fieldset>
+
+  <template #footer>
+    <Button label="Ultimo" icon="pi pi-print" outlined severity="secondary" @click="imprimirUltimoGasto" autofocus />
+    <Button label="Agregar Gasto" icon="pi pi-plus" outlined severity="secondary" @click="agregarGasto" autofocus />
+    <Button label="Cerrar" text severity="secondary" @click="visiblegastos = false" autofocus />
+  </template>
+</Dialog>
+
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Dialog v-model:visible="visibleabono" modal :position="position" header="Editar Producto" :style="{ width: '50rem' }">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">ABONO</span>
+    </div>
+  </template>
+
+      <fieldset class="border p-3 rounded mb-2">
+        <legend class="float-none w-auto px-2">ABONO</legend>
+          <div class="row">
+
+
+          </div>
+      </fieldset>
+
+  <template #footer>
+    <Button label="Cancel" text severity="secondary" @click="visibleabono = false" autofocus />
+    <Button label="Imprimir" outlined severity="secondary" @click="imprimirAbono" autofocus />
+  </template>
+</Dialog>
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Dialog v-model:visible="visiblentrada" modal :style="{ width: '50rem' }" header="ENTRADA">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">ENTRADA</span>
+    </div>
+  </template>
+
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">ENTRADA</legend>
+    <div class="grid grid-cols-12  gap-4">
+      <div class="col-span-4">
+        <label for="cantidadAgregarDatos">CANTIDAD</label>
+        <InputNumber
+          v-model="camposEntrada.cantidad"
+          v-solonumeros
+          v-numeroFocusinOut
+          v-decimales
+          class="w-full"
+          id="cantidadAgregarDatos"
+          placeholder="cantidad"
+          maxlength="250"
+        />
+      </div>
+
+      <div class="col-span-4">
+        <label for="fechaAgregarDatos">FECHA</label>
+        <Calendar
+          v-model="camposEntrada.fecha"
+          class="w-full"
+          id="fechaAgregarDatos"
+          placeholder="fecha"
+          maxlength="250"
+        />
+      </div>
+
+      <div class="col-span-4">
+        <label for="horaAgregarDatos">HORA</label>
+        <InputText
+          type="text"
+          v-model="camposEntrada.hora"
+          class="w-full"
+          id="horaAgregarDatos"
+          placeholder="hora"
+          maxlength="250"
+        />
+      </div>
+
+      <div class="col-span-4">
+        <label for="turnoAgregarDatos">TURNO</label>
+        <InputText
+          type="text"
+          v-model="camposEntrada.turno"
+          class="w-full"
+          id="turnoAgregarDatos"
+          readonly
+          placeholder="turno"
+          maxlength="250"
+        />
+      </div>
+
+
+      <div class="col-span-4">
+        <label for="mesAgregarDatos">MES</label>
+        <InputText
+          v-model="camposEntrada.mes"
+          v-solonumeros
+          v-numeroFocusinOut
+          class="w-full"
+          id="mesAgregarDatos"
+          placeholder="mes"
+          maxlength="250"
+        />
+      </div>
+
+      <div class="col-span-4">
+        <label for="yearAgregarDatos">YEAR</label>
+        <InputText
+          v-model="camposEntrada.year"
+          v-solonumeros
+          v-numeroFocusinOut
+          class="w-full"
+          id="yearAgregarDatos"
+          placeholder="year"
+          maxlength="250"
+        />
+      </div>
+
+      <div class="col-span-12">
+        <label for="descripcionAgregarDatos">DESCRIPCION</label>
+        <Textarea
+          v-model="camposEntrada.descripcion"
+          class="w-full"
+          id="descripcionAgregarDatos"
+          name="descripcion"
+          rows="3"
+        />
+      </div>
+
+    </div>
+  </fieldset>
+
+  <template #footer>
+    <Button label="Cancel" text severity="secondary" @click="visiblentrada = false" autofocus />
+    <Button label="Imprimir" outlined severity="secondary" @click="imprimirEntrada" autofocus />
+  </template>
+</Dialog>
+
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Dialog v-model:visible="visibletaller" modal :style="{ width: '50rem' }" header="TALLER">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">TALLER</span>
+    </div>
+  </template>
+
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">TALLER</legend>
+    <div class="grid grid-cols-1 gap-4">
+      <div>
+        <label for="ingresenumeroModifcarfactura">INGRESE # ORDEN</label>
+        <InputGroup>
+          <Dropdown
+            v-model="facturaTallerSeleccionada"
+            @change="seleccionarTaller"
+            filter filterPlaceholder="0000000"
+            resetFilterOnHide 
+            resetFilterOnClear 
+            selectOnFocus 
+            checkmark 
+            focusOnHover 
+            autoFilterFocus
+            :options="facturasTaller"
+            optionLabel="no_factura"
+            placeholder="Seleccione una Factura"
+            class="w-full"
+          />
+          <Button label="Recargar" icon="pi pi-sync" outlined severity="secondary" />
+        </InputGroup>
+      </div>
+
+      <div>
+        <label for="elegircliente">Nombre de Cliente</label>
+        <InputText
+          type="text"
+          v-model="clienteTaller"
+          id="elegirclientetaller"
+          class="w-full"
+        />
+      </div>
+
+<div>
+      
+      <Button label="Ver Falla" class="" icon="pi pi-eye" outlined severity="secondary" @click="fnVerFallas" />
+      <Button label="Imprimir" class="mx-2 my-2" icon="pi pi-print" outlined severity="secondary" @click="imprimirTaller" />
+      <Button label="Etiqueta" class="mx-2 my-2" icon="pi pi-print" outlined severity="secondary" @click="imprimirEtiquetaTaller" />
+      <Button label="Pedido" class="" icon="pi pi-cart-plus" outlined severity="secondary" @click="visiblePedidos = true" />
+        <Button label="Costo Reparación" icon="pi pi-money-bill" outlined severity="secondary" @click="fnReparacionTaller" />
+      <Button label="Costo Piezas" icon="pi pi-money-bill" class="ml-2" outlined severity="secondary" @click="visibleCostoPiezas = true" />
+      <Button as="router-link" label="Ver Todas las Ordenes" class="mx-2" icon="pi pi-eye" outlined severity="secondary" to="/taller" />
+    
+</div>
+
+      <div>
+        <label for="elegirimpresora">Método de Pago</label>
+        <Dropdown
+          v-model="facturaTallerSeleccionada.metodopago"
+          :options="[
+            { label: 'EFECTIVO', value: 'EFECTIVO' },
+            { label: 'TRANSFERENCIA', value: 'TRANSFERENCIA' },
+            { label: 'TARJETA', value: 'TARJETA' }
+          ]"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="Seleccione un Método de Pago"
+          class="w-full"
+        />
+      </div>
+    </div>
+  </fieldset>
+
+  <template #footer>
+    <ButtonGroup>
+
+      <Button label="Comentario" icon="pi pi-eye" outlined severity="secondary" @click="visibleModificarTaller = true" />
+      <Button label="Editar" icon="pi pi-eye" outlined severity="secondary" @click="fnEditarTaller" />
+      <Button label="Ver clave" icon="pi pi-eye" outlined severity="secondary" @click="verClaveTaller" />
+      <Button label="Entregar" outlined severity="secondary" @click="entregarTaller" />
+      <Button label="Abonar" outlined severity="secondary" @click="abonoVisible" />
+      <Button label="Nuevo" icon="pi pi-plus" outlined severity="secondary" @click="nuevoTaller" />
+      <Button label="Cerrar" outlined severity="secondary" @click="visibletaller = false" autofocus />
+    </ButtonGroup>
+  </template>
+</Dialog>
+
+<!-- ************************************************************************************* -->
+<Dialog v-model:visible="visibleModificarTaller" position="top" modal :style="{ width: '50rem' }" header="ModificarTaller">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">ModificarTaller</span>
+    </div>
+  </template>
+
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">Agregar Comentario {{facturaTallerSeleccionada.no_factura}}</legend>
+    <div class="grid grid-cols-1 gap-4">
+      <div>
+        <TextArea v-model="comentarioTaller" fluid />
+      </div>
+    </div>
+  </fieldset>
+
+  <template #footer>
+      <Button label="Agregar Comentario" icon="pi pi-comment" outlined severity="secondary" @click="fnComentario" />
+      <Button label="Cerrar" outlined severity="secondary" @click="visibleModificarTaller = false" />
+  </template>
+</Dialog>
+
+<!-- ************************************************************************************* -->
+<Dialog v-model:visible="cuadrarCaja" modal :style="{ width: '60rem' }" header="CONTAR DINERO">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">CONTAR DINERO</span>
+    </div>
+  </template>
+
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">MONEDAS</legend>
+    <div class="grid grid-cols-12 gap-4">
+
+    <div class="col-span-12 md:col-span-4">
+        <label >TURNO</label>
+        <Dropdown
+          v-model="turnoUsuarioSelected"
+          :options="['COMPLETO', ...turnosXfecha]"
+          @change="cambioTurnoSelected"
+          class="w-full"
+        />
+    </div>
+
+      <div class="col-span-12 md:col-span-4">
+        <label for="horainicio">Hora Inicio</label>
+        <InputText
+          v-model="cuadre.horainicio"
+          class="w-full"
+          readonly
+        />
+      </div>
+
+      <div class="col-span-12 md:col-span-4">
+        <label for="horafin">Hora Fin</label>
+        <InputText
+          v-model="cuadre.horafin"
+          class="w-full"
+          readonly
+        />
+      </div>
+
+      <div class="col-span-3">
+        <label for="pesos">1 {{ datosConfiguracion.moneda }}</label>
+        <InputText
+          v-model="pesos"
+          v-tecladovirtual="(event) => handleFocus('number', event.target)"
+          v-solonumeros
+          v-numeroFocusinOut
+          style="height: 5rem; font-size: 2.5rem; padding: 0.5rem;"
+          class="w-full"
+          id="pesos"
+        />
+      </div>
+
+      <div class="col-span-3">
+        <label for="cincopesos">5 {{ datosConfiguracion.plural }}</label>
+        <InputText
+          v-model="cincopesos"
+          v-solonumeros
+          v-tecladovirtual="(event) => handleFocus('number', event.target)"
+          v-numeroFocusinOut
+          style="height: 5rem; font-size: 2.5rem; padding: 0.5rem;"
+          class="w-full"
+          id="cincopesos"
+        />
+      </div>
+
+      <div class="col-span-3">
+        <label for="diezpesos">10 {{ datosConfiguracion.plural }}</label>
+        <InputText
+          v-model="diezpesos"
+          v-solonumeros
+          v-tecladovirtual="(event) => handleFocus('number', event.target)"
+          v-numeroFocusinOut
+          style="height: 5rem; font-size: 2.5rem; padding: 0.5rem;"
+          class="w-full"
+          id="diezpesos"
+        />
+      </div>
+
+      <div class="col-span-3"> 
+        <label for="veinticincopesos">25 {{ datosConfiguracion.plural }}</label>
+        <InputText
+          v-model="veinticincopesos"
+          v-solonumeros
+          v-tecladovirtual="(event) => handleFocus('number', event.target)"
+          v-numeroFocusinOut
+          style="height: 5rem; font-size: 2.5rem; padding: 0.5rem;"
+          class="w-full"
+          id="veinticincopesos"
+        />
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">BILLETES</legend>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+      <div>
+        <label for="cincuentapesos">50 {{ datosConfiguracion.plural }}</label>
+        <InputText
+          v-model="cincuentapesos"
+          v-solonumeros
+          v-tecladovirtual="(event) => handleFocus('number', event.target)"
+          v-numeroFocusinOut
+          style="height: 5rem; font-size: 2.5rem; padding: 0.5rem;"
+          class="w-full"
+          id="cincuentapesos"
+        />
+      </div>
+
+      <div>
+        <label for="cienpesos">100 {{ datosConfiguracion.plural }}</label>
+        <InputText
+          v-model="cienpesos"
+          v-solonumeros
+          v-tecladovirtual="(event) => handleFocus('number', event.target)"
+          v-numeroFocusinOut
+          style="height: 5rem; font-size: 2.5rem; padding: 0.5rem;"
+          class="w-full"
+          id="cienpesos"
+        />
+      </div>
+
+      <div>
+        <label for="docientospesos">200 {{ datosConfiguracion.plural }}</label>
+        <InputText
+          v-model="docientospesos"
+          v-solonumeros
+          v-tecladovirtual="(event) => handleFocus('number', event.target)"
+          v-numeroFocusinOut
+          style="height: 5rem; font-size: 2.5rem; padding: 0.5rem;"
+          class="w-full"
+          id="docientospesos"
+        />
+      </div>
+
+      <div>
+        <label for="quinientoscopesos">500 {{ datosConfiguracion.plural }}</label>
+        <InputText
+          v-model="quinientoscopesos"
+          v-solonumeros
+          v-tecladovirtual="(event) => handleFocus('number', event.target)"
+          v-numeroFocusinOut
+          style="height: 5rem; font-size: 2.5rem; padding: 0.5rem;"
+          class="w-full"
+          id="quinientoscopesos"
+        />
+      </div>
+
+      <div>
+        <label for="milpesos">1000 {{ datosConfiguracion.plural }}</label>
+        <InputText
+          v-model="milpesos"
+          v-solonumeros
+          v-tecladovirtual="(event) => handleFocus('number', event.target)"
+          v-numeroFocusinOut
+          style="height: 5rem; font-size: 2.5rem; padding: 0.5rem;"
+          class="w-full"
+          id="milpesos"
+        />
+      </div>
+
+      <div>
+        <label for="dosmilpesos">2000 {{ datosConfiguracion.plural }}</label>
+        <InputText
+          v-model="dosmilpesos"
+          v-solonumeros
+          v-tecladovirtual="(event) => handleFocus('number', event.target)"
+          v-numeroFocusinOut
+          style="height: 5rem; font-size: 2.5rem; padding: 0.5rem;"
+          class="w-full"
+          id="dosmilpesos"
+        />
+      </div>
+      <div>
+        <label for="dosmilpesos">INICIO CAJA</label>
+        <InputText
+          v-model="contidadInicioCaja"
+          v-solonumeros
+          v-numeroFocusinOut
+          style="height: 5rem; font-size: 2.5rem; padding: 0.5rem;"
+          class="w-full"
+          id="dosmilpesos"
+        />
+      </div>
+
+
+      <div class="col-span-2">
+        <label for="totalModal">Total</label>
+        <InputText
+          v-model="totalModal"
+          v-solonumeros
+          v-decimales
+          v-numeroFocusinOut
+          style="height: 5rem; font-size: 2.5rem; padding: 0.5rem;"
+          class="w-full"
+          id="totalModal"
+          readonly
+        />
+      </div>
+
+      <div class="col-span-2">
+        <label for="totalModalEnCaja">Total Registrado</label>
+        <InputText
+          v-model="totalModalEnCaja"
+          style="height: 5rem; font-size: 2.5rem; padding: 0.5rem;"
+          class="w-full"
+          id="totalModalEnCaja"
+          readonly
+        />
+      </div>
+
+      <div >
+        <label>ESTADO</label>
+        <div :class="`alert alert-${alerta}`" role="alert">
+          {{ colorModal }}
+        </div>
+      </div>
+    </div>
+  </fieldset>
+
+  <template #footer>
+    <Button label="Facturas" icon="pi pi-print" outlined severity="secondary" @click="fnTodasLasFacturas" />
+    <Button label="Resumen Venta" icon="pi pi-box" outlined severity="secondary" @click="fnResumenVenta" />
+    <Button label="Productos Vendidos" icon="pi pi-box" outlined severity="secondary" @click="fnProductosVendidos" />
+    <Button label="Abrir caja" icon="pi pi-box" outlined severity="secondary" @click="fnAbrirCaja" />
+    <Button label="Imprimir Cuadre" icon="pi pi-print" outlined severity="secondary" @click="visibleCuadre = true" />
+    <Button label="Cerrar" outlined severity="secondary" @click="cuadrarCaja = false" autofocus />
+  </template>
+</Dialog>
+
+<!-- ************************************************************************************* -->
+<Dialog v-model:visible="visibleInicioCaja" modal :style="{ width: '25rem' }" header="INICIO DE CAJA">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">INICIO DE CAJA</span>
+    </div>
+  </template>
+
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">CANTIDAD</legend>
+    <div class="grid grid-cols-1 gap-4">
+      <div>
+        <label for="cantidadInicio">Cantidad en {{ datosConfiguracion.plural }}</label>
+        <InputText
+          v-model="cantidadInicio"
+          v-solonumeros
+          v-numeroFocusinOut
+          style="height: 5rem; font-size: 2.5rem; padding: 0.5rem;"
+          class="w-full"
+          id="cantidadInicio"
+        />
+      </div>
+    </div>
+  </fieldset>
+
+  <template #footer>
+    <Button label="Agregar Cantidad" icon="pi pi-send" outlined severity="secondary" @click="fnAgregarCantidadCaja" />
+    <Button label="Cerrar" outlined severity="secondary" @click="visibleInicioCaja = false" autofocus />
+  </template>
+</Dialog>
+
+<!-- ************************************************************************************* -->
+<Dialog v-model:visible="visibleCuadre" modal :style="{ width: '40rem' }" header="Cuadre">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">Cuadre</span>
+    </div>
+  </template>
+
+    <fieldset class="border p-3 rounded mb-2">
+      <legend class="float-none w-auto px-2">Elige una Opción</legend>
+      <div class="flex flex-wrap gap-4 justify-center">
+         <Button label="Ver Cuadre" icon="pi pi-print" @click="fnVerCuadre" iconPos="bottom" />
+         <Button label="Imprimir Cuadre" id="botonImprimir" icon="pi pi-print" @click="imprimirCuadre" iconPos="bottom" />
+     </div >
+    </fieldset>
+
+  <template #footer>
+    <Button label="Transferir Efectivo" text severity="secondary" @click="visibleTranferirFondo = true" />
+<!--     <Button label="Ver" text severity="secondary" @click="fnVerCuadre" />
+    <Button label="Imprimir" outlined severity="secondary" @click="imprimirCuadre" /> -->
+    <Button label="Cancel" text severity="secondary" @click="visibleCuadre = false" />
+  </template>
+</Dialog>
+
+<!-- ************************************************************************************* -->
+<CrearGastosDialog v-model:visible="visiblecrearGastos" />
+<!-- ************************************************************************************* -->
+
+<Dialog v-model:visible="visibleTranferirFondo" position="top" modal :style="{ width: '30rem' }" header="TranferirFondo">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">TranferirFondo</span>
+    </div>
+  </template>
+
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">TranferirFondo</legend>
+    <div class="grid grid-cols-2  gap-4">
+      <div>
+        <label for="transaccionesCantidad">Cantidad</label>
+        <InputNumber
+          v-model="transaccionesCantidad"
+          locale="en-US"
+          :minFractionDigits="2" 
+          highlightOnFocus
+          class="w-full"
+        />     
+       </div>
+      <div>
+        <label for="transaccionesHasta">Destino</label>
+        <Dropdown
+          v-model="transaccionesHasta"
+          :options="cuentasDataNames"
+          editable
+          class="w-full"
+        />     
+       </div>
+
+    </div>
+  </fieldset>
+
+  <template #footer>
+      <Button label="Transferir" outlined severity="secondary" @click="fnTransferir"  />
+      <Button label="Cerrar" outlined severity="secondary" @click="visibletaller = false" autofocus />
+  </template>
+</Dialog>
+
+
+<!-- ************************************************************************************* -->
+<Dialog v-model:visible="visibleTransacciones" position="top" modal :style="{ width: '50rem' }" header="Transacciones">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">Transacciones</span>
+    </div>
+  </template>
+
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">Transacciones</legend>
+    <div class="grid grid-cols-3  gap-4">
+      <div>
+        <label for="transaccionesCantidad">Cantidad</label>
+        <InputNumber
+          v-model="transaccionesCantidad"
+          locale="en-US"
+          :minFractionDigits="2" 
+          highlightOnFocus
+          class="w-full"
+        />     
+       </div>
+      <div>
+        <label for="transaccionesDesde">Desde</label>
+        <Dropdown
+          v-model="transaccionesDesde"
+          :options="cuentasDataNames"
+          editable
+          class="w-full"
+        />     
+       </div>
+      <div>
+        <label for="transaccionesHasta">Hasta</label>
+        <Dropdown
+          v-model="transaccionesHasta"
+          :options="cuentasDataNames"
+          editable
+          class="w-full"
+        />     
+       </div>
+
+    </div>
+  </fieldset>
+
+  <template #footer>
+      <Button label="Transferir Efectivo en Caja" icon="pi pi-dollar" outlined severity="secondary" @click="visibleTranferirFondo = true"  />
+      <Button label="Realizar" icon="pi pi-send" outlined severity="secondary" @click="fnTransaccion"  />
+      <Button label="Cerrar" outlined severity="secondary" @click="visibletaller = false" autofocus />
+  </template>
+</Dialog>
+
+
+<!-- /**************************************************************************************/ -->
+
+<Dialog v-model:visible="visibleIA" position="top" modal :style="{ width: '75rem' }" header="IA">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">IA</span>
+    </div>
+  </template>
+
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">IA</legend>
+
+
+<div class="chat-container p-4 bg-gray-100 h-screen flex flex-col">
+  <!-- Mensajes del chat -->
+  <div ref="chatMessages" class="chat-messages space-y-4 overflow-y-auto flex-1">
+    <div v-for="(message, index) in messages" :key="index" class="message flex">
+      <!-- Mensaje del usuario -->
+      <template v-if="message.sender === 'user'">
+        <div class="ml-auto bg-blue-500 text-white py-2 px-4 rounded-lg max-w-2xl shadow">
+          <p class="text-lg">{{ message.text }}</p>
+        </div>
+      </template>
+      <!-- Mensaje de la IA -->
+      <template v-else>
+        <div class="mr-auto bg-gray-300 text-gray-800 py-2 px-4 rounded-lg max-w-2xl shadow">
+          <p class="text-lg">{{ message.text }}</p>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- Input del chat -->
+  <div class="chat-input mt-4">
+    <input
+      type="text"
+      v-model="newMessage"
+      @keydown.enter="sendMessage"
+      placeholder="Escribe tu mensaje..."
+      class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+    />
+  </div>
+</div>
+
+
+  </fieldset>
+
+  <template #footer>
+      <Button label="Cerrar" outlined severity="secondary" @click="visibleIA = false" autofocus />
+  </template>
+</Dialog>
+
+
+<!-- /**************************************************************************************/ -->
+<Dialog v-model:visible="visiblePedidos" position="top" modal :style="{ width: '50rem' }" header="Pedidos">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">Pedidos</span>
+    </div>
+  </template>
+
+    <fieldset class="border p-3 rounded mb-2">
+      <legend class="float-none w-auto px-2">Pedidos</legend>
+      <div class="grid grid-cols-1 gap-4">
+        <div v-for="category in parsedFallas" :key="category.key" class="flex items-center gap-2">
+          <Checkbox v-model="piezasPedido" :inputId="category.key" name="category" :value="category.propiedad" />
+          <label :for="category.key">{{ category.propiedad }}</label>
+        </div>
+
+        <div>
+          <Select name="proveedor" v-model="proveedorWhatsapp" :options="proveedoresData" optionLabel="nombre" placeholder="Selecciones proveedor" fluid />
+        </div>
+      </div>
+    </fieldset>
+
+  <template #footer>
+      <Button label="Realizar Pedido" outlined severity="secondary" @click="fnRealizarPedido" />
+      <Button label="Cerrar" outlined severity="secondary" @click="visibletaller = false" />
+  </template>
+</Dialog>
+<!-- /**************************************************************************************/ -->
+ <LoadingOverlay :visible="loading" />
+ <EnviarWhatsApp ref="enviarWhatsAppRef" :initialDatosWhatsApp="datosWhatsApp" />
+<!-- ************************************************************************************* -->
+<Dialog v-model:visible="visibleCostoPiezas" position="top" modal :style="{ width: '30rem' }" header="CostoPiezas">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">CostoPiezas</span>
+    </div>
+  </template>
+
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">CostoPiezas</legend>
+    <div class="grid grid-cols-1 gap-4">
+      <div>
+<div class="form-group " >
+<label for="emailAgregarDatos">COSTO PIEZA</label><br>
+     <InputText v-model="costoPieza" fluid @change="fnAplicarPrecioPieza" v-solonumeros v-focus-in-focus-out />
+</div>
+      </div>
+    </div>
+  </fieldset>
+
+  <template #footer>
+      <Button label="Aplicar Precio" outlined severity="secondary" @click="fnAplicarPrecioPieza"  />
+      <Button label="Cerrar" outlined severity="secondary" @click="visibleCostoPiezas = false"  />
+  </template>
+</Dialog>
+<!-- /********************************************************************************************/ -->
+   <TecladoVirtual ref="virtualKeyboard" />
+<!-- ************************************************************************************* -->
+   <Toast />
+<Patron :visiblePatron="showPatron" :patron="clavePatron"
+      @close="closePatron"  />
+  </main>
+</template>
+
+<script setup>
+import { ref, onMounted, watchEffect, onUnmounted,watch,nextTick,computed  } from 'vue';
+import { useToast } from 'primevue/usetoast';
+import { useRouter,useRoute} from 'vue-router';
+//import router from '../../router';
+import TecladoVirtual from '@/components/TecladoVirtual.vue'
+import CrearGastosDialog from '@/components/Gastos.vue'
+const route = useRoute();
+const router = useRouter();
+
+import Swal from 'sweetalert2'
+import {enviarDatosPorPost,
+  eliminarDatos,
+  obtenerIdsSeleccionados,
+  borrarTodoslosDatos,
+  lenguajeDataTable,
+  nfecha,
+  enviarDatosLocalStorage,
+  asientoDiario,
+  peticiones,
+formatearFecha,
+  convertirAFechaTimestamp,
+esFechaEnRango,
+  permisosPagina,
+  arrayToObjetoFromTabla,
+  transformarFechaTimestamp,
+  peticionesFetch,
+  encryptarPassword,
+  envioElectron,
+  mensajetoast,
+  crearTablaSiNoExisteOffline,
+  peticionesFetchOffline,
+  buscadorArrayObjeto,
+  lasMayusculas} from '@/funciones/funciones.js';
+  import WhatsappModal from '../Whatsapp/Whatsapp.vue';
+  import EnviarWhatsApp from '@/components/WhatsappModal.vue';
+import Patron from '../Patron/Patron.vue';
+const toast = useToast();
+import LoadingOverlay from '@/Loading/LoadingOverlay.vue';
+/************************************************************************/
+const turnosHoyArray = ref([])
+const datosEnvio = ref([])
+const fechaDeInicioHoy = ref('')
+const fechaDeFinHoy = ref('')
+const cantidadInicial = ref(0)
+//const datosFechaHoy = nfecha('timestampcompleta');
+/************************************************************************/
+const registroSocios = ref({'sexo':'HOMBRE'})
+/************************************************************************/
+const enviarWhatsAppRef = ref(null);
+const datosWhatsApp = ref({
+  nombre: 'John Doe',
+  numero: '123456789',
+  texto: 'Hola, este es un mensaje predefinido.'
+});
+/****************************************************/
+const showWhatsAppModal = async () => {
+  if (enviarWhatsAppRef.value) {
+          enviarWhatsAppRef.value.updateDatosWhatsApp(datosWhatsApp.value);
+          enviarWhatsAppRef.value.visible = true;
+  }
+};
+
+const abrirWhatsapp = ()=>{
+     showWhatsAppModal()
+}
+
+/***************************************************** */
+const visiblecobrar = ref(false);
+const visibleCostoPiezas = ref(false);
+const costoPieza = ref(0);
+const sonidoON = ref(false)
+/***************************************************** */
+const contidadInicioCaja = ref(0);
+const cajaAbiertaArray = ref([])
+/***************************************************** */
+const mensaje = ref('')
+const showWhatsapp = ref(false);
+const closeWhatsapp = () => {
+    showWhatsapp.value = false;
+};
+/***********************************************************/
+watchEffect(() => {
+  if (showWhatsapp.value) {
+    datosWhatsApp.value.nombre = datoscampos.value.nombre;
+    datosWhatsApp.value.numero = datoscampos.value.whatsapp || datoscampos.value.telefono
+    datosWhatsApp.value.texto = `Hola ${datoscampos.value.nombre} le escribimos de  *${datosEmpresa.empresa.nombre}* para informarle que su equipo se encuentra *${datoscampos.value.estado}*`;
+    showWhatsAppModal()
+  }
+});
+/************************************************************************/
+
+/************************************************************************/
+const loading = ref(false)
+const position = 'top';
+const totalModalEnCaja = ref('0.00')
+/************************************************************************/
+const datosBarcode = ref({})
+/************************************************************************/
+const baseTotalFactura = ref(0.00); 
+const propinaFactura = ref('0.00'); 
+/************************************************************************/
+const cuadre = ref({})
+const turnosXfecha = ref([])
+const turnoUsuarioSelected = ref('COMPLETO')
+/************************************************************************/
+const visibleIA = ref(false);
+const datoscamposIa = ref({});
+const visibleAverias = ref(false);
+const fallasChips = ref([]);
+/************************************************************************/
+const visiblePedidos = ref(false);
+const visiblePedidoIndividual = ref(false);
+const datoscamposPedido = ref({});
+const proveedorWhatsapp = ref({});
+const proveedorWhatsappIndividual = ref({});
+/************************************************************************/
+const cambioTurnoSelected = async()=>{
+  const cadena = turnoUsuarioSelected.value
+  const datos = turnosHoyArray.value.find(turno=>turno.turno === cadena)
+
+  if(datos){
+    cuadre.value.horainicio = datos.hora_inicio
+    cuadre.value.horafin = datos.hora_cierre || nfecha('horaAmericana')
+
+    fechaDeInicioHoy.value = nfecha('fechaAmericana') + ' '+datos.hora_inicio
+    fechaDeFinHoy.value = nfecha('fechaAmericana') + ' '+cuadre.value.horafin
+
+
+  }else{
+    cuadre.value.horainicio = '00:00:01'
+    cuadre.value.horafin = nfecha('horaAmericana')
+
+    fechaDeInicioHoy.value = nfecha('fechaAmericana') + ' '+cuadre.value.horainicio
+    fechaDeFinHoy.value = nfecha('fechaAmericana') + ' '+cuadre.value.horafin
+
+  }
+
+await fetchAndSetupDatosdelDia()
+
+}
+/************************************************************************/
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (chatMessages.value) {
+      chatMessages.value.scrollTop = chatMessages.value.scrollHeight;
+    }
+  });
+};
+/************************************************************************/
+const messages = ref([
+  { sender: 'ia', text: 'Hola, ¿en qué puedo ayudarte hoy?' }
+]);
+const newMessage = ref('');
+const chatMessages = ref(null);
+/************************************************************************/
+const parsedFallas = computed(() => {
+  return JSON.parse(facturaTallerSeleccionada.value.fallas);
+});
+/************************************************************************/
+const proveedoresData = ref([])
+const clientesData = ref([])
+/************************************************************************/
+const fnConsultaIA = async()=>{
+  visiblePedidoIndividual.value = false
+  loading.value = true
+  const falla = datoscamposPedido.value.pieza_pedido;
+  const consulta = `Tengo un ${datoscampos.value.equipo} ${datoscampos.value.marca} ${datoscampos.value.modelo} con la falla de ${falla}`;
+    messages.value.push({ sender: 'user', text: consulta });
+    try {
+    const result = await window.electron.ipcRenderer.invoke('chatGpt',consulta);
+    loading.value = false
+     toast.add({ severity: 'success', summary: 'Ok', detail: 'Respuesta del Bot', life: 3000 });
+    datoscamposIa.value.contexto = result
+    messages.value.push({ sender: 'ia', text: result });
+    visibleIA.value = true;
+     scrollToBottom();
+
+  } catch (error) {
+    loading.value = false
+     toast.add({ severity: 'error', summary: 'Error', detail: 'Error de consulta', life: 3000 });
+  }
+}
+/************************************************************************/
+const fetchDataBarcode = async () => {
+const response = await peticionesFetchOffline('getDataByField', 'barcode','id',1);
+    const jsonData = response;
+    datosBarcode.value = jsonData;
+};
+/************************************************************************/
+const fnEnvioIA = async () => {
+  const contexto = datoscamposIa.value.contexto;
+  const consulta = datoscamposIa.value.consulta;
+  try {
+    loading.value = true;
+    const result = await window.electron.ipcRenderer.invoke('chatGpt', consulta);
+    loading.value = false;
+    toast.add({ severity: 'success', summary: 'Ok', detail: 'Respuesta del Bot', life: 3000 });
+    datoscamposIa.value.contexto = result;
+    visibleIA.value = true;
+    // Agregar la respuesta de la IA al chat
+    messages.value.push({ sender: 'ia', text: result });
+     scrollToBottom();
+  } catch (error) {
+    loading.value = false;
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Error de consulta', life: 3000 });
+  }
+};
+
+const sendMessage = () => {
+  if (newMessage.value.trim() === '') return;
+
+  // Agregar el mensaje del usuario
+  messages.value.push({ sender: 'user', text: newMessage.value });
+
+  // Actualizar el campo de consulta
+  datoscamposIa.value.consulta = newMessage.value;
+
+  // Llamar a la función para enviar la consulta a la IA
+  fnEnvioIA();
+
+  // Limpiar el campo de entrada
+  newMessage.value = '';
+};
+/************************************************************************/
+const cuentasData = ref([])
+const cuentasDataNames = ref([])
+const transaccionesDesde = ref('EFECTIVO EN CAJA')
+const transaccionesHasta = ref('BANCOS')
+const transaccionesCantidad = ref('0.00')
+/************************************************************************/
+const virtualKeyboard = ref(null);
+
+const handleInput = ()=>{
+  fnCalcularCambio()
+}
+
+const handleFocus = (keyboardType, inputElement) => {
+  if (virtualKeyboard.value) {
+    virtualKeyboard.value.show(inputElement, keyboardType);
+  }
+};
+
+// Función para activar/desactivar el teclado virtual
+const toggleKeyboard = () => {
+  if (virtualKeyboard.value) {
+    virtualKeyboard.value.isEnabled = !virtualKeyboard.value.isEnabled;
+    console.log("Teclado virtual habilitado:", virtualKeyboard.value.isEnabled);
+  }
+};
+/************************************************************************/
+import {useDatosEmpresa} from '@/stores'
+const datosEmpresa = useDatosEmpresa();
+const datosEmpresaStore = useDatosEmpresa();
+
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const tokenCorto = ref('');
+const tokenSoloUso = ref('');
+const token24H = ref('');
+
+const tokenCifrado = ref(null);
+const fechaHoy = ref(nfecha('fecha'));
+const datosDefault = ref({})
+/*************************************************************/
+const datosDelDiaArray = ref({})
+/*************************************************************/
+const cantidadInicio = ref(0)
+const visibleCuadre = ref(false)
+/*************************************************************/
+const visibleTransacciones = ref(false)
+const visibleTranferirFondo = ref(false)
+/*************************************************************/
+const abonoVisible = async()=>{
+
+//facturaTallerSeleccionada
+  const saldoTotal = facturaTallerSeleccionada.value.saldo;
+
+    if (Number(facturaTallerSeleccionada.value.total) === 0) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Debe agregar Costo de Reparación', life: 3000 });
+    return;
+  }
+visibletaller.value = false
+
+  // Mostrar el SweetAlert con input para la cantidad de abono y método de pago
+  const { value: formValues, isDenied } = await Swal.fire({
+    title: 'Abonar',
+    html:
+      `<input id="swal-input-abono" class="swal2-input" placeholder="Cantidad a abonar" type="number" step="0.01" min="0">` +
+      `<select id="swal-input-metodo-pago" class="swal2-input">
+         <option value="EFECTIVO">Efectivo</option>
+         <option value="TARJETA">Tarjeta</option>
+         <option value="TRANSFERENCIA">Transferencia</option>
+       </select>`,
+    focusConfirm: false,
+    showCancelButton: true,
+    showDenyButton: true,
+    confirmButtonText: 'Abonar',
+    denyButtonText: 'Pagar Completo',
+    preConfirm: () => {
+      const abono = document.getElementById('swal-input-abono').value;
+      const metodoPago = document.getElementById('swal-input-metodo-pago').value;
+      
+      if (!abono || abono <= 0) {
+        Swal.showValidationMessage('Debes ingresar una cantidad válida de abono');
+      }
+      
+      return { abono, metodoPago };
+    }
+  });
+
+  if (!formValues) {
+    // Si el usuario cancela, no hacemos nada
+    Swal.fire('Cancelado', 'No se realizó ningún abono', 'info');
+    return;
+  }
+
+  let cantidadAbono = Number(formValues.abono);
+  const metodoPago = formValues.metodoPago;
+
+  if (isDenied) {
+    // Si el usuario selecciona "Pagar Completo", el abono es el saldo total
+    cantidadAbono = saldoTotal;
+  }
+
+  // Actualizamos el JSON de abonos con el nuevo abono
+  const abonoJSON = JSON.parse(facturaTallerSeleccionada.value.abono);
+  
+  abonoJSON.push({
+    "abono": cantidadAbono,
+    "turno": usuarioLocal.value.token,
+    "cajero": usuarioLocal.value.email,
+    "recibidopor": usuarioLocal.value.email,
+    "prioridad": 3,
+    "metodo_pago": metodoPago,
+    "hora": nfecha('hora'),
+    "fecha": nfecha('fecha')
+  });
+
+  // Convertir el abono actualizado a cadena JSON
+  facturaTallerSeleccionada.value.abono = JSON.stringify(abonoJSON);
+  
+
+  const url = link.value+api.value+"/actualizarcampos/taller";
+  if (!facturaTallerSeleccionada.value) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+  if (facturaTallerSeleccionada.value.hasOwnProperty('created_at')) {
+      facturaTallerSeleccionada.value.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await peticionesFetchOffline('updateData', 'taller',JSON.stringify(facturaTallerSeleccionada.value));
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+
+  window.electron.ipcRenderer.invoke('open-new-window', link.value+'/vista/tallertermica?factura='+facturaTallerSeleccionada.value.no_factura,'url', true,false)
+
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+
+
+  // Mostrar confirmación de que el abono se realizó con éxito
+  Swal.fire({
+    title: 'Abono realizado',
+    text: `Has abonado ${cantidadAbono} mediante ${metodoPago}.`,
+    icon: 'success'
+  });
+}
+/*************************************************************/
+const registrarSocios = ref(false);
+const cuadrarCaja = ref(false);
+const visibleabono = ref(false);
+const visiblentrada = ref(false);
+const visibletaller = ref(false);
+const visiblecrearGastos = ref(false);
+const datosFactCoti = ref({'numero':'','tipo':'Factura','nombre':'','impresora':'Termica'});
+const visibleimprimirfactura = ref(false);
+const visiblegastos = ref(false);
+const totalFactura = ref(0.00);
+const recibidoFactura = ref(0.00);
+const devueltaFactura = ref(0.00);
+const numeroFactura = ref(null);
+const facturaEfectivo = ref(0.00)
+const facturaTarjeta = ref(0.00)
+const facturaTransferencia = ref(0.00)
+/*************************************************************/
+const camposGastos = ref({});
+const camposEntrada = ref({});
+/*************************************************************/
+const usuarioLocal = ref({});
+const datosConfiguracion = ref({});
+/*************************************************************/
+const campoFactura = ref(null);
+const impresoraSeleccionada = ref(null);
+const facturas = ref([]);
+const campoNombreFactura = ref(null)
+/*************************************************************/
+const clienteTaller = ref('');
+const facturaTallerSeleccionada = ref(null);
+const facturasTaller = ref([]);
+/*************************************************************/
+const showPatron = ref(false);
+const clavePatron = ref('');
+/*************************************************************/
+const seleccionarTaller = async()=>{
+  const facturaTaller = facturaTallerSeleccionada.value;
+  clienteTaller.value = facturaTaller.nombre;
+}
+/*************************************************************/
+const fnEditarTaller = async()=>{
+    const facturaTaller = facturaTallerSeleccionada.value;
+    router.push({ path: `/editartaller/${facturaTaller.id}` });
+}
+/*************************************************************/
+const fnComentario = async()=>{
+  const facturaTaller = facturaTallerSeleccionada.value;
+    facturaTaller.observaciones = facturaTaller.observaciones +"\n"+comentarioTaller.value;
+
+    if (facturaTaller.hasOwnProperty('created_at')) {
+      facturaTaller.updated_at = nfecha('timestamp');
+    }
+
+    const url = link.value + api.value + "/actualizarcampos/taller";
+    const envioDatos = await peticionesFetchOffline('updateData', 'taller',JSON.stringify(facturaTaller));
+
+    if (envioDatos[0] == 'ok') {
+      toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+      await fetchDataTaller();
+      visibleModificarTaller.value = false
+      comentarioTaller.value = ''
+      visibletaller.value = true
+    } else {
+      toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+    }
+}
+/*************************************************************/
+const fnReparacionTaller = async () => {
+  const facturaTaller = facturaTallerSeleccionada.value;
+  visibletaller.value = false
+  if (!facturaTaller) {
+    Swal.fire("Error", "No hay una factura seleccionada", "error");
+    return;
+  }
+
+  if (Number(facturaTaller.total) !== 0) {
+    Swal.fire("No permitido", "No se puede alterar este costo", "warning");
+    return;
+  }
+
+  const { value: precioReparacion } = await Swal.fire({
+    title: "Ingrese el costo de reparación",
+    input: "number",
+    inputAttributes: {
+      min: 0,
+      step: "any",
+    },
+    showCancelButton: true,
+    confirmButtonText: "Aceptar",
+    cancelButtonText: "Cancelar",
+    inputValidator: (value) => {
+      if (!value || isNaN(value) || value <= 0) {
+        return "Debe ingresar un número válido";
+      }
+    },
+  });
+
+  if (precioReparacion) {
+    facturaTaller.total = parseFloat(precioReparacion);
+    facturaTaller.manodeobra = parseFloat(precioReparacion);
+    facturaTaller.saldo = parseFloat(precioReparacion);
+    toast.add({ severity: 'success', summary: 'OK', detail: 'Orden Actualizada con éxito', life: 3000 });
+    await funcionActualizarTaller()
+    visibletaller.value = true
+  }
+};
+
+/*************************************************************/
+const fnPiezasTaller = async()=>{
+const facturaTaller = facturaTallerSeleccionada.value;
+
+}
+const fnAplicarPrecioPieza = async()=>{
+//const facturaTaller = facturaTallerSeleccionada.value;
+   const data = facturaTallerSeleccionada.value;
+   const total = Number(data.total)
+   const porcentajeTecnico = Number(data.porcentaje_tecnico)
+   const preciopiezas = Number(costoPieza.value)
+
+   const beneficioTecnico = ((total - preciopiezas) * (porcentajeTecnico / 100)).toFixed(2);
+   const beneficioEmpresa = ((total - preciopiezas)  - beneficioTecnico).toFixed(2);
+
+   if(preciopiezas >= total){
+    toast.add({ severity: 'error', summary: 'Error', detail: 'la Pieza no puede superar el costo de la Reparación', life: 3000 });
+    return
+   }
+
+
+   data.preciopiezas = preciopiezas
+   data.beneficio_empresa = beneficioEmpresa
+   data.beneficio_tecnico = beneficioTecnico
+
+  const url = link.value+api.value+"/actualizarcampos/taller";
+  if (!data) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+  if (data.hasOwnProperty('created_at')) {
+      data.updated_at = nfecha('timestamp')
+    }
+
+  const envioDatos = await peticionesFetchOffline('updateData', 'taller',JSON.stringify(data));
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+
+}
+/*************************************************************/
+const comentarioTaller = ref('')
+const visibleModificarTaller = ref(false)
+/*************************************************************/
+const imprimirTaller = async()=>{
+  const facturaTaller = facturaTallerSeleccionada.value
+  //window.electron.ipcRenderer.invoke('open-new-window', link.value+'/vista/tallertermica?factura='+facturaTaller.no_factura,'url', true,false)
+   const datosEmpresa = JSON.stringify(enviarDatosLocalStorage())
+ const datos = JSON.stringify(facturaTaller)
+await window.electron.ipcRenderer.invoke('recibotaller',datos,datosEmpresa,true,false,false);
+
+}
+/*************************************************************/
+const nuevoTaller = async()=>{
+ router.push({ path: `/creartaller` });
+}
+/*************************************************************/
+const imprimirEtiquetaTaller = async()=>{
+  const facturaTaller = facturaTallerSeleccionada.value
+  //window.electron.ipcRenderer.invoke('open-new-window', link.value+'/vista/impresoraequipo?factura='+facturaTaller.no_factura,'url', true,false)
+
+   await printBarcode(facturaTaller.no_factura,facturaTaller.nombre)
+
+}
+/*************************************************************/
+const verClaveTaller = async () => {
+  const facturaTaller = facturaTallerSeleccionada.value;
+
+  if (facturaTaller.clave.includes('-')) {
+    clavePatron.value = facturaTaller.clave;
+    showPatron.value = true;
+  } else {
+    visibletaller.value = false
+    Swal.fire({
+      title: 'Clave',
+      text: facturaTaller.clave,
+      icon: 'info',
+      confirmButtonText: 'OK'
+    });
+  }
+};
+
+/*************************************************************/
+const closePatron = () => {
+    showPatron.value = false;
+};
+/*************************************************************/
+const funcionActualizarTaller = async ()=> {
+  const url = link.value+api.value+"/actualizarcampos/taller";
+  if (!facturaTallerSeleccionada.value) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+  if (facturaTallerSeleccionada.value.hasOwnProperty('created_at')) {
+      facturaTallerSeleccionada.value.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await peticionesFetchOffline('updateData', 'taller',JSON.stringify(facturaTallerSeleccionada.value));
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+}
+/*************************************************************/
+const moneyrecibidoRef = ref(null);
+/*************************************************************/
+watch(visiblecobrar, (newVal) => {
+  if (newVal) {
+    nextTick(() => {
+      setTimeout(() => {
+        const campoDinero = document.getElementById('dineroRecibido');
+        if (campoDinero) {
+          campoDinero.focus();
+        }
+      }, 500); // Ajusta el tiempo según sea necesario
+    });
+  }
+});
+
+/*************************************************************/
+const printBarcode = async(barcode,texto) => {
+    const content = {
+        barcodeData: {
+            barcodetype: datosBarcode.value.barcodetype,
+            barwidth: parseInt(datosBarcode.value.barwidth),
+            barheight: parseInt(datosBarcode.value.barheight),
+            labelwidth: parseInt(datosBarcode.value.labelwidth),
+            labelheight: parseInt(datosBarcode.value.labelheight),
+            fontsize: parseInt(datosBarcode.value.fontsize),
+            margen_izq: parseInt(datosBarcode.value.margen_izq),
+            margen_der: parseInt(datosBarcode.value.margen_der),
+            margen_sup: parseInt(datosBarcode.value.margen_sup),
+            margen_inf: parseInt(datosBarcode.value.margen_inf),
+            codigo: barcode,
+        },
+        labelWidth: parseInt(datosBarcode.value.labelwidth),
+        labelHeight: parseInt(datosBarcode.value.labelheight),
+        margins: {
+            top: parseInt(datosBarcode.value.margen_sup),
+            right: parseInt(datosBarcode.value.margen_der),
+            bottom: parseInt(datosBarcode.value.margen_inf),
+            left: parseInt(datosBarcode.value.margen_izq)
+        },
+        incluirCabecera:true,
+        incluirTexto:true,
+        incluirCodigo:true,
+        incluirOtro:false,
+        incluirPrecio:false,
+        headerText: datosEmpresaStore.empresa.nombre,
+        code: barcode,
+        text: texto,
+        precio: '',
+        width: parseInt(datosBarcode.value.barwidth),
+        height: parseInt(datosBarcode.value.barheight),
+        fontSize: parseInt(datosBarcode.value.fontsize),
+        cantidad: 1,
+        tipo: datosBarcode.value.barcodetype,
+        printerName: datosBarcode.value.impresora
+    };
+    await window.electron.ipcRenderer.invoke('print-barcode', content);
+
+};
+/*************************************************************/
+// visibletaller.value = false
+/*************************************************************/
+const entregarTaller = async () => {
+  if (facturaTallerSeleccionada.value.estado === 'Entregado') {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Esta Orden ya ha sido Entregada', life: 3000 });
+    return;
+  }
+
+   if (Number(facturaTallerSeleccionada.value.total) === 0) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Debe agregar Costo de Reparación', life: 3000 });
+    return;
+  }
+
+
+visibletaller.value = false
+  const result = await Swal.fire({
+    title: 'Confirmación',
+    text: '¿Ha revisado el equipo antes de entregar?',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Sí',
+    cancelButtonText: 'No'
+  });
+
+  if (result.isConfirmed) {
+    facturaTallerSeleccionada.value.estado = 'Entregado';
+    const abonoJSON = JSON.parse(facturaTallerSeleccionada.value.abono);
+    abonoJSON.push({
+      "abono": facturaTallerSeleccionada.value.saldo,
+      "prioridad": 3,
+      "turno": usuarioLocal.value.token,
+      "cajero": usuarioLocal.value.email,
+      "entregado_por": usuarioLocal.value.nombre,
+      "metodo_pago": facturaTallerSeleccionada.value.metodopago,
+      "hora": nfecha('hora'),
+      "fecha": nfecha('fecha')
+    });
+    facturaTallerSeleccionada.value.abono = JSON.stringify(abonoJSON);
+    facturaTallerSeleccionada.value.saldo = '0.00';
+    facturaTallerSeleccionada.value.fecha_entrega = nfecha('fecha');
+    await funcionActualizarTaller();
+    imprimirTaller();
+  } else if (result.dismiss === Swal.DismissReason.cancel) {
+    visibletaller.value = true
+
+  }
+};
+
+
+/*************************************************************/
+const facturasSinCobrar = ref([]);
+const tipoFactura = {
+  'EFECTIVO': { 'tipo': 'success', 'icono': 'money' },
+  'TARJETA': { 'tipo': 'danger', 'icono': 'credit-card' },
+  'TARJETA Y EFECTIVO': { 'tipo': 'danger', 'icono': 'credit-card' },
+  'TARJETA Y TRANSFERENCIA': { 'tipo': 'danger', 'icono': 'credit-card' },
+  'TRANSFERENCIA': { 'tipo': 'warning', 'icono': 'bank' },
+  'EFECTIVO Y TRANSFERENCIA': { 'tipo': 'warning', 'icono': 'bank' },
+  'TARJETA TRANSFERENCIA Y EFECTIVO': { 'tipo': 'warning', 'icono': 'bank' },
+  'CHEQUE': { 'tipo': 'warning', 'icono': 'bank' },
+  'APARTADO': { 'tipo': 'warning', 'icono': 'bank' },
+  'CREDITO': { 'tipo': 'dark', 'icono': 'money' }
+};
+/************************************************************/
+const handlePropinaChange = () => {
+  // Convertir el valor ingresado a número; si no es válido, se considera 0
+  const tip = parseFloat(propinaFactura.value) || 0;
+  
+  // Validar que la propina no sea negativa
+  if (tip < 0) {
+    // Por ejemplo, podrías notificar al usuario con un Toast
+    toast.add({
+      severity: 'error',
+      summary: 'Valor incorrecto',
+      detail: 'La propina no puede ser negativa.',
+      life: 3000
+    });
+    // Reiniciamos el campo a 0.00 y salimos
+    propinaFactura.value = '0.00';
+    return;
+  }
+  
+  // Actualizamos el total a cobrar sumando la propina al total base
+  // Es importante que baseTotalFactura tenga el valor original (sin propina)
+  //totalFactura.value = (parseFloat(baseTotalFactura.value) + tip).toFixed(2);
+  
+  // Recalcular el vuelto en base al nuevo total
+  calcularVuelto();
+};
+/************************************************************/
+const fetchAndSetupData = async () => {
+  try {
+    // 1) Traes TODAS las facturas pendientes
+    const pending = await peticionesFetchOffline(
+      'getDataArrayByCondition',
+      'facturas',
+      'estado_factura',
+      'Pendiente'
+    );
+
+    // 2) Si lo que quieres es reemplazar por completo:
+    facturasSinCobrar.value = pending;
+
+    // 3) Sólo si quieres detectar cuántas son nuevas y tocar sonido/toast:
+    const existingIds = new Set(facturasSinCobrar.value.map(f => f.id));
+    const newFacturas = pending.filter(f => !existingIds.has(f.id));
+
+    if (newFacturas.length > 0) {
+      toast.add({
+        severity: 'success',
+        summary: 'Nuevas Facturas',
+        detail: 'Hay nuevas facturas pendientes',
+        life: 3000
+      });
+
+      const { SOUND: sonidoR } = await envioElectron('datosarchivo');
+      if (sonidoR) {
+        window.electron.ipcRenderer.invoke('play-sound', 'Subtle.mp3');
+      }
+    }
+
+  } catch (error) {
+    console.error('Error fetching data', error);
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to fetch data',
+      life: 3000
+    });
+  }
+};
+
+
+/************************************************************/
+const fetchDataFactura = async () => {
+const response = await peticionesFetchOffline('getLastXRows', 'facturas','100');
+    const jsonData = response;
+    facturas.value = jsonData;
+};
+/************************************************************/
+const recargarFacturasFull = async()=>{
+  facturasSinCobrar.value = []
+  await fetchDataFactura();
+}
+/************************************************************/
+const fetchDataTaller = async () => {
+const response = await peticionesFetchOffline('getDataAsArray', 'taller');
+    const jsonData = response;
+    facturasTaller.value = jsonData.reverse();
+    if (facturasTaller.value[0]) {
+      facturaTallerSeleccionada.value = facturasTaller.value[0];
+      const datosJSON = facturasTaller.value[0]
+      clienteTaller.value = datosJSON.nombre;
+
+    }
+};
+/************************************************************/
+const datosDelDia = ref({
+    "venta": 0.00,
+    "efectivo": 0.00,
+    "transferencia": 0.00,
+    "tarjeta": 0.00,
+    "ganancia": 0.00,
+    "gastos": 0.00,
+    "entradas": 0.00,
+    "devoluciones": 0.00,
+    "inicioCaja": 0.00,
+    "abono": 0.00,
+    "cuentasXcobrar": 0.00,
+    "taller": 0.00
+});
+/************************************************************/
+const fetchAndSetupDatosdelDia = async () => {
+  const datosFechaHoy = nfecha('timestampcompleta');
+//const fechaInicioN = datosFechaHoy.fechainicio;
+//const fechaFinN = datosFechaHoy.fechafin;
+
+const fechaInicioN = fechaDeInicioHoy.value;
+const fechaFinN = fechaDeFinHoy.value;
+
+
+const response = await peticionesFetchOffline('datosVentasPorRango', fechaInicioN,fechaFinN);
+
+    const jsonData = response;
+    datosDelDia.value = jsonData;
+    datosEnvio.value = JSON.parse(JSON.stringify(jsonData));
+
+    const copiaResponse = JSON.parse(JSON.stringify(response))
+
+    const totalVentas = copiaResponse['facturas']
+    .filter(fact=>fact.almacen === datosEmpresaStore.empresa.nombre)
+    .filter(fact=>fact.estado_factura === 'Cobrado')
+    .filter(fact=>fact.metodo_pago === 'EFECTIVO')
+    .map(factura => Number(factura.total)) 
+    .reduce((acc, total) => acc + total, 0) || 0;
+
+   
+  let cantidadGastoEfectivo = 0;
+
+    const totalGastos = copiaResponse['gastos']
+    .filter(fact=>fact.almacen === datosEmpresaStore.empresa.nombre)
+    .map(gasto => {
+       if(gasto.metodo === 'EFECTIVO'){
+         cantidadGastoEfectivo += parseFloat(gasto.cantidad)
+       }
+
+       return Number(gasto.cantidad)
+
+    }) 
+    .reduce((acc, total) => acc + total, 0) || 0;
+
+
+
+
+    const cantidadInicio = copiaResponse['registrocaja']
+    .filter(fact=>fact.almacen === datosEmpresaStore.empresa.nombre)
+    .map(factura => Number(factura.cant_inicio)) 
+    .reduce((acc, total) => acc + total, 0) || 0; 
+
+const abonado = copiaResponse['cuentas_cobrar']
+  .filter(fact=>fact.almacen === datosEmpresaStore.empresa.nombre)
+  .map(factura => {
+    let totalAbono = 0;
+    let abonos = [];
+
+    try {
+        abonos = JSON.parse(factura.pagos);
+    } catch (error) {
+        console.error('Error al parsear abonos:', error);
+        return 0; 
+    }
+
+    for (let pago of abonos) {
+        const fechaBuscar = convertirAFechaTimestamp(pago.fecha, pago.hora);
+        const estaFecha = esFechaEnRango(fechaBuscar, fechaInicioN, fechaFinN);
+        if (estaFecha) {
+            if (pago.metodo === 'EFECTIVO') {
+            totalAbono += Number(pago.cantidad); 
+
+            }
+
+        }
+    }
+
+    return totalAbono; 
+  })
+  .reduce((acc, total) => acc + total, 0) || 0; 
+
+
+
+    contidadInicioCaja.value = parseFloat(cantidadInicio).toFixed(2);
+
+
+let cantidadTallerEfectivo = 0
+
+const cantidadTaller = copiaResponse['taller'].filter(fact=>fact.almacen === datosEmpresaStore.empresa.nombre)
+  .map(factura => {
+    let totalAbono = 0;
+    let abonos = [];
+
+    try {
+        abonos = JSON.parse(factura.abono);
+    } catch (error) {
+        console.error('Error al parsear abonos:', error);
+        return 0; 
+    }
+
+    for (let abono of abonos) {
+        const fechaBuscar = convertirAFechaTimestamp(abono.fecha, abono.hora);
+        const estaFecha = esFechaEnRango(fechaBuscar, fechaInicioN, fechaFinN);
+        if (estaFecha && abono.cajero == datosEmpresa.usuario.email) {
+  
+
+
+            totalAbono += Number(abono.abono); 
+            if (abono.metodo_pago === 'EFECTIVO') {
+               cantidadTallerEfectivo += Number(abono.abono);
+
+            }/*else if(abono.metodo_pago === 'TARJETA'){
+              datosDelDia.value.tarjeta += Number(abono.abono);
+
+            }else{
+              datosDelDia.value.transferencia += Number(abono.abono);
+
+            }*/
+
+
+
+
+        }
+    }
+
+    return totalAbono; 
+  })
+  .reduce((acc, total) => acc + total, 0) || 0; 
+
+
+
+
+    totalModalEnCaja.value = (totalVentas + abonado + cantidadTallerEfectivo - cantidadGastoEfectivo).toFixed(2);
+   // transaccionesCantidad.value = jsonData.efectivo
+
+};
+/************************************************************/
+const visibleInicioCaja = ref(false)
+/************************************************************/
+const actualizarTokenSoloUso = async()=>{
+    tokenSoloUso.value = Math.floor(1000 + Math.random() * 9000).toString();
+const datosJSON = await envioElectron('datosarchivo');
+  datosJSON.TOKEN_SOLOUSO = tokenSoloUso.value;
+  try {
+    const envioDatosJSON = await window.electron.ipcRenderer.invoke('actualizarjson', datosJSON);
+    toast.add({ severity: 'success', summary: 'OK', detail: 'Datos Actualizados', life: 3000 });
+  } catch (error) {
+    console.error("Error sending data to Electron:", error);
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update data', life: 3000 });
+  }
+
+}
+/************************************************************/
+const turnosAbiertos = async()=>{
+    const fecha = nfecha('timestampcompleta')
+    const response = await peticionesFetchOffline('getRowsByTimestampRange','registrocaja','created_at',fechaDeInicioHoy.value,fechaDeFinHoy.value);
+      turnosHoyArray.value = response;
+
+     const turnosAbiertos = response
+     //.filter(turno=>turno.estado === 'Abierta')
+     //.filter(est=>est.username === datosEmpresaStore.usuario.email)
+     .filter(fact=>fact.almacen === datosEmpresaStore.empresa.nombre)
+   
+   // const jsonData = response.filter(fact=>fact.almacen === datosEmpresaStore.empresa.nombre);
+    cajaAbiertaArray.value = turnosAbiertos
+
+    if(turnosAbiertos.length > 0){
+      contidadInicioCaja.value = turnosAbiertos
+  .map(factura => Number(factura.cant_inicio)) 
+  .reduce((acc, total) => acc + total, 0) || 0;
+    }
+
+
+}
+/************************************************************/
+
+/************************************************************/
+const cerrarSessiones = async(sessiones)=>{
+
+  for(let session of sessiones){
+      session.estado = 'Cerrada'
+      session.updated_at = nfecha('timestamp');
+      session.otro = nombrePC.value
+     const datosEnCaja = await peticionesFetchOffline('updateData', 'registrocaja',JSON.stringify(session));
+  }
+
+}
+/************************************************************/
+
+const fetchCuentas = async () => {
+  try {
+    const response = await peticionesFetchOffline('getDataAsArray', 'cuentas');
+    cuentasData.value = response;
+    cuentasDataNames.value = response.map(cuenta=>cuenta.nombre);
+  } catch (error) {
+    toast.add({ 
+      severity: 'error', 
+      summary: 'Error', 
+      detail: 'Failed to fetch data from cuentas', 
+      life: 3000 
+    });
+  }
+};
+
+/************************************************************/
+const fetchCxC = async () => {
+  try {
+    const fecha = nfecha('timestampcompleta')
+
+    const response = await peticionesFetchOffline('getRowsByTimestampRange','cuentas_cobrar','created_at',fecha.fechainicio,fecha.fechafin);
+
+    const jsonData = response;
+
+    if (Array.isArray(jsonData)) {
+     // cuentasXcobrarArray.value = jsonData;
+
+      datosDelDia.value.cuentasXcobrar = jsonData
+        .map(factura => Number(factura.monto_credito))
+        .reduce((acc, total) => acc + total, 0) || 0;
+    } else {
+      console.error('La respuesta no es un array válido:', jsonData);
+    }
+
+  } catch (error) {
+    console.error('Error al obtener las cuentas por cobrar:', error);
+  }
+};
+/************************************************************/
+function convertirATimestamp(fecha, hora) {
+  // Dividir la fecha en día, mes y año
+  const partesFecha = fecha.split('/');
+  const dia = partesFecha[0];
+  const mes = partesFecha[1] - 1; // Los meses en JavaScript son 0-indexados
+  const año = partesFecha[2];
+
+  // Dividir la hora en horas, minutos y segundos
+  const partesHora = hora.split(':');
+  const horas = partesHora[0];
+  const minutos = partesHora[1];
+  const segundos = partesHora[2];
+
+  // Crear un objeto Date con la fecha y hora proporcionadas
+  const fechaHora = new Date(año, mes, dia, horas, minutos, segundos);
+
+  // Devolver el timestamp
+  return fechaHora.getTime();
+}
+/************************************************************/
+const fnVerCuadre = async()=>{
+  const fechaTimeStamp =  transformarFechaTimestamp(nfecha('fecha'),false);
+
+  const impresionpagina = `${link.value}/vista/impresorareporte.php?fecha=${usuarioLocal.value.hora_inicio}AND${nfecha('timestamp')}&usuario=${usuarioLocal.value.email}`;
+
+const fechas = nfecha('timestampcompleta');
+  const datosEmpresaNN = JSON.stringify(enviarDatosLocalStorage() )
+  const datosUsuarioLocal = JSON.parse(window.localStorage.getItem('usuarioLocal')) 
+
+ const fechaInicioN = transformarFechaTimestamp(formatearFecha(cuadre.fechainicio),false) + ' '+cuadre.horainicio
+
+
+/*************************************************************/
+if (!totalModal.value) {
+  toast.add({ severity: 'error', summary: 'Error', detail: 'Debe hacer el conteo del dinero', life: 3000 });
+}
+
+const monedero = {
+  '1': Number(pesos.value) || 0,
+  '5': Number(cincopesos.value) || 0,
+  '10': Number(diezpesos.value) || 0,
+  '25': Number(veinticincopesos.value) || 0,
+  '50': Number(cincuentapesos.value) || 0,
+  '100': Number(cienpesos.value) || 0,
+  '200': Number(docientospesos.value) || 0,
+  '500': Number(quinientoscopesos.value) || 0,
+  '1000': Number(milpesos.value) || 0,
+  '2000': Number(dosmilpesos.value) || 0
+};
+
+  const peticionDatos = {
+    fechainicio:cuadre.value.fechainicio,
+    horainicio:cuadre.value.horainicio,
+    horafin:nfecha('horaAmericana'),
+    fechafin:cuadre.value.fechafin,
+    fondoinicial:datosDelDia.value.inicioCaja,
+    taller:datosDelDia.value.taller,
+    efectivo:datosDelDia.value.efectivo,
+    transferencia:datosDelDia.value.transferencia,
+    tarjeta:datosDelDia.value.tarjeta,
+    gastos:datosDelDia.value.gastos,
+    abono:datosDelDia.value.abono,
+    ganancia:datosDelDia.value.ganancia,
+    totalvendido:datosDelDia.value.venta,
+    cuentasxcobrar:datosDelDia.value.cuentasXcobrar,
+    devoluciones:datosDelDia.value.devoluciones,
+    totalcontado:Number(totalModal.value),
+    token:datosUsuarioLocal[0].token,
+    impuestos:datosDelDia.value.impuestos,
+    usuario:datosEmpresaStore.usuario
+  }
+
+//datosEnvio.value
+  datosDelDiaArray.value.peticion = peticionDatos
+
+  const totalContado = Number(totalModal.value)
+
+  const nDatosEmpresa = JSON.parse(datosEmpresaNN)
+
+  nDatosEmpresa.datoscaja = datosEnvio.value
+  nDatosEmpresa.monedero = monedero
+  nDatosEmpresa.usuario = datosEmpresaStore.usuario
+
+const timestampInicio = convertirAFechaTimestamp(cuadre.value.fechainicio, cuadre.value.horainicio);
+const timestampFin = convertirAFechaTimestamp(cuadre.value.fechafin, cuadre.value.horafin);
+
+/*  const fechasEnviar = {
+    fechainicio:timestampInicio,
+    fechafin:timestampFin
+  }*/
+
+
+  const fechasEnviar = {
+    fechainicio:fechaDeInicioHoy.value,
+    fechafin:fechaDeFinHoy.value,
+    cantidadInicio:contidadInicioCaja.value
+  }
+
+  //let enviarFecha = false
+
+   //if(turnoUsuarioSelected.value != 'COMPLETO'){
+    let  enviarFecha = JSON.stringify(fechasEnviar)
+  // }
+
+
+  const impresion = window.electron.ipcRenderer.invoke('imprimirCuadreCompleto',totalContado,JSON.stringify(nDatosEmpresa),false,false,true,enviarFecha);
+
+}
+/************************************************************/
+const fnTransaccion = async()=>{
+ 
+
+}
+/************************************************************/
+let intervalId;
+/************************************************************/
+const fetchProveedores = async () => {
+  try {
+    const response = await peticionesFetchOffline('getDataAsArray', 'proveedores');
+    proveedoresData.value = response;
+  } catch (error) {
+    toast.add({ 
+      severity: 'error', 
+      summary: 'Error', 
+      detail: 'Failed to fetch data from proveedores', 
+      life: 3000 
+    });
+  }
+};
+/************************************************************/
+const fetchClientes = async () => {
+  try {
+    const response = await peticionesFetchOffline('getDataAsArray', 'clientes');
+    clientesData.value = response;
+  } catch (error) {
+    toast.add({ 
+      severity: 'error', 
+      summary: 'Error', 
+      detail: 'Failed to fetch data from proveedores', 
+      life: 3000 
+    });
+  }
+};
+/************************************************************/
+const handleKeyDown = (event) => {
+  // Solo ejecuta si la modal de cobrar está visible
+  if (!visiblecobrar.value) return;
+
+  switch (event.key) {
+    case 'F1':
+      event.preventDefault(); // Evita la acción por defecto del navegador
+      fnDejaCambioPropina();
+      break;
+    case 'F2':
+      event.preventDefault();
+      fnCobrarPorTarjeta();
+      break;
+    case 'F3':
+      event.preventDefault();
+      fnCobrarPorTransferencia();
+      break;
+    default:
+      break;
+  }
+};
+/************************************************************/
+
+onMounted(async () => {
+permisosPagina(router,'Cajero')
+
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+tokenCorto.value = datosJSON.VITE_TOKEN_CORTO;
+tokenSoloUso.value = datosJSON.VITE_TOKEN_SOLOUSO;
+token24H.value = datosJSON.VITE_TOKEN_24H;
+
+
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+const sonido = datosJSON.SOUND;
+
+  if(!sonido){
+     sonidoON.value = sonido;
+  }else{
+     sonidoON.value = sonido;
+  }
+
+const laFechaHoy = nfecha('timestampcompleta')
+
+fechaDeInicioHoy.value = laFechaHoy.fechainicio
+fechaDeFinHoy.value = laFechaHoy.fechafin
+
+
+
+camposGastos.value = await arrayToObjetoFromTabla('gastos');
+camposEntrada.value = await arrayToObjetoFromTabla('entradas');
+usuarioLocal.value = datosEmpresaStore.usuario;
+datosConfiguracion.value = JSON.parse(window.localStorage.getItem('configuracion'));
+datosDefault.value = JSON.parse(window.localStorage.getItem('datosDefault')) || {modo:'FULL'}
+
+  await turnosAbiertos();
+  await fetchAndSetupData();
+  await fetchAndSetupDatosdelDia();
+  await fetchDataFactura();
+  await fetchDataTaller();
+  await fetchCxC();
+  await fetchCuentas();
+  await fetchProveedores();
+  await fetchClientes();
+  await fetchDataBarcode();
+
+  //await imprimirCuadre(false)
+   
+if (datosDelDia.value.inicioCaja === 0) {
+  if(datosEmpresaStore.usuario.nivel_seguridad === 'Cajero'){
+     visibleInicioCaja.value = true;
+  }
+}
+
+const fechasInicioLocal = usuarioLocal.value.hora_inicio.split(' ')
+
+cuadre.value.fechainicio = nfecha('fecha')
+cuadre.value.fechafin = nfecha('fecha')
+cuadre.value.usuario = usuarioLocal.value.usuario
+cuadre.value.turnos = usuarioLocal.value.token
+turnosXfecha.value = cajaAbiertaArray.value.map(caja=>caja.turno)
+//cuadre.value.horainicio = fechasInicioLocal[1]
+cuadre.value.horainicio = '07:00:00'
+
+cuadre.value.horafin = nfecha('horaAmericana')
+//turnoUsuarioSelected.value = usuarioLocal.value.token
+
+window.addEventListener('keydown', handleKeyDown);
+  // Configurar el intervalo para que se ejecute cada 30 segundos
+  intervalId = setInterval(fetchAndSetupData, 10000);
+
+
+});
+
+  // Limpiar el intervalo cuando el componente se desmonte
+  onUnmounted(async() => {
+
+ window.removeEventListener('keydown', handleKeyDown);
+
+    clearInterval(intervalId);
+  });
+/******************************************************/
+const pesos = ref('0.00')
+const cincopesos = ref('0.00')
+const diezpesos = ref('0.00')
+const veinticincopesos = ref('0.00')
+const cincuentapesos = ref('0.00')
+const cienpesos = ref('0.00')
+const docientospesos = ref('0.00')
+const quinientoscopesos = ref('0.00')
+const milpesos = ref('0.00')
+const dosmilpesos = ref('0.00')
+const totalModal = ref('0.00')
+const colorModal = ref('Verificando Cuadre ....')
+const alerta = ref('info')
+/******************************************************/
+watchEffect(async() => {
+  if (visiblegastos.value) {
+      camposGastos.value.fecha = nfecha('fecha');
+      camposGastos.value.hora = nfecha('hora');
+      camposGastos.value.cantidad = '0.00';
+      camposGastos.value.mes = nfecha('mes');
+      camposGastos.value.year = nfecha('year');
+      camposGastos.value.turno = usuarioLocal.value.token;
+      camposGastos.value.metodo = 'EFECTIVO';
+  }
+
+if (cuadrarCaja.value) {
+    await fetchAndSetupDatosdelDia();
+   pesos.value = '0.00'
+   cincopesos.value = '0.00'
+   diezpesos.value = '0.00'
+   veinticincopesos.value = '0.00'
+   cincuentapesos.value = '0.00'
+   cienpesos.value = '0.00'
+   docientospesos.value = '0.00'
+   quinientoscopesos.value = '0.00'
+   milpesos.value = '0.00'
+   dosmilpesos.value = '0.00'
+   totalModal.value = '0.00'
+   colorModal.value = 'Verificando Cuadre ....'
+   alerta.value = 'info'
+}
+
+
+
+if (visibleimprimirfactura.value) {
+   impresoraSeleccionada.value = datosConfiguracion.value.tipo_impresora
+}
+
+//camposEntrada
+  if (visiblentrada.value) {
+      camposEntrada.value.fecha = nfecha('fecha');
+      camposEntrada.value.hora = nfecha('hora');
+      camposEntrada.value.cantidad = '0.00';
+      camposEntrada.value.mes = nfecha('mes');
+      camposEntrada.value.year = nfecha('year');
+      camposEntrada.value.turno = usuarioLocal.value.token;
+  }
+
+
+});
+/******************************************************/
+const calcularTotal = () => {
+  totalModal.value =
+    (Number(pesos.value) || 0) +
+    (Number(cincopesos.value) * 5 || 0) +
+    (Number(diezpesos.value) * 10 || 0) +
+    (Number(veinticincopesos.value) * 25 || 0) +
+    (Number(cincuentapesos.value) * 50 || 0) +
+    (Number(cienpesos.value) * 100 || 0) +
+    (Number(docientospesos.value) * 200 || 0) +
+    (Number(quinientoscopesos.value) * 500 || 0) +
+    (Number(milpesos.value) * 1000 || 0) +
+    //(Number(contidadInicioCaja.value) * 1 || 0) +
+    (Number(dosmilpesos.value) * 2000 || 0);
+};
+
+const verificarCantidad = () => {
+  calcularTotal();
+  const diferencia = totalModal.value - (Number(totalModalEnCaja.value) + Number(contidadInicioCaja.value));
+
+  if (diferencia === 0) {
+    colorModal.value = "Efectivo correcto";
+    alerta.value = "success"; // Verde si está correcto
+  } else if (diferencia > 0) {
+    colorModal.value = `Sobra ${diferencia} ${datosConfiguracion.value.plural}`;
+    alerta.value = "info"; // Azul si sobra
+  } else {
+    colorModal.value = `Faltan ${Math.abs(diferencia)} ${datosConfiguracion.value.plural}`;
+    alerta.value = "danger"; // Rojo si falta
+  }
+};
+
+// Watch para recalcular el total y verificar cantidad cuando cambia algún valor
+watch(
+  [pesos, cincopesos, diezpesos, veinticincopesos, cincuentapesos, cienpesos, docientospesos, quinientoscopesos, milpesos, dosmilpesos],
+  verificarCantidad
+);
+/******************************************************/
+const handleEfectivoChange = () => {
+  const efectivoValue = parseFloat(facturaEfectivo.value) || 0;
+  const tarjetaValue = parseFloat(facturaTarjeta.value) || 0;
+  const transferenciaValue = parseFloat(facturaTransferencia.value) || 0;
+  const totalValue = parseFloat(totalFactura.value) || 0;
+
+  const nuevoTotal = efectivoValue + tarjetaValue + transferenciaValue;
+
+  if (nuevoTotal > totalValue) {
+    facturaEfectivo.value = (totalValue - tarjetaValue - transferenciaValue).toFixed(2);
+  } else {
+    // Handle other fields without affecting the current input
+    facturaTarjeta.value = (totalValue - efectivoValue - transferenciaValue).toFixed(2);
+  }
+
+  distribuirRestante('efectivo');
+};
+
+const handleTarjetaChange = () => {
+  const efectivoValue = parseFloat(facturaEfectivo.value) || 0;
+  const tarjetaValue = parseFloat(facturaTarjeta.value) || 0;
+  const transferenciaValue = parseFloat(facturaTransferencia.value) || 0;
+  const totalValue = parseFloat(totalFactura.value) || 0;
+
+  const nuevoTotal = efectivoValue + tarjetaValue + transferenciaValue;
+
+  if (nuevoTotal > totalValue) {
+    facturaTarjeta.value = (totalValue - efectivoValue - transferenciaValue).toFixed(2);
+  } else {
+    // Handle other fields without affecting the current input
+    facturaTransferencia.value = (totalValue - efectivoValue - tarjetaValue).toFixed(2);
+  }
+
+  distribuirRestante('tarjeta');
+};
+
+const handleTransferenciaChange = () => {
+  const efectivoValue = parseFloat(facturaEfectivo.value) || 0;
+  const tarjetaValue = parseFloat(facturaTarjeta.value) || 0;
+  const transferenciaValue = parseFloat(facturaTransferencia.value) || 0;
+  const totalValue = parseFloat(totalFactura.value) || 0;
+
+  const nuevoTotal = efectivoValue + tarjetaValue + transferenciaValue;
+
+  if (nuevoTotal > totalValue) {
+    facturaTransferencia.value = (totalValue - efectivoValue - tarjetaValue).toFixed(2);
+  } else {
+    // Handle other fields without affecting the current input
+    facturaEfectivo.value = (totalValue - tarjetaValue - transferenciaValue).toFixed(2);
+  }
+
+  distribuirRestante('transferencia');
+};
+
+
+/******************************************************/
+const distribuirRestante = (campoModificado) => {
+  const total = parseFloat(totalFactura.value);
+  const campos = {
+    efectivo: facturaEfectivo,
+    tarjeta: facturaTarjeta,
+    transferencia: facturaTransferencia
+  };
+
+  let sumOtrosCampos = 0;
+  Object.keys(campos).forEach(campo => {
+    if (campo !== campoModificado) {
+      sumOtrosCampos += parseFloat(campos[campo].value) || 0;
+    }
+  });
+
+  let restante = total - parseFloat(campos[campoModificado].value);
+  if (restante < 0) {
+    restante = 0;
+  }
+
+  const otrosCampos = Object.keys(campos).filter(campo => campo !== campoModificado);
+
+  if (restante < sumOtrosCampos) {
+    const nuevoValor = restante / otrosCampos.length;
+    otrosCampos.forEach(campo => {
+      if (campo !== campoModificado) {
+        campos[campo].value = nuevoValor.toFixed(2);
+      }
+    });
+  }
+};
+
+
+/******************************************************/
+/*const cobrarFactura = async(factura)=>{
+  numeroFactura.value = factura.no_factura
+  visiblecobrar.value = true
+  totalFactura.value = factura.total
+  recibidoFactura.value = factura.total
+  facturaEfectivo.value = factura.efectivo || 0.00
+  facturaTarjeta.value = factura.tarjeta || 0.00
+  facturaTransferencia.value = factura.transferencia || 0.00
+}*/
+const cobrarFactura = async (factura) => {
+  numeroFactura.value = factura.no_factura;
+  visiblecobrar.value = true;
+  
+  // Guarda el total original sin propina
+  baseTotalFactura.value = parseFloat(factura.total);
+  totalFactura.value = factura.total;
+  recibidoFactura.value = factura.total;
+  
+  facturaEfectivo.value = factura.efectivo || '0.00';
+  facturaTarjeta.value = factura.tarjeta || '0.00';
+  facturaTransferencia.value = factura.transferencia || '0.00';
+  
+  // Inicializa la propina en 0
+  propinaFactura.value = '0.00';
+};
+
+/******************************************************/
+const fnDejaCambioPropina = async()=>{
+  propinaFactura.value = devueltaFactura.value;
+  await cobrandoFactura()
+}
+
+/******************************************************/
+const fnProductos = (factura) => {
+  // Parsear los productos desde la factura
+  const productos = JSON.parse(factura.productos);
+
+  // Extraer solo los nombres de los productos
+  const nombresProductos = productos.map(producto => producto.nombre);
+
+  // Crear el contenido para SweetAlert
+  const contenido = nombresProductos.join('<br>');
+
+  // Mostrar la modal con SweetAlert
+  Swal.fire({
+    title: 'Productos',
+    html: contenido,
+    icon: 'info',
+    confirmButtonText: 'Cerrar'
+  });
+};
+
+/******************************************************/
+const fnImprimirFactura = async(fact)=>{
+
+ const datosFactura = fact;
+    const arrayClientes = await peticionesFetchOffline('getDataAsArray', 'clientes');
+
+if (datosFactura.metodo_pago === 'CREDITO') {
+  const datosCredito = await peticionesFetchOffline('getDataByField', 'cuentas_cobrar', 'no_factura', datosFactura.no_factura)
+
+  // Preguntar con SweetAlert si desea imprimir en térmica o tinta
+  const { value: tipoImpresion } = await Swal.fire({
+    title: '¿Cómo deseas imprimir?',
+    text: 'Selecciona el tipo de impresión',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Térmica',
+    cancelButtonText: 'Tinta',
+    reverseButtons: true,
+  });
+
+  if (tipoImpresion) {
+    // Si elige TÉRMICA (confirmado)
+  if(window.electron){
+       const datosCliente = arrayClientes.find(cl=>cl.codigo === datosCredito.cod_cliente)
+ 
+       const datosLocal = enviarDatosLocalStorage();
+       datosLocal.empresa = datosEmpresa.empresa
+       const datosEmpresa1 = JSON.stringify(datosLocal);
+         const datosFacturapendientes = await peticionesFetchOffline('getDataByDoubleCondition', 'cuentas_cobrar','cod_cliente',datosCliente.codigo,'estatus','PENDIENTE');
+
+       const envio = await window.electron.ipcRenderer.invoke('ticketCXC', JSON.stringify(datosFacturapendientes),JSON.stringify(datosCliente), datosEmpresa1);
+   
+ }
+
+
+  } else {
+    // Si elige TINTA (cancelado)
+
+  if(window.electron){
+           const datosCliente = arrayClientes.find(cl=>cl.codigo === datosCredito.cod_cliente)
+       const datosLocal = enviarDatosLocalStorage();
+       datosLocal.empresa = datosEmpresa.empresa
+       const datosEmpresa1 = JSON.stringify(datosLocal);
+
+         const datosFacturapendientes = await peticionesFetchOffline('getDataByDoubleCondition', 'cuentas_cobrar','cod_cliente',datosCliente.codigo,'estatus','PENDIENTE');
+       const envio = await window.electron.ipcRenderer.invoke('creditoPDF', JSON.stringify(datosFacturapendientes),JSON.stringify(datosCliente), datosEmpresa1);
+   
+ }
+
+
+  }
+}else{
+
+          var impresionpagina = link.value+'/vista/impresoratermica.php?factura='+datosFactura.no_factura;
+         // window.electron.ipcRenderer.invoke('open-new-window', impresionpagina, 'url', true,false);
+
+          const datosEmpresaA = JSON.stringify(enviarDatosLocalStorage())
+         // window.electron.ipcRenderer.invoke('ticket',datosFactura.no_factura,datosEmpresaA);
+
+
+  const { value: tipoImpresion } = await Swal.fire({
+    title: '¿Cómo deseas imprimir?',
+    text: 'Selecciona el tipo de impresión',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Térmica',
+    cancelButtonText: 'Tinta',
+    reverseButtons: true,
+  });
+
+  if (tipoImpresion) {
+    // Si elige TÉRMICA (confirmado)
+      if(window.electron){
+           const datosCliente = arrayClientes.find(cl=>cl.codigo === datosFactura.cod_cliente)
+            const datosLocal = enviarDatosLocalStorage();
+           datosLocal.empresa = datosEmpresa.empresa
+           const datosEmpresa1 = JSON.stringify(datosLocal);
+           const envio = await window.electron.ipcRenderer.invoke('ticket',JSON.stringify(datosFactura),JSON.stringify(datosCliente),datosEmpresa1);
+     
+     }
+
+  } else {
+    // Si elige TINTA (cancelado)
+
+  if(window.electron){
+      const datosCliente = arrayClientes.find(cl=>cl.codigo === datosFactura.cod_cliente)
+       const datosLocal = enviarDatosLocalStorage();
+       datosLocal.empresa = datosEmpresa.empresa
+       const datosEmpresa1 = JSON.stringify(datosLocal);
+       const envio = await window.electron.ipcRenderer.invoke('facturaPDF', JSON.stringify(datosFactura),JSON.stringify(datosCliente), datosEmpresa1,null);
+   
+ }
+
+
+  }
+
+
+
+
+
+    }
+
+
+}
+/******************************************************/
+const calcularVuelto = () => {
+  const recibido = parseFloat(recibidoFactura.value);
+  const total = parseFloat(totalFactura.value);
+  const propina = parseFloat(propinaFactura.value);
+  const vuelto = recibido - total - propina;
+  devueltaFactura.value = vuelto.toFixed(2);
+};
+
+/******************************************************/
+const suCambioN = async(otroJSON)=>{
+  otroJSON.cajero = usuarioLocal.value.nombre
+otroJSON.token = usuarioLocal.value.token
+otroJSON.pagocon = recibidoFactura.value
+otroJSON.sucambio = devueltaFactura.value
+otroJSON.propina = propinaFactura.value
+return JSON.stringify([otroJSON])
+}
+/******************************************************/
+const fnCobrarPorTarjeta = async()=>{
+
+const datosFactura = facturasSinCobrar.value.find(factura=>factura.no_factura === numeroFactura.value);
+datosFactura.metodo_pago = 'TARJETA'
+
+datosFactura.estado_factura = 'Cobrado';
+
+const otroJSON = JSON.parse(datosFactura.otro);
+datosFactura.otro = await suCambioN(otroJSON[0]);
+
+datosFactura.cajero = usuarioLocal.value.nombre
+datosFactura.token = usuarioLocal.value.token
+
+datosFactura.efectivo = 0.00;
+datosFactura.transferencia = 0.00;
+datosFactura.tarjeta = datosFactura.total;
+datosFactura.updated_at = nfecha('timestamp');
+
+const envio = await peticionesFetchOffline('updateData','facturas', JSON.stringify(datosFactura));
+
+if (envio[0] == 'ok' ) {
+
+       toast.add({ severity: 'success', summary: 'Correcta', detail: 'Factura ('+datosFactura.no_factura+') Actualizada correctamente', life: 3000 });
+
+facturasSinCobrar.value = facturasSinCobrar.value.filter(factura => factura.no_factura !== datosFactura.no_factura);
+
+
+       recibidoFactura.value = 0
+       devueltaFactura.value = 0
+
+        visiblecobrar.value = false
+          const datosEmpresa = JSON.stringify(enviarDatosLocalStorage())
+          window.electron.ipcRenderer.invoke('ticket',datosFactura.no_factura,datosEmpresa)
+       await fetchAndSetupData();
+}
+
+
+}
+/******************************************************/
+const fnCobrarPorTransferencia = async()=>{
+
+const datosFactura = facturasSinCobrar.value.find(factura=>factura.no_factura === numeroFactura.value);
+datosFactura.metodo_pago = 'TRANSFERENCIA'
+
+datosFactura.estado_factura = 'Cobrado';
+
+const otroJSON = JSON.parse(datosFactura.otro);
+datosFactura.otro = await suCambioN(otroJSON[0]);
+
+datosFactura.cajero = usuarioLocal.value.nombre
+datosFactura.token = usuarioLocal.value.token
+
+datosFactura.efectivo = '0.00';
+datosFactura.transferencia = datosFactura.total;
+datosFactura.tarjeta = '0.00';
+datosFactura.updated_at = nfecha('timestamp');
+
+const envio = await peticionesFetchOffline('updateData','facturas', JSON.stringify(datosFactura));
+
+
+if (envio[0] == 'ok' ) {
+
+       toast.add({ severity: 'success', summary: 'Correcta', detail: 'Factura ('+datosFactura.no_factura+') Actualizada correctamente', life: 3000 });
+
+facturasSinCobrar.value = facturasSinCobrar.value.filter(factura => factura.no_factura !== datosFactura.no_factura);
+
+
+       recibidoFactura.value = 0
+       devueltaFactura.value = 0
+
+        visiblecobrar.value = false
+          const datosEmpresa = JSON.stringify(enviarDatosLocalStorage())
+          window.electron.ipcRenderer.invoke('ticket',datosFactura.no_factura,datosEmpresa)
+       await fetchAndSetupData();
+}
+
+
+}
+/******************************************************/
+const cobrandoFactura = async()=>{
+const datosFactura = facturasSinCobrar.value.find(factura=>factura.no_factura === numeroFactura.value);
+datosFactura.estado_factura = 'Cobrado';
+
+const otroJSON = JSON.parse(datosFactura.otro);
+datosFactura.otro = await suCambioN(otroJSON[0]);
+
+datosFactura.cajero = usuarioLocal.value.nombre
+datosFactura.token = usuarioLocal.value.token
+
+datosFactura.efectivo = facturaEfectivo.value;
+datosFactura.transferencia = facturaTransferencia.value;
+datosFactura.tarjeta = facturaTarjeta.value;
+datosFactura.updated_at = nfecha('timestamp');
+
+const envio = await peticionesFetchOffline('updateData','facturas', JSON.stringify(datosFactura));
+
+if (envio[0] == 'ok' ) {
+  visiblecobrar.value = false;
+       toast.add({ severity: 'success', summary: 'Correcta', detail: 'Factura ('+datosFactura.no_factura+') Actualizada correctamente', life: 3000 });
+
+
+facturasSinCobrar.value = facturasSinCobrar.value.filter(factura => factura.no_factura !== datosFactura.no_factura);
+
+       await fetchAndSetupData();
+
+       recibidoFactura.value = 0
+       devueltaFactura.value = 0
+       await fetchAndSetupDatosdelDia()
+
+
+    await fnImprimirFactura(datosFactura)
+    return
+
+
+
+
+     if (datosConfiguracion.value.tipo_impresora == 'Impresora Ticket') {
+
+    if (datosFactura.metodo_pago === 'CREDITO') {
+
+
+       const datosCredito =  await peticionesFetchOffline('getDataByField', 'cuentas_cobrar','no_factura',numeroFactura.value);
+
+
+
+
+       const impresionpagina = link.value+'/vista/cuentascobrartermica.php?factura=' + datosCredito.no_emision ;
+      window.electron.ipcRenderer.invoke('open-new-window', impresionpagina, 'url',true,false);
+
+    }else{
+
+          var impresionpagina = link.value+'/vista/impresoratermica.php?factura='+numeroFactura.value;
+          //window.electron.ipcRenderer.invoke('open-new-window', impresionpagina, 'url', true,false);
+                    const datosEmpresa = JSON.stringify(enviarDatosLocalStorage())
+          window.electron.ipcRenderer.invoke('ticket',datosFactura.no_factura,datosEmpresa)
+
+    }
+
+
+     }else if(datosFactCoti.value.impresora == 'Offline'){
+          var impresionpagina = link.value+'/receipt/ticket.php?factura='+numeroFactura.value;
+          window.electron.ipcRenderer.invoke('open-new-window', impresionpagina,'url',false,true,false)
+     } else{
+
+    if (datosFactura.metodo_pago === 'CREDITO') {
+
+       const datosCredito =  await peticionesFetchOffline('getDataByField', 'cuentas_cobrar','no_factura',datosFactura.no_factura);
+
+       const impresionpagina = link.value+'/vista/cuentascobrartermica.php?factura=' + datosCredito.no_emision ;
+      window.electron.ipcRenderer.invoke('open-new-window', impresionpagina, 'url',true,false);
+
+    }else{
+
+      var impresionpagina = link.value+'/receipt/factura.php?factura='+numeroFactura.value;
+       window.electron.ipcRenderer.invoke('open-new-window', impresionpagina,'url',false,true,false)
+
+    }
+
+
+
+
+     }
+
+
+}else{
+         toast.add({ severity: 'error', summary: 'Upps', detail: 'Error al actualizar la Factura ('+datosFactura.no_factura+')', life: 3000 });
+}
+}
+/******************************************************/
+const eliminarFactura = async (noFactura,idFactura) => {
+  const { value: password } = await Swal.fire({
+    title: 'TOKEN para borrar',
+    input: 'password',
+    inputPlaceholder: '*******',
+    showCancelButton: true,
+    confirmButtonText: 'Verificar y Borrar',
+    cancelButtonText: 'Cancelar',
+    inputValidator: (value) => {
+      if (!value) {
+        return '¡Necesitas ingresar un TOKEN!';
+      }
+    }
+  });
+
+  if (password && password === tokenCorto.value || password === token.value || password === tokenSoloUso.value || password === token24H.value) {
+
+   const envio = await peticionesFetchOffline('deleteEntry','facturas', idFactura);
+
+if (envio[0] == 'ok' ) {
+  visiblecobrar.value = false;
+       toast.add({ severity: 'success', summary: 'Correcta', detail: 'Factura ('+noFactura+') Borrada correctamente', life: 3000 });
+       facturasSinCobrar.value = facturasSinCobrar.value.filter(factura => factura.no_factura !== noFactura);
+       await fetchAndSetupData();
+      await actualizarTokenSoloUso();
+      await fetchAndSetupDatosdelDia()
+
+}else{
+         toast.add({ severity: 'error', summary: 'Upps', detail: 'Error al borrar la Factura ('+noFactura+')', life: 3000 });
+}
+
+
+  } else {
+      toast.add({ severity: 'error', summary: 'Error', detail: 'Error de TOKEN', life: 3000 });
+  }
+};
+
+/******************************************************/
+/******************************************************/
+const imprimirCuadre = async(imprimir = true)=>{
+  const fechaTimeStamp =  transformarFechaTimestamp(nfecha('fecha'),false);
+
+  const impresionpagina = `${link.value}/vista/impresorareporte.php?fecha=${usuarioLocal.value.hora_inicio}AND${nfecha('timestamp')}&usuario=${usuarioLocal.value.email}`;
+
+const fechas = nfecha('timestampcompleta');
+  const datosEmpresa = JSON.stringify(enviarDatosLocalStorage() )
+  const datosUsuarioLocal = JSON.parse(window.localStorage.getItem('usuarioLocal')) 
+
+ const fechaInicioN = transformarFechaTimestamp(formatearFecha(cuadre.fechainicio),false) + ' '+cuadre.horainicio
+
+const response = await peticionesFetchOffline('datosVentasPorRango', fechas.fechainicio,fechas.fechafin);
+
+
+const laFechaInicio = fechas.fechainicio;
+const laFechaFin = fechas.fechafin;
+
+    const jsonData = response;
+    datosDelDiaArray.value = response;
+
+/*let facturasFiltradas = null;
+
+if (turnoUsuarioSelected.value == 'COMPLETO') {
+   //facturasFiltradas = jsonData['facturas'].filter(fact=>fact.cajero === datosUsuarioLocal[0].nombre)
+   facturasFiltradas = jsonData['facturas']
+
+}else{
+   facturasFiltradas = jsonData['facturas'].filter(fact=>fact.token === turnoUsuarioSelected.value)
+
+}*/
+
+   let facturasFiltradas = jsonData['facturas']
+   .filter(fact=>fact.almacen === datosEmpresaStore.empresa.nombre)
+
+datosDelDia.value.efectivo = 0
+
+
+const totalVentas = facturasFiltradas
+  .map(factura => Number(factura.total)) 
+  .reduce((acc, total) => acc + total, 0) || 0;
+
+const totalGanancias = facturasFiltradas
+  .map(factura => Number(factura.ganancia)) 
+  .reduce((acc, total) => acc + total, 0) || 0;
+
+const totalImpuestos = facturasFiltradas
+  .map(factura => Number(factura.impuesto)) 
+  .reduce((acc, total) => acc + total, 0) || 0;
+
+const datosGastos = jsonData['gastos']
+//const datosGastos = jsonData['gastos'].filter(gasto=>gasto.username === datosUsuarioLocal[0].email )
+
+
+const totalGastos = datosGastos.filter(fact=>fact.almacen === datosEmpresaStore.empresa.nombre)
+  .map(factura => Number(factura.cantidad)) 
+  .reduce((acc, total) => acc + total, 0) || 0;
+
+const totalDevoluciones = jsonData['devoluciones']
+  .map(factura => Number(factura.cantidad)) 
+  .reduce((acc, total) => acc + total, 0) || 0;
+
+
+   datosDelDia.value.venta = totalVentas;
+   datosDelDia.value.ganancia = totalGanancias;
+   datosDelDia.value.impuestos = totalImpuestos;
+   datosDelDia.value.gastos = totalGastos;
+   datosDelDia.value.devoluciones = totalDevoluciones;
+
+
+   datosDelDia.value.efectivo = facturasFiltradas
+  .map(factura => Number(factura.efectivo)) 
+  .reduce((acc, total) => acc + total, 0);
+
+
+   datosDelDia.value.tarjeta = facturasFiltradas
+  .map(factura => Number(factura.tarjeta)) 
+  .reduce((acc, total) => acc + total, 0);
+
+   datosDelDia.value.transferencia = facturasFiltradas
+  .map(factura => Number(factura.transferencia)) 
+  .reduce((acc, total) => acc + total, 0);
+/******************************************************************/
+const registroCaja = jsonData['registrocaja']
+.filter(fact=>fact.almacen === datosEmpresaStore.empresa.nombre)
+//.filter(reg=>reg.username === datosUsuarioLocal[0].email )
+
+  datosDelDia.value.inicioCaja = registroCaja
+  .map(factura => Number(factura.cant_inicio)) 
+  .reduce((acc, total) => acc + total, 0) || 0;
+
+
+/* datosDelDia.value.abono = jsonData['cuentas_cobrar']
+  .map(factura => Number(factura.abonado)) 
+  .reduce((acc, total) => acc + total, 0) || 0;*/
+
+    datosDelDia.value.abono = jsonData['cuentas_cobrar'].filter(fact=>fact.almacen === datosEmpresaStore.empresa.nombre)
+  .map(factura => {
+    let totalAbono = 0;
+    let abonos = [];
+
+    try {
+        abonos = JSON.parse(factura.pagos);
+    } catch (error) {
+        console.error('Error al parsear abonos:', error);
+        return 0; 
+    }
+
+    for (let pago of abonos) {
+        const fechaBuscar = convertirAFechaTimestamp(pago.fecha, pago.hora);
+        const estaFecha = esFechaEnRango(fechaBuscar, laFechaInicio, laFechaFin);
+        if (estaFecha) {
+            totalAbono += Number(pago.cantidad); 
+            if (pago.metodo === 'EFECTIVO') {
+               datosDelDia.value.efectivo += Number(pago.cantidad);
+
+            }else if(pago.metodo === 'TARJETA'){
+              datosDelDia.value.tarjeta += Number(pago.cantidad);
+
+            }else if (pago.metodo === 'TRANSFERENCIA'){
+              datosDelDia.value.transferencia += Number(pago.cantidad);
+
+            }else{
+               //datosDelDia.value.efectivo += Number(pago.cantidad);
+            }
+
+        }
+    }
+
+    return totalAbono; 
+  })
+  .reduce((acc, total) => acc + total, 0) || 0; 
+
+/*************************************************************/
+datosDelDia.value.taller = jsonData['taller'].filter(fact=>fact.almacen === datosEmpresaStore.empresa.nombre)
+  .map(factura => {
+    let totalAbono = 0;
+    let abonos = [];
+
+    try {
+        abonos = JSON.parse(factura.abono);
+    } catch (error) {
+        console.error('Error al parsear abonos:', error);
+        return 0; 
+    }
+
+    for (let abono of abonos) {
+        const fechaBuscar = convertirAFechaTimestamp(abono.fecha, abono.hora);
+        const estaFecha = esFechaEnRango(fechaBuscar, laFechaInicio, laFechaFin);
+        if (estaFecha && abono.cajero == datosUsuarioLocal[0].email) {
+  
+
+
+            totalAbono += Number(abono.abono); 
+            if (abono.metodo_pago === 'EFECTIVO') {
+               datosDelDia.value.efectivo += Number(abono.abono);
+
+            }else if(abono.metodo_pago === 'TARJETA'){
+              datosDelDia.value.tarjeta += Number(abono.abono);
+
+            }else{
+              datosDelDia.value.transferencia += Number(abono.abono);
+
+            }
+
+
+
+
+        }
+    }
+
+    return totalAbono; 
+  })
+  .reduce((acc, total) => acc + total, 0) || 0; 
+
+/*************************************************************/
+  /*datosDelDia.value.abono = jsonData['cuentas_cobrar']
+  .map(factura => {
+    let totalAbono = 0;
+    let abonos = [];
+
+    try {
+        abonos = JSON.parse(factura.pagos);
+    } catch (error) {
+        console.error('Error al parsear abonos:', error);
+        return 0; 
+    }
+
+    for (let pago of abonos) {
+        const fechaBuscar = convertirAFechaTimestamp(pago.fecha, pago.hora);
+        const estaFecha = esFechaEnRango(fechaBuscar, laFechaInicio, laFechaFin);
+        if (estaFecha) {
+            totalAbono += Number(pago.cantidad); 
+            if (pago.metodo === 'EFECTIVO') {
+               datosDelDia.value.efectivo += Number(pago.cantidad);
+
+            }else if(pago.metodo === 'TARJETA'){
+              datosDelDia.value.tarjeta += Number(pago.cantidad);
+
+            }else if (pago.metodo === 'TRANSFERENCIA'){
+              datosDelDia.value.transferencia += Number(pago.cantidad);
+
+            }else{
+               datosDelDia.value.efectivo += Number(pago.cantidad);
+            }
+
+        }
+    }
+
+    return totalAbono; 
+  })
+  .reduce((acc, total) => acc + total, 0) || 0;*/
+/*************************************************************/
+
+
+   // facturasArray.value = facturasFiltradas;
+
+
+/*************************************************************/
+if (!totalModal.value) {
+  toast.add({ severity: 'error', summary: 'Error', detail: 'Debe hacer el conteo del dinero', life: 3000 });
+}
+
+await fetchCxC();
+
+  const peticionDatos = {
+    fechainicio:cuadre.value.fechainicio,
+    horainicio:cuadre.value.horainicio,
+    horafin:nfecha('horaAmericana'),
+    fechafin:cuadre.value.fechafin,
+    fondoinicial:datosDelDia.value.inicioCaja,
+    taller:datosDelDia.value.taller,
+    efectivo:datosDelDia.value.efectivo,
+    transferencia:datosDelDia.value.transferencia,
+    tarjeta:datosDelDia.value.tarjeta,
+    gastos:datosDelDia.value.gastos,
+    abono:datosDelDia.value.abono,
+    ganancia:datosDelDia.value.ganancia,
+    totalvendido:datosDelDia.value.venta,
+    cuentasxcobrar:datosDelDia.value.cuentasXcobrar,
+    devoluciones:datosDelDia.value.devoluciones,
+    totalcontado:Number(totalModal.value),
+    token:datosUsuarioLocal[0].token,
+    impuestos:datosDelDia.value.impuestos,
+    usuario:datosEmpresaStore.usuario
+  }
+
+  const totalContado = Number(totalModal.value)
+
+  datosDelDiaArray.value.peticion = peticionDatos
+
+  //totalModalEnCaja.value = (Number(datosDelDia.value.efectivo) + contidadInicioCaja.value);
+  totalModalEnCaja.value = (parseFloat(datosDelDia.value.efectivo));
+  transaccionesCantidad.value = datosDelDia.value.efectivo;
+
+
+/*   const fechaEnviada = {
+    fechainicio: fechaInicioN+' '+horaInicio.value,
+    fechafin: fechaFinN+' '+horaFin.value,
+   }
+*/
+
+const monedero = {
+  '1': Number(pesos.value) || 0,
+  '5': Number(cincopesos.value) || 0,
+  '10': Number(diezpesos.value) || 0,
+  '25': Number(veinticincopesos.value) || 0,
+  '50': Number(cincuentapesos.value) || 0,
+  '100': Number(cienpesos.value) || 0,
+  '200': Number(docientospesos.value) || 0,
+  '500': Number(quinientoscopesos.value) || 0,
+  '1000': Number(milpesos.value) || 0,
+  '2000': Number(dosmilpesos.value) || 0
+};
+  const nDatosEmpresa = JSON.parse(datosEmpresa)
+
+  nDatosEmpresa.monedero = monedero
+  nDatosEmpresa.datoscaja = datosEnvio.value
+  nDatosEmpresa.usuario = datosEmpresaStore.usuario
+
+  if(imprimir){
+const timestampInicio = convertirAFechaTimestamp(cuadre.value.fechainicio, cuadre.value.horainicio);
+const timestampFin = convertirAFechaTimestamp(cuadre.value.fechafin, cuadre.value.horafin);
+ 
+/*  const fechasEnviar = {
+    fechainicio:timestampInicio,
+    fechafin:timestampFin
+  }*/
+
+  const fechasEnviar = {
+    fechainicio:fechaDeInicioHoy.value,
+    fechafin:fechaDeFinHoy.value,
+    cantidadInicio:contidadInicioCaja.value
+  }
+
+    let  enviarFecha = JSON.stringify(fechasEnviar)
+
+     window.electron.ipcRenderer.invoke('imprimirCuadreCompleto',totalContado,JSON.stringify(nDatosEmpresa),true,false,false,enviarFecha);
+
+  }
+
+   //window.electron.ipcRenderer.invoke('open-new-window', impresionpagina,'url',true,false)
+}
+/******************************************************/
+const imprimirUltimoGasto = async ()=>{
+const ultimoRegistro = await peticionesFetchOffline('getLastXRows', 'gastos',1);
+  if (ultimoRegistro) {
+/*    const impresionpagina = `${link.value}/vista/gastosTermica.php?id=${ultimoRegistro[0].id}`;
+      window.electron.ipcRenderer.invoke('open-new-window', impresionpagina,'url',true,false)*/
+
+        const datosEnviar = JSON.stringify(ultimoRegistro[0])
+        const datosEmpresaLoL = JSON.stringify(enviarDatosLocalStorage() )
+        window.electron.ipcRenderer.invoke('gasto',datosEnviar,datosEmpresaLoL);
+      
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Error de Peticion.', life: 3000 });
+  }
+
+}
+/******************************************************/
+const imprimirUltimaEntrada = async ()=>{
+  const ultimoRegistro = await peticionesFetchOffline('getLastXRows', 'entradas',1);
+  if (ultimoRegistro) {
+    const impresionpagina = `${link.value}/vista/entradastermica.php?id=${ultimoRegistro[0].id}`;
+      window.electron.ipcRenderer.invoke('open-new-window', impresionpagina,'url',true,false)
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Error de Peticion.', life: 3000 });
+  }
+
+}
+/******************************************************/
+const agregarGasto = async()=>{
+  const datosUsuarioLocal = JSON.parse(window.localStorage.getItem('usuarioLocal')) 
+  const url = link.value+api.value+"/insertar/gastos";
+  if (!camposGastos.value) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Datos incompletos, no se puede Enviar.', life: 3000 });
+    return;
+  }
+
+  if (camposGastos.value.hasOwnProperty('created_at')) {
+     camposGastos.value.created_at = nfecha('timestamp')
+     camposGastos.value.updated_at = nfecha('timestamp')
+    }
+
+  camposGastos.value.cajero = datosUsuarioLocal[0].email
+  camposGastos.value.usuario = datosUsuarioLocal[0].email
+  camposGastos.value.almacen = datosEmpresa.empresa.nombre
+
+
+  const envioDatos = await peticionesFetchOffline('insertData','gastos', JSON.stringify(camposGastos.value));
+
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Gasto Agregado con éxito.', life: 3000 });
+
+   await asientoDiario(link.value,api.value,tokenCifrado.value,toast,'GASTOS','EFECTIVO EN CAJA',camposGastos.value.cantidad,'REGISTRO DE GASTO POR ('+camposGastos.value.cantidad+') '+camposGastos.value.descripcion);
+
+   await imprimirUltimoGasto()
+   camposGastos.value = await arrayToObjetoFromTabla('gastos');
+   await fetchAndSetupDatosdelDia()
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar el Gasto.', life: 3000 });
+  }
+
+}
+/******************************************************/
+const recargarFacturas = async()=>{
+  await fetchDataFactura();
+  await fetchAndSetupData();
+  toast.add({ severity: 'success', summary: 'Éxito', detail: 'Facturas Recargadas.', life: 3000 });
+}
+/******************************************************/
+const facturaSeleccionada = async(factura)=>{
+  const datosFactura = facturas.value.find(fact=>fact.no_factura === factura.value.no_factura);
+  if (datosFactura) {
+    toast.add({ severity: 'success', summary: 'Éxito', detail: 'Factura Seleccionada.', life: 3000 });
+    campoNombreFactura.value = datosFactura.nombre_cliente
+  }
+
+}
+/******************************************************/
+//impresoraSeleccionada
+const imprimirFactura = async()=>{
+
+  const datosFactura = facturas.value.find(fact=>fact.no_factura === campoFactura.value.no_factura);
+  if (datosFactura) {
+
+     if (impresoraSeleccionada.value == 'Impresora Ticket') {
+          var impresionpagina = link.value+'/vista/impresoratermica.php?factura='+datosFactura.no_factura;
+        // window.electron.ipcRenderer.invoke('open-new-window', impresionpagina, 'url', true,false);
+
+              const datosEmpresa = JSON.stringify(enviarDatosLocalStorage() )
+         window.electron.ipcRenderer.invoke('ticket',datosFactura.no_factura,datosEmpresa);
+
+
+     }else if(datosFactCoti.value == 'Offline'){
+          var impresionpagina = link.value+'/receipt/ticket.php?factura='+datosFactura.no_factura;
+          window.electron.ipcRenderer.invoke('open-new-window', impresionpagina,'url',false,true,false)
+     } else{
+      var impresionpagina = link.value+'/receipt/factura.php?factura='+datosFactura.no_factura;
+      window.electron.ipcRenderer.invoke('open-new-window', impresionpagina,'url',false,true,false)
+     }
+
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Seleccione una Factura', life: 3000 });
+  }
+
+}
+/******************************************************/
+const imprimirEntrada = async()=>{
+  const url = link.value+api.value+"/insertar/entradas";
+  if (!camposEntrada.value) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Datos incompletos, no se puede Enviar.', life: 3000 });
+    return;
+  }
+  if (camposEntrada.value.hasOwnProperty('created_at')) {
+     camposEntrada.value.created_at = nfecha('timestamp')
+     camposEntrada.value.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await peticionesFetchOffline('insertData','entradas', JSON.stringify(camposEntrada.value));
+
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Entrada Agregada con éxito.', life: 3000 });
+   await imprimirUltimaEntrada()
+   camposEntrada.value = await arrayToObjetoFromTabla('entradas');
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar la Entrada.', life: 3000 });
+  }
+}
+/******************************************************/
+const fnRealizarCierre = async () => {
+  const result = await Swal.fire({
+    title: '¿Qué deseas hacer?',
+    text: "Elige una opción:",
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Realizar cierre',
+    cancelButtonText: 'Suspender',
+    reverseButtons: true
+  });
+
+  if (result.isConfirmed) {
+       const datosCaja = await peticionesFetchOffline('getDataByField', 'registrocaja','turno',datosEmpresa.usuario.token);
+       console.log("datosCaja", datosCaja);
+
+  if (!datosCaja) {
+     toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo el cierre de Caja, Cierre Manual.', life: 3000 });
+    return
+  }
+
+
+  const url = `${link.value}${api.value}/actualizarcampos/registrocaja`;
+  if (datosCaja.hasOwnProperty('created_at')) {
+    datosCaja.updated_at = nfecha('timestamp');
+  }
+
+   datosCaja.estado = 'Cerrada'
+   datosCaja.hora_cierre = nfecha('hora')
+   datosCaja.efectivo = datosDelDia.value.efectivo
+   datosCaja.tarjeta = datosDelDia.value.tarjeta
+   datosCaja.transferencia = datosDelDia.value.transferencia
+   datosCaja.abono = datosDelDia.value.abono
+   datosCaja.devoluciones = datosDelDia.value.devoluciones
+   datosCaja.entradas = datosDelDia.value.entradas
+   datosCaja.taller = datosDelDia.value.taller
+   
+
+
+  const envioDatos = await peticionesFetchOffline('updateData','registrocaja', JSON.stringify(datosCaja));
+  if (envioDatos[0] == 'ok') {
+    toast.add({ severity: 'success', summary: 'Éxito', detail: 'Caja Cerrada', life: 3000 });
+    await imprimirCuadre()
+    localStorage.clear();
+    router.push('/login')
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al cerrar Caja.', life: 3000 });
+  }
+
+
+  } else if (result.dismiss === Swal.DismissReason.cancel) {
+    router.push('/lock')
+  }
+};
+/******************************************************/
+const fnCobrarTodo = async()=>{
+    Swal.fire({
+        title: "¿Estás seguro?",
+        text: "¡Se Cobrarán todas las Facturas PENDIENTES!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, de acuerdo",
+        cancelButtonText: "No, cancelar"
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            const { value: password } = await Swal.fire({
+                title: 'Introduce la contraseña',
+                input: 'password',
+                inputPlaceholder: 'Contraseña',
+                showCancelButton: true,
+                confirmButtonText: 'Confirmar',
+                cancelButtonText: 'Cancelar'
+            });
+            if (password) {
+               if (password === token.value || password === tokenCorto.value || password === tokenSoloUso.value || password === token24H.value) {
+
+
+for(let factura of facturasSinCobrar.value){
+  const url = link.value+api.value+"/actualizarcampos/facturas";
+  if (!factura) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+
+  if (factura.hasOwnProperty('created_at')) {
+      factura.updated_at = nfecha('timestamp')
+    }
+   
+   factura.cajero = usuarioLocal.value.nombre
+   factura.token = usuarioLocal.value.token
+   factura.estado_factura = 'Cobrado';
+
+
+  const envioDatos = await peticionesFetchOffline('updateData','facturas', JSON.stringify(factura));
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+}
+facturasSinCobrar.value = [];
+
+await fetchAndSetupData();
+  await fetchDataFactura();
+  await actualizarTokenSoloUso();
+await fetchAndSetupDatosdelDia()
+                } else {
+                    toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+                }
+            }
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+            toast.add({ severity: 'success', summary: 'No te preocupes', detail: 'Datos seguros', life: 3000 });
+        }
+    });
+
+}
+/******************************************************/
+const fnEliminarTodo = async()=>{
+    Swal.fire({
+        title: "¿Estás seguro?",
+        text: "¡Se Eliminarán todas las Facturas PENDIENTES!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, de acuerdo",
+        cancelButtonText: "No, cancelar"
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            const { value: password } = await Swal.fire({
+                title: 'Introduce la contraseña',
+                input: 'password',
+                inputPlaceholder: 'Contraseña',
+                showCancelButton: true,
+                confirmButtonText: 'Confirmar',
+                cancelButtonText: 'Cancelar'
+            });
+            if (password) {
+               if (password === token.value || password === tokenCorto.value || password === tokenSoloUso.value || password === token24H.value) {
+
+
+for(let factura of facturasSinCobrar.value){
+                            try {
+                                const envioDatos = await peticionesFetchOffline('deleteEntry','facturas', factura.id);
+
+                            } catch (error) {
+                                console.error(`Error al eliminar datos para ID: ${factura.id}`, error);
+                               
+                            }
+}
+facturasSinCobrar.value = [];
+await fetchAndSetupData();
+  await fetchDataFactura();
+  await actualizarTokenSoloUso();
+                } else {
+                    toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+                }
+            }
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+            toast.add({ severity: 'success', summary: 'No te preocupes', detail: 'Datos seguros', life: 3000 });
+        }
+    });
+}
+/******************************************************/
+const fnAgregarCantidadCaja = async () => {
+  const datos = await peticionesFetchOffline('getDataByField', 'registrocaja', 'turno', datosEmpresaStore.usuario.token);
+
+  if (!datos) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'No se encontró la caja del turno actual.',
+      life: 3000
+    });
+    return;
+  }
+
+  if (cantidadInicio.value == '') {
+    cantidadInicio.value = '0.00';
+  }
+
+  datos.cant_inicio = cantidadInicio.value;
+
+  const url = link.value + api.value + "/actualizarcampos/registrocaja";
+
+  if (datos.hasOwnProperty('created_at')) {
+    datos.updated_at = nfecha('timestamp');
+  }
+
+  const envioDatos = await peticionesFetchOffline('updateData', 'registrocaja', JSON.stringify(datos));
+
+  if (envioDatos[0] === 'ok') {
+    await fetchAndSetupDatosdelDia();
+    visibleInicioCaja.value = false;
+    toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos actualizados', life: 3000 });
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+};
+
+/******************************************************/
+const fnAbrirCaja = async () => {
+  cuadrarCaja.value = false;
+
+  const { value: contrasenaIngresada, isConfirmed } = await Swal.fire({
+    title: 'Introduce la contraseña',
+    input: 'password',
+    inputPlaceholder: 'Contraseña',
+    showCancelButton: true,
+    confirmButtonText: 'Abrir Caja',
+    cancelButtonText: 'Cancelar'
+  });
+
+  if (isConfirmed) {
+    if (
+      contrasenaIngresada === token.value ||
+      contrasenaIngresada === tokenCorto.value ||
+      contrasenaIngresada === tokenSoloUso.value ||
+      contrasenaIngresada === token24H.value
+    ) {
+      const datosEmpresa = JSON.stringify(enviarDatosLocalStorage());
+      await window.electron.ipcRenderer.invoke('abrircaja', 'AbrirCaja', datosEmpresa, true, false, false);
+      toast.add({
+        severity: 'success',
+        summary: 'Caja Abierta',
+        detail: 'La caja fue abierta correctamente.',
+        life: 3000
+      });
+      cuadrarCaja.value = true;
+    } else {
+      toast.add({
+        severity: 'error',
+        summary: 'Contraseña Incorrecta',
+        detail: 'La contraseña ingresada no es válida.',
+        life: 3000
+      });
+      cuadrarCaja.value = true;
+    }
+  } else {
+    toast.add({
+      severity: 'info',
+      summary: 'Cancelado',
+      detail: 'Operación cancelada por el usuario.',
+      life: 3000
+    });
+    cuadrarCaja.value = true;
+  }
+};
+
+/******************************************************/
+const fnResumenVenta = async()=>{
+const fechaInicioN = usuarioLocal.value.hora_inicio;
+
+const facturas = await peticionesFetchOffline('getRowsByTimestampRange','facturas','created_at',fechaInicioN,nfecha('timestamp'));
+
+const datosEmpresa = JSON.stringify(enviarDatosLocalStorage() )
+const impresion = window.electron.ipcRenderer.invoke('resumenfacturas',JSON.stringify(facturas),datosEmpresa,true,false,false);
+}
+/******************************************************/
+const fnProductosVendidos = async()=>{
+
+
+const response = await peticionesFetchOffline('getRowsByTimestampRange','facturas','created_at',datosEmpresa.usuario.hora_inicio,nfecha('timestamp'));
+
+    const jsonData = response;
+  
+const productosVendidos = jsonData.reduce((acc, factura) => {
+    const productos = JSON.parse(factura.productos);
+    
+    productos.forEach(producto => {
+        const nombre = producto.nombre;
+        const existente = acc.find(item => item.nombre === nombre);
+        const totalProducto = producto.cantidad * producto.precio;
+        
+        if (existente) {
+            existente.cantidad += producto.cantidad;
+            existente.total += totalProducto;
+            
+            if (existente.categorias[producto.categoria]) {
+                existente.categorias[producto.categoria] += producto.cantidad;
+            } else {
+                existente.categorias[producto.categoria] = producto.cantidad;
+            }
+        } else {
+            acc.push({ 
+                nombre, 
+                cantidad: producto.cantidad, 
+                total: totalProducto, 
+                categorias: [producto.categoria] 
+            });
+        }
+    });
+    
+    return acc;
+}, []);
+
+
+  const datosUsuarioLocal = JSON.parse(window.localStorage.getItem('usuarioLocal')) 
+
+ const datosFechaHoy = usuarioLocal.value.hora_inicio.split(' ')
+
+
+  const peticionDatos = {
+    fechainicio:datosFechaHoy[0],
+    horainicio:datosFechaHoy[1],
+    horafin:nfecha('horaAmericana'),
+    fechafin:nfecha('fechaAmericana'),
+    taller:datosDelDia.value.taller,
+    fondoinicial:datosDelDia.value.inicioCaja,
+    efectivo:datosDelDia.value.efectivo,
+    transferencia:datosDelDia.value.transferencia,
+    tarjeta:datosDelDia.value.tarjeta,
+    gastos:datosDelDia.value.gastos,
+    abono:datosDelDia.value.abono,
+    token:datosUsuarioLocal[0].token,
+    ganancia:datosDelDia.value.ganancia,
+    totalvendido:datosDelDia.value.venta,
+    devoluciones:0.00,
+    totalcontado:0.00,
+    impuestos:datosDelDia.value.impuestos,
+    usuario:datosUsuarioLocal[0].nombre
+  }
+
+
+
+
+const datos = productosVendidos
+
+
+const losDatos = {
+    datos:datos,
+    peticion:peticionDatos
+}
+
+
+  const datosEmpresa = JSON.stringify(enviarDatosLocalStorage() )
+const impresion = window.electron.ipcRenderer.invoke('ticketproductosvendidos',JSON.stringify(losDatos),datosEmpresa,true,false,false);
+}
+/******************************************************/
+//transaccionesCantidad
+//transaccionesHasta
+const fnTransferir = async()=>{
+  const datosCuenta = await peticionesFetchOffline('getDataByField', 'cuentas','nombre',transaccionesHasta.value);
+
+  if (datosCuenta) {
+      const saldo = Number(datosCuenta.saldo) || 0;
+
+      const url = link.value+api.value+"/actualizarcampos/cuentas";
+      if (!datosCuenta) {
+        console.error("Datos incompletos, no se puede actualizar.");
+        return;
+      }
+      if (datosCuenta.hasOwnProperty('created_at')) {
+        datosCuenta.updated_at = nfecha('timestamp');
+      }
+
+       datosCuenta.saldo = (saldo + Number(transaccionesCantidad.value))
+
+      const envioDatos = await peticionesFetchOffline('updateData','cuentas', JSON.stringify(datosCuenta));
+
+      if (envioDatos[0] == 'ok') {
+
+        toast.add({ severity: 'success', summary: 'Éxito', detail: 'Fondos Transferidos Exitosamente', life: 3000 });
+      } else {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+      }
+
+
+
+  }
+
+
+}
+/******************************************************/
+const turnoFechaCambio = ()=>{
+
+}
+/******************************************************/
+const fnVerFallas = () => {
+  const datos = facturaTallerSeleccionada.value;
+ visibletaller.value = false
+  // Convertir el string JSON a un objeto real
+  const fallas = JSON.parse(datos.fallas);
+
+  // Generar un listado de las fallas para mostrar en el Swal
+  const listaFallas = fallas.map(falla => `- ${falla.propiedad}`).join('<br>');
+
+  // Mostrar las fallas en un SweetAlert2
+  Swal.fire({
+    title: 'Fallas registradas',
+    html: listaFallas,
+    icon: 'info',
+    confirmButtonText: 'Aceptar'
+  });
+};
+
+/******************************************************/
+const piezasPedido = ref([])
+const fnRealizarPedido = () => {
+    const proveedor = proveedorWhatsapp.value;
+//  const datos = facturaTallerSeleccionada.value;
+    if (!proveedor || !proveedor.nombre || !proveedor.telefono) {
+        console.error('Datos del proveedor no válidos');
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Datos del proveedor no válidos', life: 3000 });
+        return;
+    }
+
+    if (!facturaTallerSeleccionada.value.equipo || !facturaTallerSeleccionada.value.marca || !facturaTallerSeleccionada.value.modelo) {
+        console.error('Datos del equipo no válidos');
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Datos del equipo no válidos', life: 3000 });
+        return;
+    }
+
+    if (piezasPedido.value.length === 0) {
+        console.error('No hay piezas seleccionadas');
+        toast.add({ severity: 'error', summary: 'Error', detail: 'No hay piezas seleccionadas', life: 3000 });
+        return;
+    }
+
+    datosWhatsApp.value.nombre = proveedor.nombre;
+    datosWhatsApp.value.numero = proveedor.telefono;
+    datosWhatsApp.value.texto = `Hola, quiero cotizar las siguientes piezas para un *${facturaTallerSeleccionada.value.equipo}, ${facturaTallerSeleccionada.value.marca}, ${facturaTallerSeleccionada.value.modelo}*: ${piezasPedido.value.join(', ')}`;
+
+    showWhatsAppModal();
+};
+/******************************************************/
+const fnTodasLasFacturas = async () => {
+cuadrarCaja.value = false
+const fechas = nfecha('timestampcompleta');
+
+const facturas = await peticionesFetchOffline('getRowsByTimestampRange','facturas','created_at',fechas.fechainicio,fechas.fechafin);
+
+    const datosEmpresa = JSON.stringify(enviarDatosLocalStorage());
+
+    // Crear un elemento de loading en la pantalla con Tailwind CSS
+    const loadingElement = document.createElement('div');
+    loadingElement.id = 'loading';
+    loadingElement.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white text-center p-6 rounded-lg shadow-lg border border-gray-200';
+    loadingElement.innerHTML = `
+        <div class="text-xl font-semibold text-gray-800 mb-2">Imprimiendo facturas...</div>
+        <div id="loadingMessage" class="text-lg text-gray-600">Preparando...</div>
+        <div class="mt-4">
+            <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                <div id="progressBar" class="bg-blue-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%;"></div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(loadingElement);
+
+    // Referencias a los elementos de progreso
+    const loadingMessage = document.getElementById('loadingMessage');
+    const progressBar = document.getElementById('progressBar');
+
+    for (let i = 0; i < facturas.length; i++) {
+        const factura = facturas[i];
+
+        // Actualizar el mensaje y el progreso
+        loadingMessage.innerText = `Imprimiendo factura #${factura.no_factura} (${i + 1} de ${facturas.length})`;
+        const progressPercent = ((i + 1) / facturas.length) * 100;
+        progressBar.style.width = `${progressPercent}%`;
+
+        await window.electron.ipcRenderer.invoke('ticket', factura.no_factura, datosEmpresa);
+    }
+
+    // Cambiar mensaje al finalizar
+    loadingMessage.innerText = 'Todas las facturas han sido impresas.';
+    progressBar.style.width = '100%';
+    progressBar.classList.add('bg-green-500');
+
+    // Remover el mensaje después de unos segundos
+    setTimeout(() => {
+        document.body.removeChild(loadingElement);
+        cuadrarCaja.value = true
+    }, 3000);
+};
+/******************************************************/
+const fnAgregarSocio = async()=>{
+    const campos = await arrayToObjetoFromTabla(link.value+api.value, tokenCifrado.value, 'clientes');
+    campos.nombre = registroSocios.value.nombre
+    campos.codigo = registroSocios.value.codigo
+    campos.direccion = registroSocios.value.direccion
+    campos.cedula = registroSocios.value.cedula
+    campos.sexo = registroSocios.value.sexo
+    campos.edad = registroSocios.value.edad
+    campos.email = registroSocios.value.email
+    campos.fecha_nacimiento = registroSocios.value.fecha_nacimiento
+    campos.telefono = registroSocios.value.telefono
+    console.log("campos", campos);
+}
+/******************************************************/
+const generaCodigoUnicoDigitos = ()=>{
+    const codigosClientes = clientesData.value.map(cl => cl.codigo);
+  let nuevoCodigo;
+  do {
+    nuevoCodigo = Math.floor(1000 + Math.random() * 9000).toString(); // entre 1000 y 9999
+  } while (codigosClientes.includes(nuevoCodigo));
+
+  registroSocios.value.codigo = nuevoCodigo;
+
+}
+/******************************************************/
+watchEffect(() => {
+
+if (registrarSocios.value) {
+  registroSocios.value.sexo = 'HOMBRE';
+  generaCodigoUnicoDigitos()
+}
+
+
+});
+/******************************************************/
+/******************************************************/
+const verificaCodigoSocio = async()=>{
+  const codigo = registroSocios.value.codigo
+  const codigosClientes = clientesData.value.map(cl => cl.codigo);
+  console.log("codigosClientes", codigosClientes);
+  if(codigosClientes.includes(codigo)){
+    generaCodigoUnicoDigitos()
+  }
+}
+/******************************************************/
+</script>
+
+<style scoped>
+.columna {
+padding-top: 0 !important;
+padding-bottom: 0 !important;
+}
+
+  .button-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* Cuatro columnas iguales */
+    gap: 10px; /* Espaciado entre los botones */
+  }
+  
+  .button-grid button {
+    width: 100%; /* Asegura que los botones ocupen el 100% de la celda */
+    height: 100px; /* Puedes ajustar la altura a tus necesidades */
+  }
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 50vh;
+}
+
+.chat-messages {
+  flex-grow: 1;
+  overflow-y: auto;
+}
+
+.message {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.user-message {
+  background-color: #dcf8c6;
+  border-radius: 8px;
+  padding: 10px;
+  max-width: 75%;
+  align-self: flex-end;
+}
+
+.ia-message {
+  background-color: #f1f0f0;
+  border-radius: 8px;
+  padding: 10px;
+  max-width: 75%;
+  align-self: flex-start;
+}
+</style>

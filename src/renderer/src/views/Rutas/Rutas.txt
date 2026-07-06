@@ -1,0 +1,48 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Rutas",
+"to": "/rutas",
+"permiso": "Administrador,Soporte",
+"icon": "pi pi-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/rutas',
+        name: 'rutas',
+        component: () => import('../views/Rutas/Rutas.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/crearrutas',
+        name: 'crearrutas',
+        component: () => import('@/views/Rutas/CrearRutas.vue'),
+    },
+    {
+        path: '/editarrutas/:id',
+        name: 'editarrutas',
+        component: () => import('@/views/Rutas/EditarRutas.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'nombre', 'codigo'"
+******************************************************
+{
+        
+      "nombre": "nombre",
+      "NOMBRE": "NOMBRE",
+      "Nombre": "Nombre",
+     
+      "codigo": "codigo",
+      "CODIGO": "CODIGO",
+      "Codigo": "Codigo",
+}
+

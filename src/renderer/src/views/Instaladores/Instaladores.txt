@@ -1,0 +1,22 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Instaladores",
+"to": "/instaladores",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/instaladores',
+        name: 'instaladores',
+        component: () => import('../views/Instaladores/Instaladores.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********
+**********************|-CAMPOS-|******************
+"id, nombre, telefono, cedula, salario, direccion, codigo, porcentaje, activo, created_at, updated_at, usuario"
+******************************************************

@@ -1,0 +1,22 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Tecnicos",
+"to": "/tecnicos",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/tecnicos',
+        name: 'tecnicos',
+        component: () => import('../views/Tecnicos/Tecnicos.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********
+**********************|-CAMPOS-|******************
+"id, nombre, telefono, whatsapp, email, fecha_inicio, direccion, created_at, updated_at, usuario"
+******************************************************

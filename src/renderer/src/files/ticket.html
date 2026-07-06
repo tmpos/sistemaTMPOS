@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Factura</title>
+    <style>
+        * {
+            font-size: 12px; /* Default font size */
+            font-family: arial;
+        }
+
+        @page {
+            size: auto;
+            margin: 0;
+        }
+
+        body {
+            width: 250px;
+            margin: 5px;
+            padding: 5px;
+        }
+
+        .ticket {
+            width: 250px;
+            padding: 10px;
+        }
+        .header, .footer {
+            text-align: center;
+        }
+        .content {
+            margin: 10px 0;
+        }
+        th {
+            text-align: left;
+            padding: 5px;
+            border-bottom: 1px solid #000;
+        }
+        th.centrado {
+            text-align: center;
+        }
+        th.precio {
+            text-align: right;
+        }
+        thead {
+            border-bottom: 2px solid #000;
+        }
+        table {
+            width: 100%;
+            border-spacing: 0 !important;
+            border-collapse: collapse !important;
+        }
+        td, th {
+            width: 250px;
+        }
+
+        .bordeado {
+            border: 1px solid #000000;
+            border-radius: 5px;
+            padding-left: 5px;
+        }
+        .linea {
+            width: 100%;
+            border-top: 1px solid #000;
+            padding-top: 5px;
+            padding-bottom: 5px;
+            margin-bottom: 5px;
+            padding-right: 10px;
+        }
+        .derecha {
+            text-align: right;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="ticket">
+        <div id="ticket-content"></div>
+
+        <script>
+            window.electronAPI.getTicketData().then((datos) => {
+                const {
+                    nombre_negocio, direccion, telefono, email, fecha, doc, cliente,
+                    vendedor, metodo_pago, cajero, productos, subtotal, impuesto, total,
+                    pago_con, su_cambio, descuento, nota, nombre_impuesto
+                } = datos;
+
+                const productosHTML = productos.map(producto => {
+                    const calculo = (producto.precio_venta * producto.cantidad).toFixed(2);
+                    return `
+                        <tr>
+                            <td colspan="5" class="" style="overflow-wrap: break-word;">${producto.nombre}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding-left:20px;">${producto.cantidad}</td>
+                            <td class="precio centrado">${producto.precio_venta}</td>
+                            <td class="precio centrado">${producto.impuesto}</td>
+                            <td class="precio centrado">${calculo}</td>
+                        </tr>`;
+                }).join('');
+
+                const mostrarImpuesto = impuesto > 0 ? '' : 'hidden';
+                const mostrarCliente = cliente && cliente !== 'SIN REGISTRO' ? '' : 'hidden';
+                const mostrarVendedor = vendedor ? '' : 'hidden';
+                const mostrarCajero = cajero ? '' : 'hidden';
+                const mostrarNota = nota ? '' : 'hidden';
+
+                document.getElementById('ticket-content').innerHTML = `
+                    <div class="header">
+                        <b style="font-size:20px;font-weight: bold;">${nombre_negocio}</b></br>
+                        ${direccion}</br>
+                        ${telefono} - ${email}
+                    </div>
+                    <hr>
+                    <div class="content bordeado">
+                        <p>FECHA: ${fecha}</br>
+                        DOC: ${doc}</br>
+                        <span class="${mostrarCliente}">CLIENTE: ${cliente}</span></br>
+                        <span class="${mostrarVendedor}">VENDEDOR: ${vendedor}</span></br>
+                        MÉTODO DE PAGO: ${metodo_pago}</br>
+                        <span class="${mostrarCajero}">CAJERO: ${cajero}</span></p>
+                    </div>
+                    <hr>
+                    <table cellspacing="0" cellpadding="0">
+                        <thead class="linea">
+                            <tr>
+                                <th style="text-align:left;">CANT.</th>
+                                <th class="precio" style="text-align:left;">PRECIO</th>
+                                <th class="precio" style="text-align:left;">ITBIS</th>
+                                <th class="precio centrado" style="text-align:right;">TOTAL</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${productosHTML}
+                        </tbody>
+                    </table>
+                    <hr>
+                    <table>
+                        <tr>
+                            <td><span>SUBTOTAL:</span></td>
+                            <td style="text-align:right;"><span style="font-size: 1.5em !important;">${subtotal}</span></td>
+                        </tr>
+                    </table>
+                    <div id="impuesto" class="${mostrarImpuesto}" style="font-weight: bold;">
+                        <table>
+                            <tr>
+                                <td><span>${nombre_impuesto}</span></td>
+                                <td style="text-align:right;"><span style="font-size: 1.5em !important;">${impuesto}</span></td>
+                            </tr>
+                        </table>
+                    </div>
+                    <table>
+                        <tr>
+                            <td><span>DESCUENTO:</span></td>
+                            <td style="text-align:right;"><span style="font-size: 1.5em !important;">-${descuento}</span></td>
+                        </tr>
+                    </table>
+                    <table>
+                        <tr>
+                            <td><span>TOTAL:</span></td>
+                            <td style="text-align:right;"><span style="font-size: 1.5em !important;">${total}</span></td>
+                        </tr>
+                    </table>
+                    <table>
+                        <tr>
+                            <td><span>PAGO CON:</span></td>
+                            <td style="text-align:right;"><span style="font-size: 1.5em !important;">${pago_con}</span></td>
+                        </tr>
+                    </table>
+                    <table>
+                        <tr>
+                            <td><span>SU CAMBIO:</span></td>
+                            <td style="text-align:right;"><span style="font-size: 1.5em !important;">${su_cambio}</span></td>
+                        </tr>
+                    </table>
+                    <div class="footer bordeado ${mostrarNota}">
+                        <p>${nota}</p>
+                    </div>
+                    <div class="footer">
+                        <p>*** Gracias por su compra ***</p>
+                    </div>`;
+            });
+        </script>
+    </div>
+</body>
+</html>

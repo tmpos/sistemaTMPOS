@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS `garantia` (
+  `id` int(11) AUTO_INCREMENT PRIMARY KEY,
+  `referencia` TEXT(250) NOT NULL,
+  `garantia` TEXT(250) NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `usuario` text(250) COLLATE utf8_spanish_ci NOT NULL
+);

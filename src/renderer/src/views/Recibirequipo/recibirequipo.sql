@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS `recibirequipo` (
+  `id` int(11) AUTO_INCREMENT PRIMARY KEY,
+  `imei` TEXT(250) NOT NULL,
+  `estado` TEXT(250) NOT NULL,
+  `fecha` TEXT(250) NOT NULL,
+  `equipo` TEXT(250) NOT NULL,
+  `marca` TEXT(250) NOT NULL,
+  `modelo` TEXT(250) NOT NULL,
+  `preciocompra` TEXT(250) NOT NULL,
+  `precioventa` TEXT(250) NOT NULL,
+  `detalles` TEXT(250) NOT NULL,
+  `vendedor` TEXT(250) NOT NULL,
+  `cedula` TEXT(250) NOT NULL,
+  `telefono` TEXT(250) NOT NULL,
+  `direccion` TEXT(250) NOT NULL,
+  `nota` TEXT(250) NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `usuario` text(250) COLLATE utf8_spanish_ci NOT NULL
+);

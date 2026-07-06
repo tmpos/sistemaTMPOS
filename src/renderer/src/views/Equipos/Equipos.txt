@@ -1,0 +1,43 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Equipos",
+"to": "/equipos",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/equipos',
+        name: 'equipos',
+        component: () => import('../views/Equipos/Equipos.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/crearequipos',
+        name: 'crearequipos',
+        component: () => import('@/views/Equipos/CrearEquipos.vue'),
+    },
+    {
+        path: '/editarequipos/:id',
+        name: 'editarequipos',
+        component: () => import('@/views/Equipos/EditarEquipos.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'nombre'"
+******************************************************
+{
+        
+      "nombre": "nombre",
+      "NOMBRE": "NOMBRE",
+      "Nombre": "Nombre",
+}
+

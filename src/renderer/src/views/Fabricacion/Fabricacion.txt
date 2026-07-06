@@ -1,0 +1,22 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Fabricacion",
+"to": "/fabricacion",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/fabricacion',
+        name: 'fabricacion',
+        component: () => import('../views/Fabricacion/Fabricacion.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********
+**********************|-CAMPOS-|******************
+"id, descripcion, minimo, blanco, plata, negro, madera, inox, roble, otro, created_at, updated_at, imagen, usuario"
+******************************************************

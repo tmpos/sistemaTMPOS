@@ -1,0 +1,14 @@
+C:\Users\Tomas Taveras\Desktop\Sistemas\Sistema AA\resources\iphone-helper\bin\Release\net8.0\win-x64\IPhoneReaderHelper.exe
+C:\Users\Tomas Taveras\Desktop\Sistemas\Sistema AA\resources\iphone-helper\bin\Release\net8.0\win-x64\IPhoneReaderHelper.deps.json
+C:\Users\Tomas Taveras\Desktop\Sistemas\Sistema AA\resources\iphone-helper\bin\Release\net8.0\win-x64\IPhoneReaderHelper.runtimeconfig.json
+C:\Users\Tomas Taveras\Desktop\Sistemas\Sistema AA\resources\iphone-helper\bin\Release\net8.0\win-x64\IPhoneReaderHelper.dll
+C:\Users\Tomas Taveras\Desktop\Sistemas\Sistema AA\resources\iphone-helper\bin\Release\net8.0\win-x64\IPhoneReaderHelper.pdb
+C:\Users\Tomas Taveras\Desktop\Sistemas\Sistema AA\resources\iphone-helper\obj\Release\net8.0\win-x64\IPhoneReaderHelper.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Tomas Taveras\Desktop\Sistemas\Sistema AA\resources\iphone-helper\obj\Release\net8.0\win-x64\IPhoneReaderHelper.AssemblyInfoInputs.cache
+C:\Users\Tomas Taveras\Desktop\Sistemas\Sistema AA\resources\iphone-helper\obj\Release\net8.0\win-x64\IPhoneReaderHelper.AssemblyInfo.cs
+C:\Users\Tomas Taveras\Desktop\Sistemas\Sistema AA\resources\iphone-helper\obj\Release\net8.0\win-x64\IPhoneReaderHelper.csproj.CoreCompileInputs.cache
+C:\Users\Tomas Taveras\Desktop\Sistemas\Sistema AA\resources\iphone-helper\obj\Release\net8.0\win-x64\IPhoneReaderHelper.dll
+C:\Users\Tomas Taveras\Desktop\Sistemas\Sistema AA\resources\iphone-helper\obj\Release\net8.0\win-x64\refint\IPhoneReaderHelper.dll
+C:\Users\Tomas Taveras\Desktop\Sistemas\Sistema AA\resources\iphone-helper\obj\Release\net8.0\win-x64\IPhoneReaderHelper.pdb
+C:\Users\Tomas Taveras\Desktop\Sistemas\Sistema AA\resources\iphone-helper\obj\Release\net8.0\win-x64\IPhoneReaderHelper.genruntimeconfig.cache
+C:\Users\Tomas Taveras\Desktop\Sistemas\Sistema AA\resources\iphone-helper\obj\Release\net8.0\win-x64\ref\IPhoneReaderHelper.dll

@@ -1,0 +1,519 @@
+
+<script setup>
+import { ref, onMounted, nextTick, watchEffect } from 'vue';
+import { useToast } from "primevue/usetoast";
+import { useRouter, useRoute } from 'vue-router';
+const router = useRouter();
+const route = useRoute(); 
+import { enviarDatosPorPost, eliminarDatos, obtenerIdsSeleccionados, borrarTodoslosDatos, lenguajeDataTable, nfecha, arrayToObjetoFromTabla, peticionesFetch, encryptarPassword, envioElectron, generarCodigoUnico, generarTablaFromStringJSON, peticiones, enviarSolicitudGet, mensajetoast, lasMayusculas, peticionesFetchOffline, arrayToObjetoFromTablaOffline, crearTablaSiNoExisteOffline } from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+/************************************************************************/
+import jsPDF from 'jspdf';
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const tokenCorto = ref('');
+/************************************************************************/
+const datoscampos = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+const position = "top";
+const todosLosapartados = ref([]);
+/************************************************************************/
+const visibleAbonoModal = ref(false)
+const btn1Abono = ref('0.00')
+const btn2Abono = ref('0.00')
+const btn3Abono = ref('0.00')
+const fechaAbonoModal = ref('')
+const abonoAbonoModal = ref('0.00')
+const metodoAbonoModal = ref('EFECTIVO')
+/************************************************************************/
+const fetchAllData = async () => {
+    const response = await enviarSolicitudGet(`${link.value+api.value}/datosarray/apartados`,tokenCifrado.value);
+    const jsonData = response;
+    todosLosapartados.value = response;
+    datoscampos.value = jsonData.find(datos=>datos.id == route.params.id)
+};
+/************************************************************************/
+function navigate(action) {
+    const currentIndex = todosLosapartados.value.findIndex(notacredito => notacredito.id == route.params.id);
+    if (currentIndex === -1) return;
+    let newIndex;
+    switch (action) {
+        case 'primero':
+            newIndex = 0;
+            break;
+        case 'anterior':
+            newIndex = currentIndex > 0 ? currentIndex - 1 : 0;
+            break;
+        case 'siguiente':
+            newIndex = currentIndex + 1 < todosLosapartados.value.length ? currentIndex + 1 : currentIndex;
+            break;
+        case 'ultimo':
+            newIndex = todosLosapartados.value.length - 1;
+            break;
+        default:
+            return;
+    }
+    datoscampos.value = todosLosapartados.value[newIndex];
+    router.push({ path: `/editarapartados/${todosLosapartados.value[newIndex].id}` });
+}
+/************************************************************************/
+onMounted(async() => {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+await fetchAllData()
+});
+/************************************************************************/
+watchEffect(()=>{
+
+  if (visibleAbonoModal.value) {
+    fechaAbonoModal.value = nfecha('fecha')
+    metodoAbonoModal.value = 'EFECTIVO'
+    btn1Abono.value = (Number(datoscampos.value.saldo) / 4).toFixed(2)
+    btn2Abono.value = (Number(datoscampos.value.saldo) / 2).toFixed(2)
+    btn3Abono.value = (Number(datoscampos.value.saldo)).toFixed(2)
+    abonoAbonoModal.value = datoscampos.value.saldo;
+  }
+
+})
+/************************************************************************/
+async function funcionActualizar(e) {
+  if(e){
+    e.preventDefault();
+  }
+  const url = link.value+api.value+"/actualizarcampos/apartados";
+  if (!datoscampos.value) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+  if (datoscampos.value.hasOwnProperty('created_at')) {
+      datoscampos.value.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await peticionesFetchOffline('updateData', 'apartados', JSON.stringify(datoscampos.value));
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+const editPago = ()=>{
+
+}
+const rowColorCallback = ()=>{
+
+}
+/************************************************************************/
+const fnbtnAgregArbono = (cantidad)=>{
+   abonoAbonoModal.value = Number(cantidad).toFixed(2)
+}
+/************************************************************************/
+const fnAgregarAbonoModal = async() => {
+  visibleAbonoModal.value = false;
+    let totalAbonado = Number(abonoAbonoModal.value);
+
+        const pagosArray = JSON.parse(datoscampos.value.pagos) || [];
+        const saldoFactura = Number(datoscampos.value.saldo);
+
+        let abonoActual = Math.min(totalAbonado, saldoFactura); // Abonar lo máximo posible sin exceder el saldo
+        let saldoN = (saldoFactura - abonoActual).toFixed(2);
+
+        var estado = 'PENDIENTE';
+        if (saldoN <= 0) {
+            estado = 'SALDADO';
+        }
+
+        const numeroPago = pagosArray.length + 1;
+        const npago = {
+            "nopago": numeroPago,
+            "cantidad": abonoActual.toFixed(2),
+            "metodo": metodoAbonoModal.value,
+            "fecha": fechaAbonoModal.value,
+            "hora": nfecha('hora'),
+            "turno": datosEmpresa.usuario.token,
+            "cajero": datosEmpresa.usuario.email,
+            "saldo": saldoN
+        };
+
+        pagosArray.push(npago);
+
+        const sumaAbono = pagosArray
+            .map(abono => Number(abono.cantidad))
+            .reduce((acc, curr) => acc + curr, 0)
+            .toFixed(2);
+
+        datoscampos.value.pagos = JSON.stringify(pagosArray);
+        datoscampos.value.estatus = estado;
+        datoscampos.value.abonado = sumaAbono;
+        datoscampos.value.saldo = saldoN;
+        datoscampos.value.updated_at = nfecha('timestamp');
+
+        // Actualizar la datoscampos en la base de datos
+        funcionActualizar()
+        fnPrint()
+};
+/************************************************************************/
+const fnPrint = () => {
+  const doc = new jsPDF({
+    orientation: 'p', // Vertical
+    unit: 'mm',
+    format: [80, 200], // Tamaño de ticket
+  });
+
+  let y = 10; // Posición vertical inicial
+
+  // Datos de la empresa
+  doc.setFontSize(10);
+  doc.text(datosEmpresa.empresa.nombre, 40, y, { align: 'center' });
+  y += 5;
+  doc.text(datosEmpresa.empresa.direccion, 40, y, { align: 'center' });
+  y += 5;
+  doc.text(`Tel: ${datosEmpresa.empresa.telefono}`, 40, y, { align: 'center' });
+  y += 10;
+
+  // Línea separadora
+  doc.line(5, y, 75, y);
+  y += 5;
+
+  // Datos del cliente
+  doc.setFontSize(9);
+  doc.text(`Cliente: ${datoscampos.value.nombre_cliente}`, 5, y);
+  y += 5;
+  doc.text(`Cédula: ${datoscampos.value.cedula_cliente}`, 5, y);
+  y += 5;
+  doc.text(`Teléfono: ${datoscampos.value.telefono_cliente}`, 5, y);
+  y += 10;
+
+  // Detalles del crédito
+  doc.text(`No. Factura: ${datoscampos.value.no_factura}`, 5, y);
+  y += 5;
+  doc.text(`Total Crédito: RD$ ${datoscampos.value.monto_credito}`, 5, y);
+  y += 5;
+  doc.text(`Cuotas: ${datoscampos.value.cuotas}`, 5, y);
+  y += 5;
+  doc.text(`Saldo Pendiente: RD$ ${datoscampos.value.saldo}`, 5, y);
+  y += 10;
+
+  // Línea separadora
+  doc.line(5, y, 75, y);
+  y += 5;
+
+  // Pagos realizados
+  doc.setFontSize(8);
+  doc.text(`Pagos`, 5, y);
+  y += 5;
+
+  const pagosArray = JSON.parse(datoscampos.value.pagos || "[]");
+
+  if (pagosArray.length === 0) {
+    doc.text("No hay pagos registrados.", 5, y);
+    y += 5;
+  } else {
+    pagosArray.forEach((pago, index) => {
+      doc.text(`#${index + 1} - ${pago.fecha} - RD$ ${pago.cantidad} (${pago.metodo})`, 5, y);
+      y += 5;
+    });
+  }
+  
+  y += 10;
+
+  // Totales
+  doc.setFontSize(10);
+  doc.text(`Total Crédito: RD$ ${datoscampos.value.monto_credito}`, 5, y);
+  y += 5;
+  doc.text(`Total Abonado: RD$ ${datoscampos.value.abonado}`, 5, y);
+  y += 5;
+  doc.text(`Saldo Pendiente: RD$ ${datoscampos.value.saldo}`, 5, y);
+  y += 10;
+
+  // Línea final
+  doc.line(5, y, 75, y);
+  y += 5;
+
+  doc.text(`Gracias por su pago`, 40, y, { align: 'center' });
+
+  // Convertir a Blob URL para mostrarlo en el Swal
+  const pdfDataUri = doc.output('datauristring');
+
+  Swal.fire({
+    title: 'Ticket de Pago',
+    html: `<iframe width="100%" height="400" src="${pdfDataUri}"></iframe>`,
+    showCancelButton: true,
+    confirmButtonText: 'Imprimir',
+    cancelButtonText: 'Cerrar',
+    preConfirm: () => {
+      doc.autoPrint();
+      window.open(doc.output('bloburl'), '_blank');
+    },
+  });
+};
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="container-fluid mt-5 card">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Apartados</legend>
+
+    <div class="flex space-x-2">
+      
+<Button as="router-link" icon="pi pi-home" to="/apartados" />
+<Button as="router-link" class="ms-1" icon="pi pi-plus-circle" to="/crearapartados" />
+
+<!--     <Button
+      icon="pi pi-trash"
+      class="p-button-danger ms-1"
+      title="Borrar Entrada"
+      @click="borrarEntrada"
+    /> -->
+    <Button
+      icon="pi pi-step-backward"
+      class=" ms-1"
+      title="Primero"
+      @click="navigate('primero')"
+    />
+    <Button
+      icon="pi pi-chevron-left"
+      class=" ms-1"
+      title="Anterior"
+      @click="navigate('anterior')"
+    />
+    <Button
+      icon="pi pi-chevron-right"
+      class=" ms-1"
+      title="Siguiente"
+      @click="navigate('siguiente')"
+    />
+    <Button
+      icon="pi pi-step-forward"
+      class=" ms-1"
+      title="Ultimo"
+      @click="navigate('ultimo')"
+    />
+
+    <Button
+      icon="pi pi-dollar"
+      class="ms-1"
+      label="Abono"
+      severity="contrast"
+      @click="visibleAbonoModal = true"
+    />
+
+    <Button
+      icon="pi pi-save"
+      class="ms-1"
+      severity="contrast"
+      @click="funcionActualizar"
+    />
+
+    <Button
+      icon="pi pi-print"
+      class="ms-1"
+      severity="contrast"
+      @click="fnPrint"
+    />
+
+
+    </div>
+
+
+</fieldset>
+<section>
+<fieldset class="border p-3 rounded mb-2">
+  <legend class="float-none w-auto px-2">Campos</legend>
+    <form id="formularioGenerar" action="" method="">
+         <div class="box-body">
+          <div class="grid grid-cols-12 gap-4 mt-4 text-blue-600" id="campos">
+
+<div class="col-span-12 sm:col-span-12 md:col-span-2 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="no_emision" class="block text-sm font-medium text-gray-700 dark:text-gray-400">No emision</label>
+                <InputText type="text"  v-solonumeros class="form-input w-full " v-model="datoscampos.no_emision" name="no_emision" placeholder="no_emision" id="actualizarno_emision" readonly />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-2 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="no_factura" class="block text-sm font-medium text-gray-700 dark:text-gray-400">No factura</label>
+                <InputText type="text"  v-solonumeros class="form-input w-full " v-model="datoscampos.no_factura" name="no_factura" placeholder="no_factura" id="actualizarno_factura" readonly />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-2 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="cod_cliente" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Cod cliente</label>
+                <InputText type="text"  v-solonumeros class="form-input w-full " v-model="datoscampos.cod_cliente" name="cod_cliente" placeholder="cod_cliente" id="actualizarcod_cliente" readonly />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-4 lg:col-span-4 xl:col-span-4 2xl:col-span-4">
+                <label for="nombre_cliente" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Nombre cliente</label>
+                <InputText type="text"  v-mayuscula class="form-input w-full " v-model="datoscampos.nombre_cliente" name="nombre_cliente" placeholder="nombre_cliente" id="actualizarnombre_cliente" readonly />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-2 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="cedula_cliente" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Cedula cliente</label>
+                <InputText type="text"  class="form-input w-full " v-model="datoscampos.cedula_cliente" name="cedula_cliente" placeholder="cedula_cliente" id="actualizarcedula_cliente" readonly />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-4 lg:col-span-4 xl:col-span-4 2xl:col-span-4">
+                <label for="telefono_cliente" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Telefono cliente</label>
+                <InputText type="text"  v-maska="patronTelefono" class="form-input w-full " v-model="datoscampos.telefono_cliente" name="telefono_cliente" placeholder="telefono_cliente" id="actualizartelefono_cliente" readonly />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-4 lg:col-span-4 xl:col-span-4 2xl:col-span-4">
+                <label for="whatsapp_cliente" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Whatsapp cliente</label>
+                <InputText type="text"  v-maska="patronTelefono" class="form-input w-full " v-model="datoscampos.whatsapp_cliente" name="whatsapp_cliente" placeholder="whatsapp_cliente" id="actualizarwhatsapp_cliente" readonly />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-4 lg:col-span-4 xl:col-span-4 2xl:col-span-4">
+                <label for="email_cliente" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Email cliente</label>
+                <InputText type="text"  class="form-input w-full " v-model="datoscampos.email_cliente" name="email_cliente" placeholder="email_cliente" id="actualizaremail_cliente" readonly />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12 2xl:col-span-12">
+                    <label for="direccion_cliente" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Direccion cliente</label>
+                   <Textarea id="actualizardireccion_cliente"  v-model="datoscampos.direccion_cliente" name="direccion_cliente" rows="3" class="form-textarea w-full " placeholder="Enter Direccion_cliente" readonly></textarea>
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12 2xl:col-span-12">
+                    <label for="productos" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Productos</label>
+<div class="overflow-x-auto border rounded-md p-4">
+  <div v-html="generarTablaFromStringJSON(datoscampos.productos)" class="min-w-full whitespace-nowrap"></div>
+</div>
+
+
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-2 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="fecha_emision" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Fecha emision</label>
+                   <InputText  v-model="datoscampos.fecha_emision"  readonly fluid />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-2 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="hora" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Hora</label>
+                   <InputText  v-model="datoscampos.hora"  readonly fluid />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-2 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="fecha_vencimiento" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Fecha vencimiento</label>
+                   <InputText  v-model="datoscampos.fecha_vencimiento" readonly fluid />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-2 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="monto_credito" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Monto credito</label>
+                <InputText type="text"   v-solonumeros v-decimales v-numeroFocusinOut class="form-input w-full " v-model="datoscampos.monto_credito" name="monto_credito" placeholder="monto_credito" id="actualizarmonto_credito" readonly />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-2 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="cuotas" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Cuotas</label>
+                <InputText type="text"   v-solonumeros class="form-input w-full " v-model="datoscampos.cuotas" name="cuotas" placeholder="cuotas" id="actualizarcuotas" readonly />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-2 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="tiempo" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Tiempo</label>
+                    <Dropdown  v-model="datoscampos.tiempo" :options="['DIARIO','SEMANAL','QUINCENAL','MENSUAL','LOS 15','LOS 30']" placeholder="Seleccione tiempo" class="w-full" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-2 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="fecha_ultimo_pago" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Fecha ultimo pago</label>
+                <InputText type="text"  class="form-input w-full " v-model="datoscampos.fecha_ultimo_pago" name="fecha_ultimo_pago" placeholder="fecha_ultimo_pago" id="actualizarfecha_ultimo_pago" readonly />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-2 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="proxima_fecha_pago" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Proxima fecha pago</label>
+                <InputText type="text"  class="form-input w-full " v-model="datoscampos.proxima_fecha_pago" name="proxima_fecha_pago" placeholder="proxima_fecha_pago" id="actualizarproxima_fecha_pago" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-2 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="abonado" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Abonado</label>
+                <InputText type="text"   v-solonumeros v-decimales v-numeroFocusinOut class="form-input w-full " v-model="datoscampos.abonado" name="abonado" placeholder="abonado" id="actualizarabonado" readonly />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-2 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="saldo" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Saldo</label>
+                <InputText type="text"   v-solonumeros v-decimales v-numeroFocusinOut class="form-input w-full " v-model="datoscampos.saldo" name="saldo" placeholder="saldo" id="actualizarsaldo" readonly />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-2 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="estatus" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Estatus</label>
+                    <Dropdown  v-model="datoscampos.estatus" :options="['PENDIENTE','PAGADO','OTRO']" placeholder="Seleccione estatus" class="w-full" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-2 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="vendedor" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Vendedor</label>
+                <InputText type="text"  v-mayuscula class="form-input w-full " v-model="datoscampos.vendedor" name="vendedor" placeholder="vendedor" id="actualizarvendedor" readonly />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12 2xl:col-span-12">
+                    <label for="pagos" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Pagos</label>
+
+<div class="overflow-x-auto border rounded-md p-4">
+  <div v-html="generarTablaFromStringJSON(datoscampos.pagos, false, true,editPago,null,'tablaPagos',undefined,rowColorCallback)" class="min-w-full whitespace-nowrap"></div>
+</div>
+
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12 2xl:col-span-12">
+                    <label for="nota" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Nota</label>
+                   <Textarea id="actualizarnota"  v-model="datoscampos.nota" name="nota" rows="6" class="form-textarea w-full " placeholder="Enter Nota"></textarea>
+                </div>
+
+        <div class="hidden col-span-12">
+          <label for="created_at-Actualizador" class="block text-sm font-medium text-gray-700">CREATED_AT</label>
+          <InputText v-model="datoscampos.created_at" name="created_at" id="created_at-Actualizador" placeholder="created_at" class="w-full" />
+        </div>
+        <div class="hidden col-span-12">
+          <label for="updated_at-Actualizador" class="block text-sm font-medium text-gray-700">UPDATED_AT</label>
+          <InputText v-model="datoscampos.updated_at" name="updated_at" id="updated_at-Actualizador" placeholder="updated_at" class="w-full" />
+        </div>
+        <div class="hidden col-span-12">
+          <label for="usuario-Actualizador" class="block text-sm font-medium text-gray-700">USUARIO</label>
+          <InputText v-model="datoscampos.usuario" name="usuario" id="usuario-Actualizador" placeholder="usuario" maxlength="250" class="w-full" />
+        </div>
+
+<div class="form-group col-span-12 mb-5 mt-5">
+  <Button label="Actualizar" fluid  @click="funcionActualizar" autofocus />
+</div>
+
+
+  </div>
+  </div>
+   </form>
+   </fieldset>
+</section>
+  </div>
+   </main>
+<Toast />
+
+<!-- //////////////////////////////////////////////////////////////////////// -->
+<Dialog v-model:visible="visibleAbonoModal" modal :position="position" header="Modal de Abono" :style="{ width: '40rem' }">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold white-space-nowrap">Modal de Abono</span>
+    </div>
+  </template>
+
+      <fieldset class="border p-3 rounded mb-2">
+        <legend class="float-none w-auto px-2">{{datoscampos.nombre_cliente}}</legend>
+          <div class="row">
+                <div class="col-12">
+                  <Button :label="btn1Abono"  outlined severity="secondary" @click="fnbtnAgregArbono(btn1Abono)"  />
+                  <Button :label="btn2Abono" class="mx-1" outlined severity="secondary" @click="fnbtnAgregArbono(btn2Abono)"  />
+                  <Button :label="btn3Abono" outlined severity="secondary" @click="fnbtnAgregArbono(btn3Abono)"  />
+                </div>
+
+                  <div class="col-4 form-group">
+                    <label for="fechaabono">FECHA</label>
+                    <InputText type="text" name="fechaabono" v-datepicker v-model="fechaAbonoModal"  class="form-control datepicker " id="fechaabono"  />
+                  </div>
+
+                  <div class="col-4 form-group">
+                    <label for="abono">ABONO</label>
+                    <InputText type="text" name="abono" v-model="abonoAbonoModal" v-solonumeros v-numeroFocusinOut v-decimales  class="form-control decimales soloNumero" id="abono" />
+                  </div>
+
+                  <div class="col-4 form-group">
+                    <label for="metodoabono">METODO</label>
+                  <Dropdown  v-model="metodoAbonoModal" :options="['EFECTIVO','TRANSFERENCIA','TARJETA']" placeholder="Seleccione estatus" class="w-full" />
+                  </div>
+          </div>
+      </fieldset>
+
+  <template #footer>
+    <Button label="Agregar Abono" outlined severity="secondary" @click="fnAgregarAbonoModal"  />
+    <Button label="Cancel" outlined severity="secondary" @click="visibleAbonoModal = false" autofocus />
+  </template>
+</Dialog>
+<!-- //////////////////////////////////////////////////////////////////////// -->
+
+</template>
+<style scoped>
+</style>
+

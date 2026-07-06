@@ -1,0 +1,502 @@
+<script setup>
+import { ref, onMounted, nextTick, watchEffect,onBeforeUnmount } from 'vue';
+import { useToast } from "primevue/usetoast";
+import { useRouter, useRoute } from 'vue-router';
+const router = useRouter();
+const route = useRoute(); 
+import {enviarDatosPorPost,
+  eliminarDatos, 
+  obtenerIdsSeleccionados,
+  borrarTodoslosDatos,
+  lenguajeDataTable,
+  nfecha,
+  arrayToObjetoFromTabla,
+  peticionesFetch,
+  encryptarPassword,
+  envioElectron,
+  peticionesFetchOffline,
+  enviarSolicitudGet,
+  generarCodigoUnico,
+  convertirAFechaTimestamp,
+  peticiones,
+  enviarDatosLocalStorage,
+  generarTablaFromStringJSON,
+  mensajetoast,
+  lasMayusculas} from '@/funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+/************************************************************************/
+import LoadingOverlay from '@/Loading/LoadingOverlay.vue';
+const loading = ref(false)
+/************************************************************************/
+const datosDefault = ref({})
+/************************************************************************/
+const visiblePrint = ref(false)
+/************************************************************************/
+import {useDatosEmpresa} from '@/stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const tokenCorto = ref('');
+/************************************************************************/
+const position = "top";
+/************************************************************************/
+const datoscampos = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+const todosLosFacturas = ref([]);
+/************************************************************************/
+/************************************************************************/
+const fetchAllData = async () => {
+/*    const response = await enviarSolicitudGet(`${link.value+api.value}/datosarray/facturas`,tokenCifrado.value);*/
+    const response =  await peticionesFetchOffline('getDataAsArray', 'facturas');
+
+    const jsonData = response;
+    todosLosFacturas.value = jsonData;
+    datoscampos.value = jsonData.find(datos=>datos.id == route.params.id)
+};
+/************************************************************************/
+const detectarProductosVendidos = ()=>{
+  const productos = JSON.parse(datoscampos.value.productos)
+
+}
+/************************************************************************/
+function navigate(action) {
+    const currentIndex = todosLosFacturas.value.findIndex(facturas => facturas.id == route.params.id);
+    if (currentIndex === -1) return;
+    let newIndex;
+    switch (action) {
+        case 'primero':
+            newIndex = 0;
+            break;
+        case 'anterior':
+            newIndex = currentIndex > 0 ? currentIndex - 1 : 0;
+            break;
+        case 'siguiente':
+            newIndex = currentIndex + 1 < todosLosFacturas.value.length ? currentIndex + 1 : currentIndex;
+            break;
+        case 'ultimo':
+            newIndex = todosLosFacturas.value.length - 1;
+            break;
+        default:
+            return;
+    }
+    datoscampos.value = todosLosFacturas.value[newIndex];
+    detectarProductosVendidos()
+    router.push({ path: `/editarfacturas/${todosLosFacturas.value[newIndex].id}` });
+}
+/************************************************************************/
+const agregarTimeStamp = async()=>{
+  const fechaInicioN = convertirAFechaTimestamp(datoscampos.value.fecha_emision, datoscampos.value.hora);
+  datoscampos.value.updated_at = fechaInicioN;
+  datoscampos.value.created_at = fechaInicioN;
+
+  const url = link.value+api.value+"/actualizarcampos/facturas";
+  if (!datoscampos.value) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+
+/*  const envioDatos = await enviarDatosPorPost(url, datoscampos.value,tokenCifrado.value);*/
+    const envioDatos = await peticionesFetchOffline('updateData', 'facturas',JSON.stringify(datoscampos.value));
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+  
+
+}
+/************************************************************************/
+const handleKeyDown = (event) => {
+  switch (event.key) {
+    case 'ArrowRight':
+      //agregarTimeStamp()
+      navigate('siguiente');
+      break;
+    case 'ArrowLeft':
+      //agregarTimeStamp()
+      navigate('anterior');
+      break;
+    case 'ArrowUp':
+      navigate('primero');
+      break;
+    case 'ArrowDown':
+      navigate('ultimo');
+      break;
+    default:
+      break;
+  }
+};
+/************************************************************************/
+onMounted(async() => {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+
+datosDefault.value = JSON.parse(window.localStorage.getItem('datosDefault')) || {};
+
+await fetchAllData()
+detectarProductosVendidos()
+
+window.addEventListener('keydown', handleKeyDown);
+
+});
+/************************************************************************/
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleKeyDown);
+});
+/************************************************************************/
+async function funcionActualizar(e) {
+  e.preventDefault();
+  const url = link.value+api.value+"/actualizarcampos/facturas";
+  if (!datoscampos.value) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+  if (datoscampos.value.hasOwnProperty('created_at')) {
+      datoscampos.value.updated_at = nfecha('timestamp')
+    }
+
+    const envioDatos = await peticionesFetchOffline('updateData', 'facturas',JSON.stringify(datoscampos.value));
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+
+/************************************************************************/
+const fnPrintReceipt = ()=>{
+      const impresionpagina = link.value+'/vista/impresoratermica.php?factura='+datoscampos.value.no_factura;
+
+    if(window.electron){
+      window.electron.ipcRenderer.invoke('open-new-window', impresionpagina, 'url', true,false);
+    }else{
+      console.log("datoscampos.value", datoscampos.value);
+      //router.push({ path: `/factura/${datoscampos.value.no_factura}` });
+    }
+}
+/************************************************************************/
+const fnPrint = ()=>{
+  const impresionpagina = link.value+'/receipt/factura.php?factura='+datoscampos.value.no_factura;
+  if(window.electron){
+    window.electron.ipcRenderer.invoke('open-new-window', impresionpagina,'url',false,true,false)
+  }else{
+      router.push({ path: `/factura/${datoscampos.value.no_factura}` });
+    }
+}
+/************************************************************************/
+/************************************************************************/
+const fnSincronizarImei = async () => {
+  loading.value = true;
+  
+  try {
+    const productos = JSON.parse(datoscampos.value.productos);
+
+    for (let prod of productos) {
+      if (prod.categoria === 'CELULARES') {
+        const listaImei = prod.lista_imei.split(',');
+
+        // Manejo de actualizaciones de IMEIs
+        await Promise.all(listaImei.map(async imei => {
+          const datosImei = await peticionesFetchOffline('getDataByField', 'imei','imei',imei);
+          
+          if (datosImei) {
+            if (datosImei.hasOwnProperty('created_at')) {
+              datosImei.updated_at = nfecha('timestamp');
+            }
+            datosImei.estado = 'VENDIDO';
+            const url = `${link.value + api.value}/actualizarcampos/imei`;
+            await peticionesFetchOffline('updateData', 'imei',JSON.stringify(datosImei));
+          }
+        }));
+
+        // Actualización del producto relacionado
+        const datosProducto = await peticionesFetchOffline('getDataByField', 'productos','codigo',prod.codigo);
+
+        if (datosProducto) {
+
+          const response = peticionesFetchOffline('getDataArrayByTwoConditions', 'imei','id_equi',datosProducto.id,'estado','DISPONIBLE');
+          
+          datosProducto.stock = response.length;
+          const url = `${link.value + api.value}/actualizarcampos/productos`;
+          await peticionesFetchOffline('updateData', 'productos',JSON.stringify(datosProducto));
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error en la sincronización de IMEI:', error);
+  } finally {
+    loading.value = false;
+  }
+};
+
+/************************************************************************/
+const fnImpresoraGrande = async()=>{
+            const impresionpagina = link.value+'/receipt/factura.php?factura='+datoscampos.value.no_factura;
+
+//router.push({ path: `/factura/${datoscampos.value.no_factura}` });
+  if(window.electron){
+
+     const datosEmpresa1 = JSON.stringify(enviarDatosLocalStorage());
+         const datosFactura = datoscampos.value
+         const datosCliente = await peticionesFetchOffline('getDataByField', 'clientes','codigo',datoscampos.value.cod_cliente);
+
+     const envio = await window.electron.ipcRenderer.invoke('facturaPDF', JSON.stringify(datosFactura),JSON.stringify(datosCliente), datosEmpresa1,null);
+
+
+
+
+  }else{
+      router.push({ path: `/factura/${datoscampos.value.no_factura}` });
+    }
+
+}
+/**********************************************************************/
+const fnImpresoraChica = async()=>{
+
+  if(window.electron){
+
+     const datosEmpresa1 = JSON.stringify(enviarDatosLocalStorage());
+         const datosFactura = datoscampos.value
+         const datosCliente = await peticionesFetchOffline('getDataByField', 'clientes','codigo',datoscampos.value.cod_cliente);
+
+     const envio = await window.electron.ipcRenderer.invoke('ticket', JSON.stringify(datosFactura),JSON.stringify(datosCliente), datosEmpresa1);
+
+
+  }else{
+      router.push({ path: `/factura/${datoscampos.value.no_factura}` });
+    }
+
+}
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper card">
+  <div class="container-fluid mt-5">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Facturas</legend>
+    <div class="row">
+      <div class="col-sm-12">
+       <router-link to="/facturas" class="btn btn-dark text-white "><i class="icon-home"></i></router-link>
+<router-link to="/vender" class="btn btn-success text-white ms-1"><i class="icon-plus"></i></router-link>
+<a href="#" class="btn btn-danger btnaccion cartelito ms-1" data-toggle="tooltip" title="Borrar Entrada" id="borrador"><i class="icon-trash-4"></i></a>
+<a href="#" @click="navigate('primero')" class="btn btn-dark text-white ms-1" title="Primero"><i class="icon-to-start-alt"></i></a>
+<a href="#" @click="navigate('anterior')" class="btn btn-dark text-white ms-1" title="Anterior"><i class="icon-left-dir"></i></a>
+<a href="#" @click="navigate('siguiente')" class="btn btn-dark text-white ms-1" title="Siguiente"><i class="icon-right-dir"></i></a>
+<a href="#" @click="navigate('ultimo')" class="btn btn-dark text-white ms-1" title="Ultimo"><i class="icon-to-end-alt"></i></a>
+<a href="#" @click="visiblePrint = true" class="btn btn-dark text-white ms-1" ><i class="icon-print"></i></a>
+<!-- <a href="#" @click="fnPrint" class="btn btn-warning text-white ms-1"><i class="icon-file-pdf"></i></a>
+ -->
+<a href="#" @click="fnSincronizarImei" v-if="datosDefault.modo == 'CELULAR'" class="btn btn-dark text-white ms-1"><i class="icon-mobile"></i></a>
+<a href="#" @click="funcionActualizar"  class="btn btn-success text-white ms-1"><i class="icon-floppy"></i></a>
+
+
+
+      </div>
+    </div>
+</fieldset>
+<section>
+<fieldset class="border p-3 rounded mb-2">
+  <legend class="float-none w-auto px-2">Campos</legend>
+    <form id="formularioActualizar" action="" method="">
+         <div class="box-body">
+          <div class="row" id="campos">
+<div class="form-group col-12" v-if="datosEmpresa.usuario.nivel_seguridad === 'Soporte'">
+<label for="id-Actualizador">ID</label>
+<input type="input" v-model="datoscampos.id" name="id"  class="form-control" id="id-Actualizador" readonly placeholder="id"  maxlength="11">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="no_factura-Actualizador">NO_FACTURA</label>
+<input type="input" v-model="datoscampos.no_factura" name="no_factura"  class="form-control" id="no_factura-Actualizador" readonly placeholder="no_factura"  maxlength="250" >
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="tipo_factura-Actualizador">TIPO_FACTURA</label>
+<input type="input" v-model="datoscampos.tipo_factura" name="tipo_factura"  class="form-control" id="tipo_factura-Actualizador" readonly placeholder="tipo_factura"  maxlength="250" >
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="comprobante-Actualizador">COMPROBANTE</label>
+<input type="input" v-model="datoscampos.comprobante" name="comprobante"  class="form-control" id="comprobante-Actualizador" readonly placeholder="comprobante"  maxlength="250" >
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="cod_cliente-Actualizador">COD_CLIENTE</label>
+<input type="input" v-model="datoscampos.cod_cliente" name="cod_cliente"  class="form-control" id="cod_cliente-Actualizador"  placeholder="cod_cliente"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-8 col-md-8 col-lg-8 col-xl-8" >
+<label for="nombre_cliente-Actualizador">NOMBRE_CLIENTE</label>
+<input type="input" v-model="datoscampos.nombre_cliente" name="nombre_cliente"  class="form-control" id="nombre_cliente-Actualizador"  placeholder="nombre_cliente" v-mayuscula maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="telefono_cliente-Actualizador">TELEFONO_CLIENTE</label>
+<InputMask id="telefono_cliente-Actualizador" class="form-control" v-model="datoscampos.telefono_cliente" :mask="patronTelefono" readonly :placeholder="patronTelefono" />
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="productos-Actualizador">PRODUCTOS</label>
+
+<div class="table-responsive">
+  <div v-html="generarTablaFromStringJSON(datoscampos.productos)" class="border p-3 rounded mb-2"></div>
+</div>
+
+
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="vendedor-Actualizador">VENDEDOR</label>
+<input type="input" v-model="datoscampos.vendedor" name="vendedor"  class="form-control" id="vendedor-Actualizador"  placeholder="vendedor"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="metodo_pago-Actualizador">METODO_PAGO</label>
+<input type="input" v-model="datoscampos.metodo_pago" name="metodo_pago"  class="form-control" id="metodo_pago-Actualizador"  placeholder="metodo_pago"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="tarjeta-Actualizador">TARJETA</label>
+<input type="input" v-model="datoscampos.tarjeta" name="tarjeta"  class="form-control" id="tarjeta-Actualizador"  placeholder="tarjeta"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="transferencia-Actualizador">TRANSFERENCIA</label>
+<input type="input" v-model="datoscampos.transferencia" name="transferencia"  class="form-control" id="transferencia-Actualizador"  placeholder="transferencia"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="efectivo-Actualizador">EFECTIVO</label>
+<input type="input" v-model="datoscampos.efectivo" name="efectivo"  class="form-control" id="efectivo-Actualizador"  placeholder="efectivo"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="canal_venta-Actualizador">CANAL_VENTA</label>
+<input type="input" v-model="datoscampos.canal_venta" name="canal_venta"  class="form-control" id="canal_venta-Actualizador"  placeholder="canal_venta"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="fecha_emision-Actualizador">FECHA_EMISION</label>
+<input type="input" v-model="datoscampos.fecha_emision" name="fecha_emision"  class="form-control" id="fecha_emision-Actualizador"  placeholder="fecha_emision"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="impuesto-Actualizador">IMPUESTO</label>
+<input type="input" v-model="datoscampos.impuesto" name="impuesto"  class="form-control" id="impuesto-Actualizador"  placeholder="impuesto"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="descuento-Actualizador">DESCUENTO</label>
+<input type="input" v-model="datoscampos.descuento" name="descuento"  class="form-control" id="descuento-Actualizador"  placeholder="descuento"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="subtotal-Actualizador">SUBTOTAL</label>
+<input type="input" v-model="datoscampos.subtotal" name="subtotal"  class="form-control" id="subtotal-Actualizador"  placeholder="subtotal"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="total-Actualizador">TOTAL</label>
+<input type="input" v-model="datoscampos.total" name="total"  class="form-control" id="total-Actualizador"  placeholder="total"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="ganancia-Actualizador">GANANCIA</label>
+<input type="input" v-model="datoscampos.ganancia" name="ganancia"  class="form-control" id="ganancia-Actualizador"  placeholder="ganancia"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="financiera-Actualizador">FINANCIERA</label>
+<input type="input" v-model="datoscampos.financiera" name="financiera"  class="form-control" id="financiera-Actualizador"  placeholder="financiera"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="estado_factura-Actualizador">ESTADO_FACTURA</label>
+<input type="input" v-model="datoscampos.estado_factura" name="estado_factura"  class="form-control" id="estado_factura-Actualizador"  placeholder="estado_factura"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="fecha_estado-Actualizador">FECHA_ESTADO</label>
+<input type="input" v-model="datoscampos.fecha_estado" name="fecha_estado"  class="form-control" id="fecha_estado-Actualizador"  placeholder="fecha_estado"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="mes-Actualizador">MES</label>
+<input type="input" v-model="datoscampos.mes" name="mes"  class="form-control" id="mes-Actualizador"  placeholder="mes"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="year-Actualizador">YEAR</label>
+<input type="input" v-model="datoscampos.year" name="year"  class="form-control" id="year-Actualizador"  placeholder="year"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="hora-Actualizador">HORA</label>
+<input type="input" v-model="datoscampos.hora" name="hora"  class="form-control" id="hora-Actualizador"  placeholder="hora"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="otro-Actualizador">OTRO</label>
+
+<div class="table-responsive">
+  <div v-html="generarTablaFromStringJSON(datoscampos.otro)" class="border p-3 rounded mb-2"></div>
+</div>
+
+
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="nota-Actualizador">NOTA</label>
+<textarea class="form-control " id="nota-Actualizador" name="nota" v-model="datoscampos.nota" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="cajero-Actualizador">CAJERO</label>
+<input type="input" v-model="datoscampos.cajero" name="cajero"  class="form-control" id="cajero-Actualizador"  placeholder="cajero"  maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="token-Actualizador">TOKEN</label>
+<input type="input" v-model="datoscampos.token" name="token"  class="form-control" id="token-Actualizador"  placeholder="token"  maxlength="250" readonly>
+</div>
+<div class="form-group col-6" hidden>
+<label for="created_at-Actualizador">CREATED_AT</label>
+<input type="input" v-model="datoscampos.created_at" name="created_at"  class="form-control" id="created_at-Actualizador"  placeholder="created_at"  maxlength="">
+</div>
+<div class="form-group col-6" hidden>
+<label for="updated_at-Actualizador">UPDATED_AT</label>
+<input type="input" v-model="datoscampos.updated_at" name="updated_at"  class="form-control" id="updated_at-Actualizador"  placeholder="updated_at"  maxlength="">
+</div>
+<div class="form-group col-12" hidden>
+<label for="usuario-Actualizador">USUARIO</label>
+<input type="input" v-model="datoscampos.usuario" name="usuario"  class="form-control" id="usuario-Actualizador"  placeholder="usuario"  maxlength="250">
+</div>
+<div class="form-group col-sm-12 mb-5 mt-5">
+<button type="submit" @click="funcionActualizar" class="btn btn-primary elboton w-100">Actualizar Datos</button>
+  </div>
+  </div>
+  </div>
+   </form>
+</fieldset>
+</section>
+  </div>
+   </main>
+   <LoadingOverlay :visible="loading" />
+<Toast />
+
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+
+  <Dialog v-model:visible="visiblePrint" :position="position" modal header="Productos" :style="{ width: '30rem' }" :breakpoints="{ '1199px': '75vw', '575px': '90vw' }">
+    <template #header>
+      <div class="inline-flex align-items-center justify-content-center gap-2">
+        <span class="font-bold white-space-nowrap">Modal Editar</span>
+      </div>
+    </template>
+
+    <fieldset class="border p-3 rounded mb-2">
+      <legend class="float-none w-auto px-2">Elige la Impresora</legend>
+      <div class="flex flex-wrap gap-4 justify-center">
+         <Button label="Impresora Grande" icon="pi pi-print" @click="fnImpresoraGrande" iconPos="bottom" />
+         <Button label="Impresora Térmica" icon="pi pi-print" @click="fnImpresoraChica" iconPos="bottom" />
+     </div >
+    </fieldset>
+
+    <template #footer>
+      <Button label="Cancel" text severity="secondary" @click="visiblePrint = false" />
+    </template>
+  </Dialog>
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+
+</template>
+<style>
+    .table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+</style>

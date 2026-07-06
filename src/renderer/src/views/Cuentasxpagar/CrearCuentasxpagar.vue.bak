@@ -1,0 +1,239 @@
+<script setup>
+import { ref, onMounted, nextTick, watchEffect } from 'vue';
+import { useToast } from "primevue/usetoast";
+import { useRouter, useRoute } from 'vue-router';
+const router = useRouter();
+const route = useRoute(); 
+import {enviarDatosPorPost,
+  eliminarDatos, 
+  obtenerIdsSeleccionados,
+  borrarTodoslosDatos,
+  lenguajeDataTable,
+  nfecha,
+  arrayToObjetoFromTabla,
+  peticionesFetch,
+  encryptarPassword,
+  envioElectron,
+  generarCodigoUnico,
+  peticiones,
+  mensajetoast,
+  lasMayusculas} from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+import SelectButton from 'primevue/selectbutton';
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const tokenCorto = ref('');
+/************************************************************************/
+const datoscamposCuentasxpagar = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+const position = "top";
+/************************************************************************/
+const fetchAndSetupData = async () => {
+    const jsonData = await arrayToObjetoFromTabla(link.value+api.value,tokenCifrado.value,'cuentasxpagar');
+    datoscamposCuentasxpagar.value = jsonData;
+    datoscamposCuentasxpagar.value.estado = datoscamposCuentasxpagar.value.estado || 'PENDIENTE'
+    datoscamposCuentasxpagar.value.fecha = datoscamposCuentasxpagar.value.fecha || nfecha('fecha')
+    datoscamposCuentasxpagar.value.hora = datoscamposCuentasxpagar.value.hora || nfecha('hora')
+    datoscamposCuentasxpagar.value.productos = datoscamposCuentasxpagar.value.productos || '[]'
+    datoscamposCuentasxpagar.value.total = datoscamposCuentasxpagar.value.total || '0.00'
+    datoscamposCuentasxpagar.value.subtotal = datoscamposCuentasxpagar.value.subtotal || '0.00'
+    datoscamposCuentasxpagar.value.saldo = datoscamposCuentasxpagar.value.saldo || '0.00'
+    datoscamposCuentasxpagar.value.abono = datoscamposCuentasxpagar.value.abono || '0.00'
+    datoscamposCuentasxpagar.value.impuestos = datoscamposCuentasxpagar.value.impuestos || '0.00'
+};
+/************************************************************************/
+onMounted(async() => {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCorto.value = datosJSON.VITE_TOKEN_CORTO;
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+if (!datosEmpresa.empresa.nombre) {
+    await datosEmpresa.inicializarDatosEmpresa(link.value+api.value);
+  }
+await fetchAndSetupData()
+});
+/************************************************************************/
+async function enviarDatos(event) {
+    event.preventDefault();
+  const url = link.value+api.value+"/insertar/cuentasxpagar";
+  if (!datoscamposCuentasxpagar.value) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Datos incompletos, no se puede Enviar.', life: 3000 });
+    return;
+  }
+  if (datoscamposCuentasxpagar.value.hasOwnProperty('created_at')) {
+     datoscamposCuentasxpagar.value.created_at = nfecha('timestamp')
+     datoscamposCuentasxpagar.value.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await enviarDatosPorPost(url, datoscamposCuentasxpagar.value,tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Agregados con éxito.', life: 3000 });
+Swal.fire({
+  title: "Datos Agregados",
+  text: "Que hacemos ahora?",
+  icon: "warning",
+  showCancelButton: true,
+  confirmButtonText: "Agregar Otro!",
+  cancelButtonText: "No, Regresar al Inicio!",
+ }).then(async(result) => {
+  if (result.isConfirmed) {
+      fetchAndSetupData()
+} else if (result.dismiss === Swal.DismissReason.cancel) {
+    router.push({ path: `/cuentasxpagar` });
+  }
+})
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+const fnBuscarRNC = async()=>{
+  const rnc = datoscamposCuentasxpagar.value.rnc
+  try {
+
+const response = await peticiones('https://demo.tmposrd.com/vista/buscadorRNCdgii.php',{'rnc':rnc},'POST')
+if (response) {
+  toast.add({ severity: 'success', summary: 'Encontrado', detail: 'Datos Encontrados', life: 3000 });
+  datoscamposCuentasxpagar.value.proveedor = response.RGE_NOMBRE
+}else{
+
+toast.add({ severity: 'error', summary: 'Error', detail: 'Error, No se encuentran los Datos.', life: 3000 });
+}
+} catch (error) {
+console.error('Error en la solicitud SOAP:', error);
+toast.add({ severity: 'error', summary: 'Error', detail: 'Error, No se encuentran los Datos.', life: 3000 });
+}
+}
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper card">
+  <div class="container-fluid mt-5">
+        <fieldset class="border p-3 round mb-2">
+          <legend class="float-none w-auto px-2">Datos de Cuentasxpagar</legend>
+    <div class="row">
+      <div class="col-sm-12">
+       <router-link to="/cuentasxpagar" class="btn btn-dark text-white "><i class="icon-home"></i></router-link>
+      </div>
+    </div>
+</fieldset>
+<section>
+<fieldset class="border p-3 round mb-2">
+  <legend class="float-none w-auto px-2">Campos</legend>
+    <form id="formularioActualizar" action="" method="">
+         <div class="box-body">
+          <div class="row" id="campos">
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="no_emisionAgregarDatos">NO_EMISION</label>
+<input type="input" v-model="datoscamposCuentasxpagar.no_emision" name="no_emision"  class="form-control " id="no_emisionAgregarDatos"  readonly placeholder="no_emision" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="no_facturaAgregarDatos">NO_FACTURA</label>
+<input type="input" v-model="datoscamposCuentasxpagar.no_factura" name="no_factura"  class="form-control " id="no_facturaAgregarDatos"   placeholder="no_factura" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="fechaAgregarDatos">FECHA</label>
+<input type="input" v-model="datoscamposCuentasxpagar.fecha" name="fecha"  class="form-control " id="fechaAgregarDatos"  v-datepicker placeholder="fecha" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="horaAgregarDatos">HORA</label>
+<input type="input" v-model="datoscamposCuentasxpagar.hora" name="hora"  class="form-control " id="horaAgregarDatos"   placeholder="hora" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="ncfAgregarDatos">NCF</label>
+<input type="input" v-model="datoscamposCuentasxpagar.ncf" name="ncf"  class="form-control " id="ncfAgregarDatos"   placeholder="ncf" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="rncAgregarDatos">RNC</label>
+
+<InputGroup>
+    <InputText placeholder="RNC" v-model="datoscamposCuentasxpagar.rnc" />
+    <Button icon="pi pi-search" @click="fnBuscarRNC" severity="warn" />
+</InputGroup>
+
+
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="proveedorAgregarDatos">PROVEEDOR</label>
+<input type="input" v-model="datoscamposCuentasxpagar.proveedor" name="proveedor"  class="form-control " id="proveedorAgregarDatos"  v-mayuscula placeholder="proveedor" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="productosAgregarDatos">PRODUCTOS</label>
+<textarea class="form-control " v-model="datoscamposCuentasxpagar.productos" id="productosAgregarDatos" name="productos" cols="30" rows="3" readonly></textarea>
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="estadoAgregarDatos">ESTADO</label><br>
+<SelectButton v-model="datoscamposCuentasxpagar.estado" :options="['PENDIENTE','PAGADO','OTRO']" aria-labelledby="basic" :allowEmpty="false" />
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="fecha_pagoAgregarDatos">FECHA_PAGO</label>
+<input type="input" v-model="datoscamposCuentasxpagar.fecha_pago" name="fecha_pago"  class="form-control " id="fecha_pagoAgregarDatos"  v-datepicker placeholder="fecha_pago" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="hora_pagoAgregarDatos">HORA_PAGO</label>
+<input type="input" v-model="datoscamposCuentasxpagar.hora_pago" name="hora_pago"  class="form-control " id="hora_pagoAgregarDatos"   placeholder="hora_pago" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="subtotalAgregarDatos">SUBTOTAL</label>
+<input type="input" v-model="datoscamposCuentasxpagar.subtotal" name="subtotal"  class="form-control soloNumero" id="subtotalAgregarDatos" v-solonumeros v-decimales v-numeroFocusinOut  placeholder="subtotal" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="impuestosAgregarDatos">IMPUESTOS</label>
+<input type="input" v-model="datoscamposCuentasxpagar.impuestos" name="impuestos"  class="form-control soloNumero" id="impuestosAgregarDatos" v-solonumeros v-decimales v-numeroFocusinOut  placeholder="impuestos" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="totalAgregarDatos">TOTAL</label>
+<input type="input" v-model="datoscamposCuentasxpagar.total" name="total"  class="form-control soloNumero" id="totalAgregarDatos" v-solonumeros v-decimales v-numeroFocusinOut  placeholder="total" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="saldoAgregarDatos">SALDO</label>
+<input type="input" v-model="datoscamposCuentasxpagar.saldo" name="saldo"  class="form-control soloNumero" id="saldoAgregarDatos" v-solonumeros v-decimales v-numeroFocusinOut  placeholder="saldo" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="abonoAgregarDatos">ABONO</label>
+<input type="input" v-model="datoscamposCuentasxpagar.abono" name="abono"  class="form-control soloNumero" id="abonoAgregarDatos" v-solonumeros v-decimales v-numeroFocusinOut  placeholder="abono" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="notaAgregarDatos">NOTA</label>
+<textarea class="form-control " v-model="datoscamposCuentasxpagar.nota" id="notaAgregarDatos" name="nota" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-6" hidden>
+<label for="created_atAgregarDatos">CREATED_AT</label>
+<input type="input" v-model="datoscamposCuentasxpagar.created_at" name="created_at"  class="form-control " id="created_atAgregarDatos"   placeholder="created_at" maxlength="">
+</div>
+<div class="form-group col-6" hidden>
+<label for="updated_atAgregarDatos">UPDATED_AT</label>
+<input type="input" v-model="datoscamposCuentasxpagar.updated_at" name="updated_at"  class="form-control " id="updated_atAgregarDatos"   placeholder="updated_at" maxlength="">
+</div>
+<div class="form-group col-12" hidden>
+<label for="usuarioAgregarDatos">USUARIO</label>
+<input type="input" v-model="datoscamposCuentasxpagar.usuario" name="usuario"  class="form-control " id="usuarioAgregarDatos"   placeholder="usuario" maxlength="250">
+</div>
+<div class="form-group col-sm-12 mb-5 mt-5">
+<Button icon="pi pi-check" label="Agregar Datos"  raised round severity="primary" aria-label="Agregar Datos" class="w-100 " @click="enviarDatos" />
+  </div>
+  </div>
+  </div>
+   </form>
+   </fieldset>
+</section>
+  </div>
+   </main>
+<Toast />
+</template>
+<style>
+</style>

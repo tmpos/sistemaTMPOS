@@ -1,0 +1,240 @@
+
+<script setup>
+import { ref, onMounted, nextTick, watchEffect } from 'vue';
+import { useToast } from "primevue/usetoast";
+import { useRouter, useRoute } from 'vue-router';
+import axios from 'axios';
+const router = useRouter();
+const route = useRoute(); 
+import { 
+nfecha, 
+arrayToObjetoFromTabla, 
+peticionesFetch,
+obtenerIdsSeleccionados, 
+crearTablaSiNoExiste,
+encryptarPassword,
+peticionesFetchOffline,
+peticionesFetchOfflineRED,
+buscadorArrayObjeto,
+envioElectron,
+generarCodigoUnico } from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+/************************************************************************/
+import TablaJSON from '../../components/TablaJSON.vue'
+const archivosParaSubir = ref([]);
+/************************************************************************/
+import flatPickr from 'vue-flatpickr-component';
+import 'flatpickr/dist/flatpickr.css';
+/************************************************************************/
+  const basic = ref({
+    dateFormat: 'd/m/Y',
+  });
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+console.log("datosEmpresa", datosEmpresa);
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const tokenCorto = ref('');
+const datosJSON = ref([]);
+/************************************************************************/
+const datoscamposPrueba = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+const position = "top";
+/************************************************************************/
+async function campos() {
+  const campos = await arrayToObjetoFromTabla('prueba');
+  datoscamposPrueba.value = campos;
+datoscamposPrueba.value.imagen = generarCodigoUnico();
+}
+/************************************************************************/
+const datosConfig = async()=>{
+    const response = await envioElectron('datosarchivo');
+    datosJSON.value = response;
+    link.value = datosJSON.value.VITE_LINKURL;
+    api.value = datosJSON.value.VITE_LINK_API;
+    token.value = datosJSON.value.VITE_TOKEN;
+    patronTelefono.value = datosJSON.value.VITE_PATRON_TELEFONO;
+    linkImpresora.value = datosJSON.value.VITE_IMPRESORA_LOCAL;
+    tokenCorto.value = datosJSON.value.VITE_TOKEN_CORTO;
+    patroncedula.value = datosJSON.value.VITE_PATRON_CEDULA;
+}
+/************************************************************************/
+onMounted(async() => {
+await datosConfig()
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+await campos()
+});
+/************************************************************************/
+async function enviarDatos(event) {
+    event.preventDefault();
+  const url = link.value+api.value+"/insertar/prueba";
+  if (!datoscamposPrueba.value) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Datos incompletos, no se puede Enviar.', life: 3000 });
+    return;
+  }
+  if (datoscamposPrueba.value.hasOwnProperty('created_at')) {
+     datoscamposPrueba.value.created_at = nfecha('timestamp')
+     datoscamposPrueba.value.updated_at = nfecha('timestamp')
+    }
+
+  const datosEnviar = JSON.parse(JSON.stringify(datoscamposPrueba.value));
+  const envioDatos = await peticionesFetchOfflineRED('insertData','prueba', JSON.stringify(datosEnviar));
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Agregados con éxito.', life: 3000 });
+
+if (archivosParaSubir.value.length > 0) {
+      for (const archivo of archivosParaSubir.value) {
+        const nombreFinal = archivo.name;
+        const carpeta = datoscamposPrueba.value.imagen; 
+        await subirImagenDespuesDeInsertar(archivo, carpeta, nombreFinal);
+      }
+      }
+
+
+Swal.fire({
+  title: "Datos Agregados",
+  text: "Que hacemos ahora?",
+  icon: "warning",
+  showCancelButton: true,
+  confirmButtonText: "Agregar Otro!",
+  cancelButtonText: "No, Regresar al Inicio!",
+ }).then(async(result) => {
+  if (result.isConfirmed) {
+      fetchAndSetupData()
+} else if (result.dismiss === Swal.DismissReason.cancel) {
+    router.push({ path: `/prueba` });
+  }
+})
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+const handleUpload = async (event) => {
+  const archivos = event.files;
+  archivosParaSubir.value = archivos;
+};
+
+// archivo: File, subcarpeta: string (ej: 'productos'), nombreFinal: string
+async function subirImagenDespuesDeInsertar(archivo, subcarpeta, nombreFinal) {
+  if (!archivo) {
+    console.error('❌ No se seleccionaron archivos');
+    return;
+  }
+
+    const formData = new FormData();
+    formData.append('archivo', archivo);
+    formData.append('ruta', `imagenes/prueba/${datoscamposPrueba.value.imagen}`);
+    formData.append('nombre', archivo.name);
+
+    try {
+      const response = await fetch('http://192.168.0.107:3000/api/subirarchivo', {
+        method: 'POST',
+        headers: {
+          Authorization: tokenCifrado.value // ⚠️ No pongas Content-Type manual
+        },
+        body: formData
+      });
+
+      const resultado = await response.json();
+      if (resultado.success) {
+         toast.add({ severity: 'success', summary: 'Ok', detail: 'imagen Subida con exito', life: 3000 });
+        console.log(`✅ Archivo ${archivo.name} subido en:`, resultado.path);
+      } else {
+        console.error(`❌ Error subiendo ${archivo.name}:`, resultado.message);
+      }
+    } catch (err) {
+      console.error(`❌ Error de red con ${archivo.name}:`, err.message);
+    }
+  
+}
+
+
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="container-fluid mt-5 card">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Prueba</legend>
+    <div class="row">
+      <div class="col-sm-12">
+        <Button as="router-link" icon="pi pi-home" to="/prueba" />
+      </div>
+    </div>
+</fieldset>
+<section>
+<fieldset class="border p-3 rounded mb-2">
+  <legend class="float-none w-auto px-2">Campos</legend>
+    <form id="formularioGenerar" action="" method="">
+         <div class="box-body">
+          <div class="grid grid-cols-12 gap-4 mt-4 text-blue-600" id="campos">
+
+<div class="col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12 2xl:col-span-12">
+                    <label for="nombre" class="block text-sm font-medium text-gray-700 dark:text-gray-400">NOMBRE</label>
+                    <InputText type="text" fluid class=" "  v-mayuscula v-model="datoscamposPrueba.nombre" placeholder="nombre" name="crearnombre" id="nombre" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-6 xl:col-span-6 2xl:col-span-6">
+                    <label  class="block text-sm font-medium text-gray-700 dark:text-gray-400" for="telefono">TELEFONO</label>
+                    <InputMask fluid class=""  :mask="patronTelefono" v-model="datoscamposPrueba.telefono" placeholder="telefono" name="creartelefono" id="telefono" />
+                  </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-6 xl:col-span-6 2xl:col-span-6">
+                    <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-400">EMAIL</label>
+                    <InputText type="text" fluid class=" "  v-model="datoscamposPrueba.email" placeholder="email" name="crearemail" id="email" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12 2xl:col-span-12">
+                    <label  class="block text-sm font-medium text-gray-700 dark:text-gray-400" for="direccion">DIRECCION</label>
+                   <Textarea id="creardireccion" rows="3" fluid class="form-textarea w-full "  v-model="datoscamposPrueba.direccion" placeholder="Direccion" />
+                </div>
+<div class="form-group col-span-12" >
+<label for="imagenAgregarDatos">IMAGEN</label>
+<FileUpload
+  :customUpload="true"
+  :auto="false"
+  :showUploadButton="false"
+  chooseLabel="Seleccionar Imagenes"
+  @select="handleUpload"
+  :multiple="true" 
+  accept="image/*"
+/>
+
+</div>
+
+<div class="form-group col-6" hidden>
+<label for="created_atAgregarDatos">CREATED_AT</label>
+<input type="input" v-model="datoscamposPrueba.created_at" name="created_at"  class="form-control " id="created_atAgregarDatos"  placeholder="created_at" maxlength="">
+</div>
+<div class="form-group col-6" hidden>
+<label for="updated_atAgregarDatos">UPDATED_AT</label>
+<input type="input" v-model="datoscamposPrueba.updated_at" name="updated_at"  class="form-control " id="updated_atAgregarDatos"  placeholder="updated_at" maxlength="">
+</div>
+
+<div class="form-group col-12" hidden>
+<label for="usuarioAgregarDatos">USUARIO</label>
+<input type="input" v-model="datoscamposPrueba.usuario" name="usuario"  class="form-control " id="usuarioAgregarDatos"  placeholder="usuario" maxlength="250">
+</div>
+
+<div class="form-group col-span-12 mb-5 mt-5">
+  <Button label="Enviar Datos" fluid  @click="enviarDatos" />
+</div>
+
+  </div>
+  </div>
+   </form>
+   </fieldset>
+</section>
+  </div>
+   </main>
+<Toast />
+</template>
+<style scoped>
+</style>
+

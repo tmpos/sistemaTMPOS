@@ -1,0 +1,29 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"name": "Hojaentrada",
+"link": "/hojaentrada",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/hojaentrada',
+        name: 'hojaentrada',
+        component: () => import('../views/Hojaentrada/Hojaentrada.vue'),
+    },
+    {
+        path: '/crearhojaentrada',
+        name: 'crearhojaentrada',
+        component: () => import('../views/Hojaentrada/CrearHojaentrada.vue'),
+    },
+    {
+        path: '/editarhojaentrada/:id',
+        name: 'editarhojaentrada',
+        component: () => import('../views/Hojaentrada/EditarHojaentrada.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********

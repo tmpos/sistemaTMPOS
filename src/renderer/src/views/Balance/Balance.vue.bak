@@ -1,0 +1,172 @@
+<script setup>
+import { ref, onMounted, computed } from 'vue';
+import { peticionesFetch, encryptarPassword, envioElectron } from '../../funciones/funciones.js';
+import { useDatosEmpresa } from '../../stores';
+import * as XLSX from 'xlsx';  // Importamos la librería xlsx
+import jsPDF from 'jspdf';  // Importamos jsPDF
+import 'jspdf-autotable';  // Importamos autoTable
+// Variables reactivas
+const link = ref(null);
+const api = ref(null);
+const token = ref(null);
+const tokenCifrado = ref(null);
+const balanceComprobacion = ref([]);
+
+const fetchAsientoDiario = async () => {
+  const datosAsientoDiario = await peticionesFetch(`${link.value}${api.value}`, `datosarray/asientodiario`, {}, tokenCifrado.value, 'GET');
+  generarBalanceComprobacion(datosAsientoDiario);
+};
+
+function generarBalanceComprobacion(datosAsientoDiario) {
+  const balance = {};
+
+  datosAsientoDiario.forEach(entrada => {
+    const asiento = JSON.parse(entrada.asiento);
+    
+    asiento.forEach(transaccion => {
+      const debitoCuenta = transaccion.debito;
+      const creditoCuenta = transaccion.credito;
+      const debito = parseFloat(transaccion.cantidadDebito) || 0;
+      const credito = parseFloat(transaccion.cantidadCredito) || 0;
+
+      // Agrupar los débitos
+      if (debitoCuenta) {
+        if (!balance[debitoCuenta]) {
+          balance[debitoCuenta] = { debito: 0, credito: 0 };
+        }
+        balance[debitoCuenta].debito += debito;
+      }
+
+      // Agrupar los créditos
+      if (creditoCuenta) {
+        if (!balance[creditoCuenta]) {
+          balance[creditoCuenta] = { debito: 0, credito: 0 };
+        }
+        balance[creditoCuenta].credito += credito;
+      }
+    });
+  });
+
+  // Convertir el objeto balance a un array para ser usado en la tabla
+  balanceComprobacion.value = Object.keys(balance).map(cuentaNombre => ({
+    cuenta: cuentaNombre,
+    debito: balance[cuentaNombre].debito > 0 ? balance[cuentaNombre].debito : 0,
+    credito: balance[cuentaNombre].credito > 0 ? balance[cuentaNombre].credito : 0
+  }));
+}
+
+// Computed para calcular los totales
+const totalDebito = computed(() => {
+  return balanceComprobacion.value.reduce((acc, curr) => acc + curr.debito, 0);
+});
+
+const totalCredito = computed(() => {
+  return balanceComprobacion.value.reduce((acc, curr) => acc + curr.credito, 0);
+});
+
+// Función para exportar a Excel
+function exportarExcel() {
+  const wsData = [
+    ["Cuenta", "Débito", "Crédito"],  // Encabezados de la tabla
+    ...balanceComprobacion.value.map(item => [item.cuenta, item.debito > 0 ? item.debito.toFixed(2) : '', item.credito > 0 ? item.credito.toFixed(2) : '']),
+    ["Totales", totalDebito.value.toFixed(2), totalCredito.value.toFixed(2)]
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Balance de Comprobación");
+
+  // Generar el archivo Excel y disparar la descarga
+  XLSX.writeFile(wb, `balance_comprobacion.xlsx`);
+}
+/**************************************************************************/
+// Función para exportar a PDF
+function exportarPDF() {
+  const doc = new jsPDF();
+  
+  // Título del documento
+  doc.text('Balance de Comprobación', 14, 20);
+  
+  // Encabezados de la tabla
+  const head = [['Cuenta', 'Débito', 'Crédito']];
+  
+  // Datos de la tabla
+  const body = balanceComprobacion.value.map(item => [
+    item.cuenta,
+    item.debito > 0 ? item.debito.toFixed(2) : '',
+    item.credito > 0 ? item.credito.toFixed(2) : ''
+  ]);
+  
+  // Agregar los totales al final
+  body.push(['Totales', totalDebito.value.toFixed(2), totalCredito.value.toFixed(2)]);
+  
+  // Generar la tabla
+  doc.autoTable({
+    head: head,
+    body: body,
+    startY: 30,
+  });
+  
+  // Guardar el archivo PDF
+  doc.save('balance_comprobacion.pdf');
+}
+/**************************************************************************/
+onMounted(async() => {
+  const datosJSON = await envioElectron('datosarchivo');
+  link.value = datosJSON.VITE_LINKURL;
+  api.value = datosJSON.VITE_LINK_API;
+  token.value = datosJSON.VITE_TOKEN;
+  tokenCifrado.value = await encryptarPassword(token.value, 10);
+  await fetchAsientoDiario();
+});
+</script>
+
+<template>
+<main class="content-wrapper">
+  <div class="container-fluid mt-5">
+    <div class="row">
+      <div class="col-md-12">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Balance de Comprobación</legend>
+            <div class="row">
+              <div class="col-sm-12 mb-3">
+                 <Button label="Asiento Diario" as="router-link"  to="/asientodiario" raised icon="pi pi-book" severity="contrast"  />
+                 <Button label="Mayor General" as="router-link"  to="/mayorgeneral" raised icon="pi pi-book" severity="contrast" class="ml-2"   />
+                 <Button label="Exportar a Excel" raised @click="exportarExcel" icon="pi pi-file-excel" severity="success" class="ml-2"  />
+                 <Button label="Exportar a PDF" raised @click="exportarPDF" icon="pi pi-file-pdf" severity="danger" class="ml-2"  />
+              </div>
+              <div class="col-sm-12">
+                <table class="table table-hover">
+                  <thead>
+                    <tr>
+                      <th>Cuenta</th>
+                      <th>Débito</th>
+                      <th>Crédito</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(item, index) in balanceComprobacion" :key="index">
+                      <td>{{ item.cuenta }}</td>
+                      <td>{{ item.debito > 0 ? item.debito.toFixed(2) : '' }}</td>
+                      <td>{{ item.credito > 0 ? item.credito.toFixed(2) : '' }}</td>
+                    </tr>
+                    <!-- Fila para mostrar los totales -->
+                    <tr class="font-weight-bold">
+                      <td>Totales</td>
+                      <td>{{ totalDebito.toFixed(2) }}</td>
+                      <td>{{ totalCredito.toFixed(2) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+        </fieldset>
+      </div>
+    </div>
+  </div>
+</main>
+</template>
+
+
+<style scoped>
+</style>

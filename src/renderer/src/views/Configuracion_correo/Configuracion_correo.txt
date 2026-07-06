@@ -1,0 +1,48 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Configuracion_correo",
+"to": "/configuracion_correo",
+"permiso": "Administrador,Soporte",
+"icon": "pi pi-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/configuracion_correo',
+        name: 'configuracion_correo',
+        component: () => import('../views/Configuracion_correo/Configuracion_correo.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/crearconfiguracion_correo',
+        name: 'crearconfiguracion_correo',
+        component: () => import('@/views/Configuracion_correo/CrearConfiguracion_correo.vue'),
+    },
+    {
+        path: '/editarconfiguracion_correo/:id',
+        name: 'editarconfiguracion_correo',
+        component: () => import('@/views/Configuracion_correo/EditarConfiguracion_correo.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'email', 'password'"
+******************************************************
+{
+        
+      "email": "email",
+      "EMAIL": "EMAIL",
+      "Email": "Email",
+     
+      "password": "password",
+      "PASSWORD": "PASSWORD",
+      "Password": "Password",
+}
+

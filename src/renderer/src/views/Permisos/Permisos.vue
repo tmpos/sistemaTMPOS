@@ -1,0 +1,632 @@
+<script setup>
+import { ref, onMounted, nextTick, watchEffect } from 'vue';
+import { useRouter,useRoute } from 'vue-router';
+const router = useRouter();
+import axios from 'axios';
+import { enviarDatosPorPost, eliminarDatos, obtenerIdsSeleccionados, borrarTodoslosDatos, lenguajeDataTable, nfecha, arrayToObjetoFromTabla, peticionesFetch, encryptarPassword, envioElectron, mensajetoast, peticiones, lasMayusculas, peticionesFetchOffline, arrayToObjetoFromTablaOffline, crearTablaSiNoExisteOffline } from '../../funciones/funciones.js';
+  import bcrypt from 'bcryptjs';
+import Swal from 'sweetalert2'
+import { useToast } from "primevue/usetoast";
+const toast = useToast();
+/************************************************************************/
+import config from '../../../../../resources/config.json';
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const production = config.VITE_PRODUCTION;
+const link = ref(config.VITE_LINKURL);
+const api = ref(config.VITE_LINK_API);
+const token = ref(config.VITE_TOKEN);
+const patronTelefono = ref(config.VITE_PATRON_TELEFONO);
+const linkImpresora = ref(config.VITE_IMPRESORA_LOCAL);
+const tokenCifrado = ref(null);
+/************************************************************************/
+const usuariosArray = ref([])
+const menuArray = ref([])
+/************************************************************************/
+document.body.classList.add('sidebar-close');
+/************************************************************************/
+watchEffect(() => {
+    //Aqui para vigilar eventos
+});
+/************************************************************************/
+const menu = ref([
+    {
+        label: 'Home',
+        items: [{ label: 'Home', icon: 'pi pi-fw pi-home', to: '/' }]
+    },
+    {
+        label: 'Pages',
+        icon: 'pi pi-fw pi-briefcase',
+        to: '/pages',
+        items: [
+
+        {
+        "label": "Sistema",
+        "icon": "fas icon-arrows-cw",
+        "items": [
+          {
+            "label": "Configuracion",
+            "to": "/configuracion",
+            "permiso": "Administrador,Soporte",
+            "icon": "far icon-cog"
+          },
+          {
+          "label": "Backupexcel",
+          "to": "/backupexcel",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-circle"
+          },
+          {
+          "label": "Impresoras",
+          "to": "/impresoras",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-print"
+          },
+          {
+          "label": "Metodopago",
+          "to": "/metodopago",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-money"
+          },
+          {
+          "label": "Garantia",
+          "to": "/garantia",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-newspaper-1"
+          },
+          {
+          "label": "Mensajeria",
+          "to": "/mensajeria",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-news"
+          },
+          {
+          "label": "Paises",
+          "to": "/paises",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-flag"
+          },
+          {
+          "label": "Theme",
+          "to": "/theme",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-brush-1"
+          },
+          {
+          "label": "Whatsapp",
+          "to": "/whatsapp",
+          "icon": "fas icon-whatsapp"
+          },
+          {
+          "label": "Registrocaja",
+          "to": "/registrocaja",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-inbox"
+          }
+        ]
+      },
+      {
+        "label": "Productos",
+        "icon": "fas icon-th",
+        "items": [
+          {
+            "label": "Productos",
+            "to": "/productos",
+            "permiso": "Administrador,Soporte",
+            "icon": "far icon-th"
+          },
+          {
+          "label": "Combos",
+          "to": "/combos",
+          "icon": "fas icon-th-list"
+          },
+          {
+            "label": "Marcas",
+            "to": "/marcas",
+            "permiso": "Administrador,Soporte",
+            "icon": "fas icon-users"
+          },
+          {
+            "label": "Categorias",
+            "to": "/categorias",
+            "permiso": "Administrador,Soporte",
+            "icon": "far icon-circle"
+          },
+          {
+          "label": "Imei",
+          "to": "/imei",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-barcode"
+          },
+          {
+          "label": "Empaques",
+          "to": "/empaques",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-box-4"
+          },
+          {
+          "label": "Preparados",
+          "to": "/preparados",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-circle"
+          },
+          {
+          "label": "Barcode",
+          "to": "/barcode",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-barcode"
+          }
+        ]
+      },
+      {
+        "label": "Contactos",
+        "icon": "fas icon-users",
+        "items": [
+          {
+          "label": "Usuarios",
+          "to": "/usuarios",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-users"
+          },
+          {
+            "label": "Clientes",
+            "to": "/clientes",
+            "permiso": "Administrador,Soporte",
+            "icon": "fas icon-users"
+          },
+          {
+            "label": "Meseros",
+            "to": "/meseros",
+            "permiso": "Administrador,Soporte",
+            "icon": "fas icon-users"
+          },
+          {
+          "label": "Proveedores",
+          "to": "/proveedores",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-users"
+          },
+          {
+          "label": "Delivery",
+          "to": "/delivery",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-motorcycle"
+          },
+          {
+        "label": "Instaladores",
+        "to": "/instaladores",
+        "permiso": "Administrador,Soporte",
+        "icon": "fas "
+        }
+                
+        ]
+      },
+      {
+        "label": "Ventas",
+        "icon": "fas icon-doc",
+        "items": [
+          {
+            "label": "Facturas",
+            "to": "facturas",
+            "permiso": "Administrador,Soporte",
+            "icon": "fas icon-doc"
+          },
+          {
+          "label": "Cotizacion",
+          "to": "/cotizacion",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-doc"
+          },
+          {
+          "label": "Financiamientos",
+          "to": "/financiamientos",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-doc"
+          },
+          {
+          "label": "Notacredito",
+          "to": "/notacredito",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-docs-1"
+          },
+          {
+          "label": "Conduce",
+          "to": "/conduce",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-truck"
+          },
+          {
+          "label": "Ventasenproceso",
+          "to": "/ventasenproceso",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-hourglass"
+          },
+          {
+          "label": "Devoluciones",
+          "to": "/devoluciones",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-back"
+          }
+
+        ]
+      },
+      {
+        "label": "Taller",
+        "icon": "fas icon-tools",
+        "items": [
+          {
+            "label": "Mi Taller",
+            "to": "/mitaller",
+            "permiso": "Administrador,Soporte",
+            "icon": "fas icon-wrench"
+          },
+
+          {
+          "label": "Equipos",
+          "to": "/equipos",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-tablet"
+          },
+          {
+          "label": "Tecnicos",
+          "to": "/tecnicos",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-users-1"
+          },
+          {
+          "label": "Taller",
+          "to": "/taller",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-tools"
+          },
+          {
+          "label": "Cellinfo",
+          "to": "/cellinfo",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-circle-empty"
+          },
+          {
+          "label": "Recibirequipo",
+          "to": "/recibirequipo",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-mobile"
+          },
+          {
+          "label": "Hojaentrada",
+          "to": "/hojaentrada",
+          "permiso": "Administrador,Soporte",
+          "icon": "fas icon-circle-empty"
+          }
+        ]
+      },
+        {
+        "label": "Contabilidad",
+        "icon": "fas icon-doc",
+        "items": [
+             {
+              "label": "Cuentas",
+              "to": "/cuentas",
+              "permiso": "Administrador,Soporte",
+              "icon": "fas icon-th-list"
+              },
+              {
+              "label": "Banco",
+              "to": "/banco",
+              "permiso": "Administrador,Soporte",
+              "icon": "fas icon-bank"
+              },
+              {
+              "label": "Mayorgeneral",
+              "to": "/mayorgeneral",
+              "permiso": "Administrador,Soporte",
+              "icon": "fas icon-book"
+              },
+              {
+              "label": "Asientodiario",
+              "to": "/asientodiario",
+              "permiso": "Administrador,Soporte",
+              "icon": "fas icon-book"
+              },
+              {
+              "label": "Balance",
+              "to": "/balance",
+              "permiso": "Administrador,Soporte",
+              "icon": "fas icon-balance-scale"
+              },
+              {
+              "label": "Entradas Extra",
+              "to": "/entradas",
+              "permiso": "Administrador,Soporte",
+              "icon": "fas icon-sort-alt-up"
+              },
+              {
+              "label": "Entradas Fijas",
+              "to": "/entradasfijas",
+              "permiso": "Administrador,Soporte",
+              "icon": "fas icon-sort-alt-up"
+              },
+              {
+              "label": "Gastos",
+              "to": "/gastos",
+              "permiso": "Administrador,Soporte",
+              "icon": "fas icon-sort-alt-down"
+              },
+              {
+              "label": "Gastos Fijos",
+              "to": "/gastosfijos",
+              "permiso": "Administrador,Soporte",
+              "icon": "fas icon-sort-alt-down"
+              },
+              {
+              "label": "Recibos",
+              "to": "/recibos",
+              "permiso": "Administrador,Soporte",
+              "icon": "fas icon-doc"
+              },
+              {
+              "label": "Cuentas_cobrar",
+              "to": "/cuentas_cobrar",
+              "permiso": "Administrador,Soporte",
+              "icon": "fas icon-doc"
+              },
+
+              {
+              "label": "Caja",
+              "to": "/caja",
+              "permiso": "Administrador,Soporte",
+              "icon": "fas icon-money"
+              },
+              {
+              "label": "Confiscal",
+              "to": "/confiscal",
+              "permiso": "Administrador,Soporte",
+              "icon": "fas icon-balance-scale"
+              },
+              {
+              "label": "Comprobantes E",
+              "to": "/comprobantes-electronicos",
+              "permiso": "Administrador,Soporte",
+              "icon": "fas icon-doc-text"
+              },
+              {
+              "label": "Compras",
+              "to": "/compras",
+              "permiso": "Administrador,Soporte",
+              "icon": "fas icon-basket-alt"
+              }
+        ]
+      },
+      {
+        "label": "Nómina",
+        "icon": "fas icon-book",
+        "items": [
+                  {
+                  "label": "Nomina",
+                  "to": "/nomina",
+                  "permiso": "Administrador,Soporte",
+                  "icon": "fas icon-docs-1"
+                  }
+        ]
+      },
+            {
+                label: 'Soporte',
+                icon: 'pi pi-cart-plus',
+                  items: [
+
+                  {
+                  "label": "Variables",
+                  "to": "/variables",
+                  "permiso": "Soporte",
+                  "icon": "fas icon-docs-1"
+                  },
+                  {
+                  "label": "Menu",
+                  "to": "/menu",
+                  "icon": "fas icon-th"
+                  },
+                  {
+                  "label": "Permisos",
+                  "to": "/permisos",
+                  "permiso": "Soporte",
+                  "icon": "fas fa-circle"
+                  }
+
+                  ]
+            },
+
+            {
+                label: 'Vender',
+                icon: 'pi pi-cart-plus',
+                to: '/vender'
+            },
+            {
+                label: 'Salir',
+                icon: 'pi pi-times-circle',
+                to: '/salir'
+            }
+        ]
+    },
+
+
+]);
+/************************************************************************/
+const listausuarios = async()=>{
+  const datos = await peticiones(`${link.value}${api.value}/datosarray/usuarios`, {}, 'GET', tokenCifrado.value);
+  usuariosArray.value = datos;
+  console.log("datos", datos);
+
+}
+/************************************************************************/
+
+const envioMenu = async (menuInsterno) => {
+  const url = link.value + api.value + "/insertar/menu";
+  
+  if (!menuInsterno.hasOwnProperty('created_at')) {
+    menuInsterno.created_at = nfecha('timestamp');
+    menuInsterno.updated_at = nfecha('timestamp');
+  }
+
+  const menuLink = menuInsterno.to;
+  menuInsterno.link = menuLink;
+  delete menuInsterno.to;
+  menuInsterno.label = menuInsterno.label.toUpperCase();
+  menuInsterno.usuario = 'Soporte';
+  
+  if (menuInsterno.items && menuInsterno.items.length > 0) {
+    menuInsterno.items = menuInsterno.items.map(item => item.label.toUpperCase());
+  } else {
+    menuInsterno.items = '';
+  }
+  
+  if (!menu.parent) {
+    menu.parent = ''
+  }
+
+  menuInsterno.otro = '';
+
+  const envioDatos = await enviarDatosPorPost(url, menuInsterno, tokenCifrado.value);
+};
+
+/***********************************************************/
+const verMenu = async()=>{
+    const datos = await peticiones(`${link.value}${api.value}/datosarray/menu`, {}, 'GET', tokenCifrado.value);
+  menuArray.value = datos;
+  console.log("datos", datos);
+}
+/***********************************************************/
+
+onMounted(async () => {
+  if (production === 'false') {
+    const datosJSON = await envioElectron('datosarchivo');
+    link.value = datosJSON.VITE_LINKURL;
+    api.value = datosJSON.VITE_LINK_API;
+    token.value = datosJSON.VITE_TOKEN;
+    patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+    linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+  }
+  tokenCifrado.value = await encryptarPassword(token.value, 10);
+  
+  if (!datosEmpresa.empresa.nombre) {
+    await datosEmpresa.inicializarDatosEmpresa(link.value + api.value);
+  }
+
+  await listausuarios();
+  await verMenu();
+
+/*const sendMenuRecursively = async (menuItems, parentLabel = '') => {
+  for (let menuItem of menuItems) {
+    if (typeof menuItem === 'object' && menuItem !== null) {
+      console.log('Sending menu item:', menuItem, 'with parent:', parentLabel); // Log para depuración
+      const menuData = { ...menuItem, parent: parentLabel };
+      await envioMenu(menuData);
+
+      if (Array.isArray(menuItem.items) && menuItem.items.length > 0) {
+        await sendMenuRecursively(menuItem.items, menuItem.label.toUpperCase());
+      }
+    } else {
+      console.warn('Invalid menu item:', menuItem); // Log de advertencia para elementos no válidos
+    }
+  }
+};
+
+
+  await sendMenuRecursively(menu.value);*/
+});
+
+
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="w-full px-4 mt-5">
+    <div class="grid grid-cols-12 gap-4">
+      <div class="md:col-span-12">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Permisos</legend>
+            <div class="grid grid-cols-12 gap-4">
+              <div class="sm:col-span-12">
+                      <div class=" card p-3">
+        <div class="grid grid-cols-12 gap-4">
+            <div class="form-group col-span-4">
+            <label for="nombreusuario">Usuario</label>
+            <select type="text" name="nombreusuario" style="width: 100%;"  class="form-control  " id="nombreusuario"  >
+              <option :value="user.nombre" v-for="user in usuariosArray">{{user.nombre}}</option>
+            </select>
+            </div>
+            <div class="form-group col-span-4">
+              <label for="elBuscador">Accesos</label>
+             <select name="buscador" id="elBuscador" class="form-control custom-select select2bs4  mb-4" >
+          </select></div>
+          <div class="form-group col-span-2"  id="idseleccionar"><br>
+          <label for="seleccionartodo">Seleccionar Todos</label>
+          <br>
+          <InputSwitch v-model="checked" />
+          </div>
+
+          <div class="form-group col-span-2"  id="idborrar"><br>
+          <label for="borrarpermisos">Borrar Permisos</label>
+          <br>
+         <InputSwitch v-model="checked" />
+          </div>
+
+      </div>
+      </div>
+              </div>
+            </div>
+        </fieldset>
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Permisos</legend>
+  <div class="grid grid-cols-12 gap-4">
+    <div class="card flex justify-content-center col-span-12 md:col-span-3">
+      <div class="switch-container">
+        <h6 class="text-center">Contenido</h6>
+        <div class="switch-row">
+          <div class="switch-group">
+            <label for="p001">Prueba 1</label><br>
+            <InputSwitch id="p001" v-model="checked1" />
+          </div>
+          <div class="switch-group">
+            <label for="p002">Prueba 2</label><br>
+            <InputSwitch id="p002" v-model="checked2" />
+          </div>
+        </div>
+        <div class="switch-row">
+          <div class="switch-group">
+            <label for="p003">Prueba 3</label><br>
+            <InputSwitch id="p003" v-model="checked3" />
+          </div>
+          <div class="switch-group">
+            <label for="p004">Prueba 4</label><br>
+            <InputSwitch id="p004" v-model="checked4" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+        </fieldset>
+      </div>
+<Toast />
+  </div>
+  </div>
+</main>
+</template>
+<style scoped>
+  .switch-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.switch-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.switch-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+</style>

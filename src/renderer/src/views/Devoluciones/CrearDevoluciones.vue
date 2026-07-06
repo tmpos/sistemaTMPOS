@@ -1,0 +1,193 @@
+<script setup>
+import { ref, onMounted, nextTick, watchEffect } from 'vue';
+import { useRoute} from 'vue-router';
+import { useToast } from "primevue/usetoast";
+import router from '../../router';
+const route = useRoute(); 
+import { enviarDatosPorPost, eliminarDatos, obtenerIdsSeleccionados, borrarTodoslosDatos, lenguajeDataTable, nfecha, arrayToObjetoFromTabla, peticionesFetch, encryptarPassword, envioElectron, generarCodigoUnico, mensajetoast, lasMayusculas, peticionesFetchOffline, arrayToObjetoFromTablaOffline, crearTablaSiNoExisteOffline } from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+/************************************************************************/
+import config from '../../../../../resources/config.json';
+/************************************************************************/
+document.body.classList.add('sidebar-close');
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const production = config.VITE_PRODUCTION;
+const link = ref(config.VITE_LINKURL);
+const api = ref(config.VITE_LINK_API);
+const token = ref(config.VITE_TOKEN);
+const patronTelefono = ref(config.VITE_PATRON_TELEFONO);
+const linkImpresora = ref(config.VITE_IMPRESORA_LOCAL);
+const tokenCifrado = ref(null);
+/************************************************************************/
+const datoscamposDevoluciones = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+/************************************************************************/
+const fetchAndSetupData = async () => {
+    const jsonData = await arrayToObjetoFromTablaOffline('devoluciones');
+    datoscamposDevoluciones.value = jsonData;
+};
+/************************************************************************/
+onMounted(async() => {
+if (!datosEmpresa.empresa.nombre) {
+    await datosEmpresa.inicializarDatosEmpresa(link.value+api.value);
+  }
+if (production == 'false') {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+}
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+fetchAndSetupData()
+});
+/************************************************************************/
+async function enviarDatos(event) {
+    event.preventDefault();
+  const url = link.value+api.value+"/insertar/devoluciones";
+  if (!datoscamposDevoluciones.value) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Datos incompletos, no se puede Enviar.', life: 3000 });
+    return;
+  }
+  if (datoscamposDevoluciones.value.hasOwnProperty('created_at')) {
+     datoscamposDevoluciones.value.created_at = nfecha('timestamp')
+     datoscamposDevoluciones.value.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await peticionesFetchOffline('insertData', 'devoluciones', JSON.stringify(datoscamposDevoluciones.value));
+  
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Agregados con éxito.', life: 3000 });
+Swal.fire({
+  title: "Datos Agregados",
+  text: "Que hacemos ahora?",
+  icon: "warning",
+  showCancelButton: true,
+  confirmButtonText: "Agregar Otro!",
+  cancelButtonText: "No, Regresar al Inicio!",
+ }).then(async(result) => {
+  if (result.isConfirmed) {
+      fetchAndSetupData()
+} else if (result.dismiss === Swal.DismissReason.cancel) {
+    router.push({ path: `/devoluciones` });
+  }
+})
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="w-full px-4 mt-5">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Devoluciones</legend>
+    <div class="grid grid-cols-12 gap-4">
+      <div class="sm:col-span-12">
+       <router-link to="/devoluciones" class="btn btn-dark text-white "><i class="icon-home"></i></router-link>
+      </div>
+    </div>
+</fieldset>
+<section>
+    <form id="formularioActualizar" action="" method="">
+         <div class="box-body">
+          <div class="grid grid-cols-12 gap-4" id="campos">
+<div class="form-group col-span-12 sm:col-span-3 md:col-span-3 lg:col-span-3 xl:col-span-3" >
+<label for="no_emisionAgregarDatos">NO_EMISION</label>
+<input type="input" v-model="datoscamposDevoluciones.no_emision" name="no_emision"  class="form-control " id="no_emisionAgregarDatos"  placeholder="no_emision" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-3 md:col-span-3 lg:col-span-3 xl:col-span-3" >
+<label for="no_facturaAgregarDatos">NO_FACTURA</label>
+<input type="input" v-model="datoscamposDevoluciones.no_factura" name="no_factura"  class="form-control " id="no_facturaAgregarDatos"  placeholder="no_factura" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-3 md:col-span-3 lg:col-span-3 xl:col-span-3" >
+<label for="fechaAgregarDatos">FECHA</label>
+<input type="input" v-model="datoscamposDevoluciones.fecha" name="fecha"  class="form-control " id="fechaAgregarDatos"  placeholder="fecha" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-3 md:col-span-3 lg:col-span-3 xl:col-span-3" >
+<label for="horaAgregarDatos">HORA</label>
+<input type="input" v-model="datoscamposDevoluciones.hora" name="hora"  class="form-control " id="horaAgregarDatos"  placeholder="hora" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-8 md:col-span-8 lg:col-span-8 xl:col-span-8" >
+<label for="nombre_clienteAgregarDatos">NOMBRE_CLIENTE</label>
+<input type="input" v-model="datoscamposDevoluciones.nombre_cliente" name="nombre_cliente"  class="form-control " id="nombre_clienteAgregarDatos"  placeholder="nombre_cliente" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-4 md:col-span-4 lg:col-span-4 xl:col-span-4" >
+<label for="cedula_clienteAgregarDatos">CEDULA_CLIENTE</label>
+<input type="input" v-model="datoscamposDevoluciones.cedula_cliente" name="cedula_cliente"  class="form-control " id="cedula_clienteAgregarDatos"  placeholder="cedula_cliente" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12" >
+<label for="productosAgregarDatos">PRODUCTOS</label>
+<textarea class="form-control " v-model="datoscamposDevoluciones.productos" id="productosAgregarDatos" name="productos" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-span-12 sm:col-span-4 md:col-span-4 lg:col-span-4 xl:col-span-4" >
+<label for="subtotalAgregarDatos">SUBTOTAL</label>
+<input type="input" v-model="datoscamposDevoluciones.subtotal" name="subtotal"  class="form-control " id="subtotalAgregarDatos"  placeholder="subtotal" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-4 md:col-span-4 lg:col-span-4 xl:col-span-4" >
+<label for="impuestosAgregarDatos">IMPUESTOS</label>
+<input type="input" v-model="datoscamposDevoluciones.impuestos" name="impuestos"  class="form-control " id="impuestosAgregarDatos"  placeholder="impuestos" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-4 md:col-span-4 lg:col-span-4 xl:col-span-4" >
+<label for="totalAgregarDatos">TOTAL</label>
+<input type="input" v-model="datoscamposDevoluciones.total" name="total"  class="form-control " id="totalAgregarDatos"  placeholder="total" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12" >
+<label for="notaAgregarDatos">NOTA</label>
+<textarea class="form-control " v-model="datoscamposDevoluciones.nota" id="notaAgregarDatos" name="nota" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-span-12 sm:col-span-4 md:col-span-4 lg:col-span-4 xl:col-span-4" >
+<label for="cantidadAgregarDatos">CANTIDAD</label>
+<input type="input" v-model="datoscamposDevoluciones.cantidad" name="cantidad"  class="form-control soloNumero" id="cantidadAgregarDatos" v-solonumeros placeholder="cantidad" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-4 md:col-span-4 lg:col-span-4 xl:col-span-4" >
+<label for="turnoAgregarDatos">TURNO</label>
+<input type="input" v-model="datoscamposDevoluciones.turno" name="turno"  class="form-control " id="turnoAgregarDatos"  placeholder="turno" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-4 md:col-span-4 lg:col-span-4 xl:col-span-4" >
+<label for="cajeroAgregarDatos">CAJERO</label>
+<input type="input" v-model="datoscamposDevoluciones.cajero" name="cajero"  class="form-control " id="cajeroAgregarDatos"  placeholder="cajero" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12" >
+<label for="descripcionAgregarDatos">DESCRIPCION</label>
+<textarea class="form-control " v-model="datoscamposDevoluciones.descripcion" id="descripcionAgregarDatos" name="descripcion" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-span-12 sm:col-span-6 md:col-span-6 lg:col-span-6 xl:col-span-6" >
+<label for="mesAgregarDatos">MES</label>
+<input type="input" v-model="datoscamposDevoluciones.mes" name="mes"  class="form-control " id="mesAgregarDatos"  placeholder="mes" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-6 md:col-span-6 lg:col-span-6 xl:col-span-6" >
+<label for="yearAgregarDatos">YEAR</label>
+<input type="input" v-model="datoscamposDevoluciones.year" name="year"  class="form-control " id="yearAgregarDatos"  placeholder="year" maxlength="250">
+</div>
+<div class="form-group col-span-6" hidden>
+<label for="created_atAgregarDatos">CREATED_AT</label>
+<input type="input" v-model="datoscamposDevoluciones.created_at" name="created_at"  class="form-control " id="created_atAgregarDatos"  placeholder="created_at" maxlength="">
+</div>
+<div class="form-group col-span-6" hidden>
+<label for="updated_atAgregarDatos">UPDATED_AT</label>
+<input type="input" v-model="datoscamposDevoluciones.updated_at" name="updated_at"  class="form-control " id="updated_atAgregarDatos"  placeholder="updated_at" maxlength="">
+</div>
+<div class="form-group col-span-12" hidden>
+<label for="usuarioAgregarDatos">USUARIO</label>
+<input type="input" v-model="datoscamposDevoluciones.usuario" name="usuario"  class="form-control " id="usuarioAgregarDatos"  placeholder="usuario" maxlength="250">
+</div>
+<div class="form-group sm:col-span-12 mb-5 mt-5">
+<button type="submit" @click="enviarDatos" class="btn btn-primary elboton w-100">Enviar Datos</button>
+  </div>
+  </div>
+  </div>
+   </form>
+</section>
+  </div>
+   </main>
+<Toast />
+</template>
+<style>
+</style>

@@ -1,0 +1,235 @@
+
+<script setup>
+import { ref, onMounted, nextTick, watchEffect } from 'vue';
+import { useToast } from "primevue/usetoast";
+import { useRouter, useRoute } from 'vue-router';
+const router = useRouter();
+const route = useRoute(); 
+import {enviarDatosPorPost,
+  eliminarDatos, 
+  obtenerIdsSeleccionados,
+  borrarTodoslosDatos,
+  lenguajeDataTable,
+  nfecha,
+  arrayToObjetoFromTabla,
+  peticionesFetch,
+  encryptarPassword,
+  envioElectron,
+  generarCodigoUnico,
+  peticiones,
+  enviarSolicitudGet,
+  mensajetoast,
+  lasMayusculas} from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const tokenCorto = ref('');
+/************************************************************************/
+const datoscampos = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+const position = "top";
+const todosLosnomina = ref([]);
+/************************************************************************/
+const fetchAllData = async () => {
+    const response = await enviarSolicitudGet(`${link.value+api.value}/datosarray/nomina`,tokenCifrado.value);
+    const jsonData = response;
+    todosLosnomina.value = response;
+    datoscampos.value = jsonData.find(datos=>datos.id == route.params.id)
+};
+/************************************************************************/
+function navigate(action) {
+    const currentIndex = todosLosnomina.value.findIndex(notacredito => notacredito.id == route.params.id);
+    if (currentIndex === -1) return;
+    let newIndex;
+    switch (action) {
+        case 'primero':
+            newIndex = 0;
+            break;
+        case 'anterior':
+            newIndex = currentIndex > 0 ? currentIndex - 1 : 0;
+            break;
+        case 'siguiente':
+            newIndex = currentIndex + 1 < todosLosnomina.value.length ? currentIndex + 1 : currentIndex;
+            break;
+        case 'ultimo':
+            newIndex = todosLosnomina.value.length - 1;
+            break;
+        default:
+            return;
+    }
+    datoscampos.value = todosLosnomina.value[newIndex];
+    router.push({ path: `/editarnotacredito/${todosLosnomina.value[newIndex].id}` });
+}
+/************************************************************************/
+onMounted(async() => {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+await fetchAllData()
+});
+/************************************************************************/
+async function funcionActualizar(e) {
+  e.preventDefault();
+  const url = link.value+api.value+"/actualizarcampos/nomina";
+  if (!datoscampos.value) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+  if (datoscampos.value.hasOwnProperty('created_at')) {
+      datoscampos.value.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await enviarDatosPorPost(url, datoscampos.value,tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="container-fluid mt-5 card">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Nomina</legend>
+    <div class="row">
+      <div class="col-sm-12">
+       <router-link to="/nomina" class="btn btn-dark text-white "><i class="icon-home"></i></router-link>
+      </div>
+    </div>
+</fieldset>
+<section>
+<fieldset class="border p-3 rounded mb-2">
+  <legend class="float-none w-auto px-2">Campos</legend>
+    <form id="formularioGenerar" action="" method="">
+         <div class="box-body">
+          <div class="grid grid-cols-12 gap-4 mt-4 text-blue-600" id="campos">
+
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="no_nomina" class="block text-sm font-medium text-gray-700 dark:text-gray-400">No nomina</label>
+                <InputText type="text"  v-solonumeros readonly class="form-input w-full " v-model="datoscampos.no_nomina" name="no_nomina" placeholder="no_nomina" id="actualizarno_nomina" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-4 xl:col-span-4 2xl:col-span-4">
+                    <label for="fecha_inicio" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Fecha inicio</label>
+                   <DatePicker  v-model="datoscampos.fecha_inicio" showButtonBar fluid />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-4 xl:col-span-4 2xl:col-span-4">
+                    <label for="fecha_final" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Fecha final</label>
+                   <DatePicker  v-model="datoscampos.fecha_final" showButtonBar fluid />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="estado" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Estado</label>
+                    <Dropdown editable v-model="datoscampos.estado" :options="['ACTIVA','PAGADA','CANCELADA']" placeholder="Seleccione estado" class="w-full" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-4 xl:col-span-4 2xl:col-span-4">
+                <label for="cedula" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Cedula</label>
+                <InputText type="text"  v-solonumeros class="form-input w-full " v-model="datoscampos.cedula" name="cedula" placeholder="cedula" id="actualizarcedula" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-6 xl:col-span-6 2xl:col-span-6">
+                <label for="nombre" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Nombre</label>
+                <InputText type="text"  v-mayuscula class="form-input w-full " v-model="datoscampos.nombre" name="nombre" placeholder="nombre" id="actualizarnombre" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="cargo" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Cargo</label>
+                <InputText type="text"  v-mayuscula class="form-input w-full " v-model="datoscampos.cargo" name="cargo" placeholder="cargo" id="actualizarcargo" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="sueldo" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Sueldo</label>
+                <InputText type="text"  v-solonumeros v-decimales v-numeroFocusinOut class="form-input w-full " v-model="datoscampos.sueldo" name="sueldo" placeholder="sueldo" id="actualizarsueldo" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="comision" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Comision</label>
+                <InputText type="text"  v-solonumeros v-decimales v-numeroFocusinOut class="form-input w-full " v-model="datoscampos.comision" name="comision" placeholder="comision" id="actualizarcomision" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="hora_extra" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Hora extra</label>
+                <InputText type="text"  v-solonumeros v-decimales v-numeroFocusinOut class="form-input w-full " v-model="datoscampos.hora_extra" name="hora_extra" placeholder="hora_extra" id="actualizarhora_extra" />
+            </div>
+
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="ingreso_sdss" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Ingreso sdss</label>
+                <InputText type="text"  v-solonumeros v-decimales v-numeroFocusinOut class="form-input w-full " v-model="datoscampos.ingreso_sdss" name="ingreso_sdss" placeholder="ingreso_sdss" id="actualizaringreso_sdss" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="sf_salud" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Sf salud</label>
+                <InputText type="text"  v-solonumeros v-decimales v-numeroFocusinOut class="form-input w-full " v-model="datoscampos.sf_salud" name="sf_salud" placeholder="sf_salud" id="actualizarsf_salud" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="svejez_discap" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Svejez discap</label>
+                <InputText type="text"  v-solonumeros v-decimales v-numeroFocusinOut class="form-input w-full " v-model="datoscampos.svejez_discap" name="svejez_discap" placeholder="svejez_discap" id="actualizarsvejez_discap" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="desc_percapita" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Desc percapita</label>
+                <InputText type="text"  v-solonumeros v-decimales v-numeroFocusinOut class="form-input w-full " v-model="datoscampos.desc_percapita" name="desc_percapita" placeholder="desc_percapita" id="actualizardesc_percapita" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="base_isr" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Base isr</label>
+                <InputText type="text"  v-solonumeros v-decimales v-numeroFocusinOut class="form-input w-full " v-model="datoscampos.base_isr" name="base_isr" placeholder="base_isr" id="actualizarbase_isr" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="imp_sobre_renta" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Imp sobre renta</label>
+                <InputText type="text"  v-solonumeros v-decimales v-numeroFocusinOut class="form-input w-full " v-model="datoscampos.imp_sobre_renta" name="imp_sobre_renta" placeholder="imp_sobre_renta" id="actualizarimp_sobre_renta" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="prestamos" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Prestamos</label>
+                <InputText type="text"  v-solonumeros v-decimales v-numeroFocusinOut class="form-input w-full " v-model="datoscampos.prestamos" name="prestamos" placeholder="prestamos" id="actualizarprestamos" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="avance_sueldo" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Avance sueldo</label>
+                <InputText type="text"  v-solonumeros v-decimales v-numeroFocusinOut class="form-input w-full " v-model="datoscampos.avance_sueldo" name="avance_sueldo" placeholder="avance_sueldo" id="actualizaravance_sueldo" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="total_deducciones" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Total deducciones</label>
+                <InputText type="text"  v-solonumeros v-decimales v-numeroFocusinOut class="form-input w-full " v-model="datoscampos.total_deducciones" name="total_deducciones" placeholder="total_deducciones" id="actualizartotal_deducciones" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                <label for="total_neto_pagar" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Total neto pagar</label>
+                <InputText type="text"  v-solonumeros v-decimales v-numeroFocusinOut class="form-input w-full " v-model="datoscampos.total_neto_pagar" name="total_neto_pagar" placeholder="total_neto_pagar" id="actualizartotal_neto_pagar" />
+            </div>
+
+        <div class="hidden col-span-12">
+          <label for="created_at-Actualizador" class="block text-sm font-medium text-gray-700">CREATED_AT</label>
+          <InputText v-model="datoscampos.created_at" name="created_at" id="created_at-Actualizador" placeholder="created_at" class="w-full" />
+        </div>
+        <div class="hidden col-span-12">
+          <label for="updated_at-Actualizador" class="block text-sm font-medium text-gray-700">UPDATED_AT</label>
+          <InputText v-model="datoscampos.updated_at" name="updated_at" id="updated_at-Actualizador" placeholder="updated_at" class="w-full" />
+        </div>
+        <div class="hidden col-span-12">
+          <label for="usuario-Actualizador" class="block text-sm font-medium text-gray-700">USUARIO</label>
+          <InputText v-model="datoscampos.usuario" name="usuario" id="usuario-Actualizador" placeholder="usuario" maxlength="250" class="w-full" />
+        </div>
+
+<div class="form-group col-sm-12 mb-5 mt-5">
+  <Button label="Save" outlined severity="primary" @click="funcionActualizar" autofocus />
+</div>
+
+
+
+  </div>
+  </div>
+   </form>
+   </fieldset>
+</section>
+  </div>
+   </main>
+<Toast />
+</template>
+<style scoped>
+</style>
+

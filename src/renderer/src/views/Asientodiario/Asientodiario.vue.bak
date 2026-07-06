@@ -1,0 +1,602 @@
+<script setup>
+import { ref, onMounted, nextTick, watchEffect,computed } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
+const router = useRouter();
+import axios from 'axios';
+import { enviarDatosPorPost, eliminarDatos, obtenerIdsSeleccionados, borrarTodoslosDatos, lenguajeDataTable, nfecha, arrayToObjetoFromTabla, peticionesFetch, encryptarPassword, envioElectron, mensajetoast, crearTablaSiNoExiste, peticiones, lasMayusculas,generarTablaFromStringJSON } from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+import { useToast } from "primevue/usetoast";
+import Awesomplete from '../../components/Awesomplete.vue';
+const toast = useToast();
+/************************************************************************/
+/************************************************************************/
+const usuarioLocal = ref({})
+/************************************************************************/
+const camposArray = ["numero","fecha","hora","asiento","descripcion","usuario"];
+/************************************************************************/
+import { useDatosEmpresa } from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const tokenCorto = ref('');
+/************************************************************************/
+const selectedItems = ref([]);
+/************************************************************************/
+const position = ref('top');
+const openPosition = (pos) => {
+    position.value = pos;
+    visible.value = true;
+}
+/************************************************************************/
+const datoscamposAsientodiario = ref({})
+/************************************************************************/
+const visible = ref(false);
+const visiblecrear = ref(false);
+const value = ref(null);
+const id = ref(null);
+const datoscampos = ref({});
+const data = ref([]);
+const searchQuery = ref('');
+const AsientodiarioEditar = ref(null);
+const cuentasArray = ref([])
+const cuentasNombres = ref([])
+/************************************************************************/
+async function limpiarCamposCrear() {
+datoscamposAsientodiario.value = {}
+await campos();
+}
+/************************************************************************/
+const ultimoRegistro = ref(null)
+/************************************************************************/
+watchEffect(() => {
+  if (visiblecrear.value) {
+    datoscamposAsientodiario.value.numero = ultimoRegistro.value;
+    datoscamposAsientodiario.value.fecha = nfecha('fecha');
+    datoscamposAsientodiario.value.hora = nfecha('hora');
+    datoscamposAsientodiario.value.descripcion = 'REGISTRO DE VENTA';
+    datoscamposAsientodiario.value.debito = 'EFECTIVO EN CAJA';
+    datoscamposAsientodiario.value.credito = 'VENTAS';
+    datoscamposAsientodiario.value.cantidadDebito = '0.00';
+    datoscamposAsientodiario.value.cantidadCredito = '0.00';
+    datoscamposAsientodiario.value.asiento = '[]';
+  }
+});
+/************************************************************************/
+const fetchAndSetupData = async () => {
+    try {
+        const response = await peticionesFetch(`${link.value}${api.value}`, `datosarray/asientodiario`, {}, tokenCifrado.value, 'GET');
+        const jsonData = response;
+
+        // Check if jsonData is an array and has elements
+        if (Array.isArray(jsonData) && jsonData.length > 0) {
+            data.value = jsonData;
+            const lastNumber = parseFloat(jsonData[jsonData.length - 1].numero) + 1 || 1;
+            ultimoRegistro.value = lastNumber.toString().padStart(8, '0');
+        } else {
+            data.value = [];
+            ultimoRegistro.value = '00000001'; 
+        }
+    } catch (error) {
+        console.error('Error fetching data:', error);
+        data.value = [];
+        ultimoRegistro.value = '00000001'; // Default value in case of error
+    }
+};
+
+/************************************************************************/
+const fetchCuentas = async () => {
+    try {
+        const response = await peticionesFetch(`${link.value}${api.value}`, `datosarray/cuentas`, {}, tokenCifrado.value, 'GET');
+        const jsonData = response;
+        cuentasArray.value = response;
+        cuentasNombres.value = response.map(cuenta=>cuenta.nombre);
+    } catch (error) {
+        console.error('Error fetching data:', error);
+    }
+};
+/************************************************************************/
+async function campos() {
+  const campos = await arrayToObjetoFromTabla(link.value+api.value, tokenCifrado.value, 'asientodiario', true,camposArray,'usuario');
+  datoscamposAsientodiario.value = campos;
+}
+/************************************************************************/
+onMounted(async () => {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCorto.value = datosJSON.VITE_TOKEN_CORTO;
+
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+await crearTablaSiNoExiste(link.value, api.value, 'asientodiario', camposArray, tokenCifrado.value,toast);
+usuarioLocal.value = JSON.parse(window.localStorage.getItem('usuarioLocal'))[0] || {};
+await campos();
+await fetchAndSetupData();
+await fetchCuentas();
+});
+/************************************************************************/
+  async function borrarTodo() {
+    Swal.fire({
+        title: "¿Estás seguro?",
+        text: "¡Se borrarán los datos!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, de acuerdo",
+        cancelButtonText: "No, cancelar"
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            const { value: password } = await Swal.fire({
+                title: 'Introduce la contraseña',
+                input: 'password',
+                inputPlaceholder: 'Contraseña',
+                showCancelButton: true,
+                confirmButtonText: 'Confirmar',
+                cancelButtonText: 'Cancelar'
+            });
+            if (password) {
+               if (password === token.value || password === tokenCorto.value) {
+                    const envioDatos = await borrarTodoslosDatos(link.value + api.value + '/borrartodo', 'asientodiario', tokenCifrado.value);
+                    if (envioDatos[0] == 'ok') {
+                        fetchAndSetupData();
+                        toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos borrados', life: 3000 });
+                    } else {
+                        toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al borrar datos.', life: 3000 });
+                   }
+                } else {
+                    toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+                }
+            }
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+            toast.add({ severity: 'success', summary: 'No te preocupes', detail: 'Datos seguros', life: 3000 });
+        }
+    });
+}
+/************************************************************************/
+async function funcionActualizar() {
+  const url = link.value+api.value+"/actualizarcampos/asientodiario";
+  if (!datoscampos.value) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+  if (datoscampos.value.hasOwnProperty('created_at')) {
+    datoscampos.value.updated_at = nfecha('timestamp');
+  }
+  const envioDatos = await enviarDatosPorPost(url, datoscampos.value, tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+    visible.value = false;
+    fetchAndSetupData();
+    toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+async function funcionCrear() {
+  const url = link.value+api.value+"/insertar/asientodiario";
+  if (datoscamposAsientodiario.value.hasOwnProperty('created_at')) {
+    datoscamposAsientodiario.value.created_at = nfecha('timestamp');
+    datoscamposAsientodiario.value.updated_at = nfecha('timestamp');
+  }
+
+  delete(datoscamposAsientodiario.value.debito)
+  delete(datoscamposAsientodiario.value.cantidadDebito)
+  delete(datoscamposAsientodiario.value.credito)
+  delete(datoscamposAsientodiario.value.cantidadCredito)
+
+  const envioDatos = await enviarDatosPorPost(url, datoscamposAsientodiario.value, tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+    fetchAndSetupData();
+    toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Agregados', life: 3000 });
+    limpiarCamposCrear();
+    visiblecrear.value = false;
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+async function borrarSeleccionados() {
+  const ids = obtenerIdsSeleccionados(selectedItems.value);
+    Swal.fire({
+        title: "¿Estas Seguro?",
+        text: "Se Borraran los Datos!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, de acuerdo!",
+        cancelButtonText: "No, cancelar!",
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            const { value: password } = await Swal.fire({
+                title: 'Introduce la contraseña',
+                input: 'password',
+                inputPlaceholder: 'Contraseña',
+                showCancelButton: true,
+                confirmButtonText: 'Confirmar',
+                cancelButtonText: 'Cancelar'
+            });
+            if (password) {
+                if (password === token.value || password === tokenCorto.value) {
+                    let exitoTotal = true;
+                    if (ids.length > 0) {
+                        for (const id of ids) {
+                            try {
+                                const envioDatos = await eliminarDatos(`${link.value}${api.value}/borrar/asientodiario`, id, tokenCifrado.value);
+                            } catch (error) {
+                                console.error(`Error al eliminar datos para ID: ${id}`, error);
+                                exitoTotal = false;
+                            }
+                        }
+                        if (exitoTotal) {
+                            fetchAndSetupData();
+                            toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Borrados', life: 3000 });
+                        } else {
+                            toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Borrar los datos.', life: 3000 });
+                        }
+                    } else {
+                        toast.add({ severity: 'error', summary: 'Error', detail: 'No hay datos para borrar', life: 3000 });
+                    }
+                } else {
+                    toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+                }
+            }
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+            toast.add({ severity: 'success', summary: 'No te preocupes', detail: 'Datos Seguros', life: 3000 });
+        }
+    });
+}
+/************************************************************************/
+const itemsAsientodiario = ref([]);
+const menu = ref(null);
+const currentRowData = ref(null);
+const toggleAsientodiario = (event, rowData) => {
+currentRowData.value = rowData;
+itemsAsientodiario.value = [
+{ label: 'Editar', icon: 'pi pi-pencil', command: () => { 
+visible.value = true;
+datoscampos.value = currentRowData.value;
+} },
+{ label: 'Eliminar', icon: 'pi pi-trash', command: () => {
+            Swal.fire({
+                title: 'Introduce la contraseña',
+                input: 'password',
+                inputPlaceholder: 'Contraseña',
+                showCancelButton: true,
+                confirmButtonText: 'Eliminar',
+                cancelButtonText: 'Cancelar'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    const contrasenaIngresada = result.value;
+                    if (contrasenaIngresada === token.value || contrasenaIngresada === tokenCorto.value) {
+                        const datosFactura = await peticionesFetch(`${link.value}${api.value}`, `borrarporcampo/asientodiario`, { campo: 'id', valor: rowData.id }, tokenCifrado.value, 'POST');
+                        if (datosFactura[0] == 'ok') {
+                            toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos eliminados correctamente', life: 3000 });
+                            await fetchAndSetupData()
+                        } else {
+                            toast.add({ severity: 'error', summary: 'Error', detail: 'Error al eliminar los datos', life: 3000 });
+                        }
+                    } else {
+                        toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+                    }
+                }
+            });
+        } 
+    },
+];
+menu.value.toggle(event);
+};
+/************************************************************************/
+const filteredAsientodiario = computed(() => {
+if (!searchQuery.value) return data.value;
+return data.value.filter(busqueda => {
+  return Object.values(busqueda).some(value =>
+    String(value).toLowerCase().includes(searchQuery.value.toLowerCase())
+   );
+  });
+});
+/************************************************************************/
+const fnAwesomplete = ()=>{
+}
+const handleSelectCompleteDebito = async(selected)=>{
+    datoscamposAsientodiario.value.debito = selected;
+}
+const handleSelectCompletecredito = async(selected)=>{
+    datoscamposAsientodiario.value.credito = selected;
+}
+/************************************************************************/
+const fnRouter = (ruta) => {
+  router.push(ruta);
+};
+/************************************************************************/
+const fnAgregarAsiento = () => {
+    const existente = JSON.parse(datoscamposAsientodiario.value.asiento) || [];
+
+    const asiento = {
+        debito: datoscamposAsientodiario.value.debito,
+        cantidadDebito: parseFloat(datoscamposAsientodiario.value.cantidadDebito),
+        credito: datoscamposAsientodiario.value.credito,
+        cantidadCredito: parseFloat(datoscamposAsientodiario.value.cantidadCredito),
+    };
+
+    if (asiento.cantidadDebito === asiento.cantidadCredito) {
+        // Add the new asiento to the existing array
+        existente.push(asiento);
+        // Reset the amounts to '0.00'
+        datoscamposAsientodiario.value.cantidadDebito = '0.00';
+        datoscamposAsientodiario.value.cantidadCredito = '0.00';
+    } else {
+        // Calculate the difference
+        const debitoRestante = asiento.cantidadDebito > asiento.cantidadCredito ? asiento.cantidadDebito - asiento.cantidadCredito : 0;
+        const creditoRestante = asiento.cantidadCredito > asiento.cantidadDebito ? asiento.cantidadCredito - asiento.cantidadDebito : 0;
+
+        // Update the remaining amounts
+        datoscamposAsientodiario.value.cantidadDebito = debitoRestante.toFixed(2);
+        datoscamposAsientodiario.value.cantidadCredito = creditoRestante.toFixed(2);
+
+        // Push the current asiento with balanced amounts
+        asiento.cantidadDebito = asiento.cantidadCredito = Math.min(asiento.cantidadDebito, asiento.cantidadCredito);
+        existente.push(asiento);
+    }
+
+    // Update the asiento array
+    datoscamposAsientodiario.value.asiento = JSON.stringify(existente);
+};
+
+/************************************************************************/
+const fnigualarCantidad = ()=>{
+    datoscamposAsientodiario.value.cantidadCredito = datoscamposAsientodiario.value.cantidadDebito;
+}
+/************************************************************************/
+window.handleEditClick = function(index) {
+  console.log('Edit row with index:', index);
+  // Add your edit logic here
+};
+
+window.handleDeleteClick = function(index) {
+  console.log('Delete row with index:', index);
+  // Add your delete logic here
+};
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="container-fluid mt-5">
+<Card>
+<template #content>
+    <div class="row">
+      <div class="col-md-12">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Asientodiario</legend>
+            <div class="row">
+              <div class="col-sm-12">
+             <Button icon="pi pi-sync" raised rounded severity="warn" @click="fetchAndSetupData" aria-label="Recargar" />
+             <Button icon="pi pi-plus" raised rounded severity="success" @click="visiblecrear = true" aria-label="Agregar Nuevo" class="ml-1" />
+             <Button icon="pi pi-trash" raised rounded severity="danger" @click="borrarSeleccionados" aria-label="Agregar Nuevo" class="ml-1" />
+
+             <Button icon="pi pi-book" as="router-link" to="/mayorgeneral" label="Mayor General" raised rounded severity="contrast"  class="ml-1" />
+
+             <Button icon="pi pi-book" as="router-link" to="/asientodiario2" label="Asiento Diario" raised rounded severity="contrast"  class="ml-1" />
+
+             <Button icon="pi icon-balance-scale" as="router-link" to="/balance" label="Balance" raised rounded severity="contrast"  class="ml-1" />
+
+             <Button icon="pi pi-trash" v-if="usuarioLocal.usuario =='Soporte'" raised rounded severity="danger" label="Borrar Todo" class="float-end" @click="borrarTodo" aria-label="Borrar Todo" />
+
+              </div>
+            </div>
+        </fieldset>
+      </div>
+      <div class="col-md-12">
+ <div style="display: flex; justify-content: flex-end;">
+ <input v-model="searchQuery" placeholder="Buscar asientodiario..." class="p-inputtext p-component" style="margin-bottom: 10px;" />
+</div>
+<DataTable 
+    :value="filteredAsientodiario"  
+    scrollable 
+    scrollHeight="600px"  
+    dataKey="id" 
+    paginator 
+    :rows="10" 
+    v-model:selection="selectedItems" 
+    selectionMode="single" 
+    :rowsPerPageOptions="[5, 10, 20, 50]" 
+    tableStyle="min-width: 50rem">
+    <Column selectionMode="multiple" headerStyle="width: 3rem"></Column>
+    <Column header="Options">
+        <template #body="slotProps">
+            <Button 
+                icon="pi pi-cog" 
+                @click="toggleAsientodiario($event, slotProps.data)"
+                aria-haspopup="true"
+                aria-controls="overlay_menu_factura"
+            />
+            <Menu 
+                ref="menu" 
+                id="overlay_menu_Asientodiario" 
+                :model="itemsAsientodiario" 
+                :popup="true"
+            />
+        </template>
+    </Column>
+    <Column field="numero" header="Numero"></Column>
+<Column field="fecha" header="Fecha"></Column>
+<Column field="hora" header="Hora"></Column>
+<Column field="descripcion" header="Asiento"></Column>
+
+</DataTable>
+      </div>
+    </div>
+  </template>
+</Card>
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Dialog v-model:visible="visible" :position="position" modal header="Modificar Asientodiario" :style="{ width: '50rem' }" :breakpoints="{ '1199px': '75vw', '575px': '90vw' }">
+            <template #header>
+                <div class="inline-flex align-items-center justify-content-center gap-2">
+                    <span class="font-bold white-space-nowrap">Modal Editar</span>
+                </div>
+            </template>
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">Asientodiario</legend>
+     <form id="formularioActualizarAsientodiario" action="" method="">
+         <div  style="margin-top: 15px;color: #34AAB2;" class="row">
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" hidden>
+<label for="id-Actualizador">ID</label>
+<input type="input" v-model="datoscampos.id" name="id"  class="form-control" id="id-Actualizador"  placeholder="id"  maxlength="11">
+</div>
+<div class="form-group col-12" hidden>
+<label for="id-Actualizador">ID</label>
+<input type="input" v-model="datoscampos.id" name="id"  class="form-control" id="id-Actualizador" readonly placeholder="id"  maxlength="11">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="numero-Actualizador">NUMERO</label>
+<input type="input" v-model="datoscampos.numero" name="numero"  class="form-control" id="numero-Actualizador" readonly placeholder="numero"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="fecha-Actualizador">FECHA</label>
+<input type="input" v-model="datoscampos.fecha" name="fecha"  class="form-control" id="fecha-Actualizador"  placeholder="fecha"  maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="hora-Actualizador">HORA</label>
+<input type="input" v-model="datoscampos.hora" name="hora"  class="form-control" id="hora-Actualizador"  placeholder="hora"  maxlength="250">
+</div>
+
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="descripcion-Actualizador">DESCRIPCION</label>
+<input type="input" v-model="datoscampos.descripcion" name="hora"  class="form-control" id="descripcion-Actualizador"  placeholder="hora"  maxlength="250">
+</div>
+
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="asiento-Actualizador">ASIENTO</label>
+<div class="table-responsive">
+  <div v-html="generarTablaFromStringJSON(datoscampos.asiento,true,'handleEditClick', 'handleDeleteClick')" class="border p-3 rounded mb-2"></div>
+</div>
+
+</div>
+<div class="form-group col-6" hidden>
+<label for="created_at-Actualizador">CREATED_AT</label>
+<input type="input" v-model="datoscampos.created_at" name="created_at"  class="form-control" id="created_at-Actualizador"  placeholder="created_at"  maxlength="">
+</div>
+<div class="form-group col-6" hidden>
+<label for="updated_at-Actualizador">UPDATED_AT</label>
+<input type="input" v-model="datoscampos.updated_at" name="updated_at"  class="form-control" id="updated_at-Actualizador"  placeholder="updated_at"  maxlength="">
+</div>
+<div class="form-group col-12" hidden>
+<label for="usuario-Actualizador">USUARIO</label>
+<input type="input" v-model="datoscampos.usuario" name="usuario"  class="form-control" id="usuario-Actualizador"  placeholder="usuario"  maxlength="250">
+</div>
+
+        </div>
+        </form>
+</fieldset>
+            <template #footer>
+                <Button label="Cancel" text severity="secondary" @click="visible = false" autofocus />
+                <Button label="Save" outlined severity="secondary" @click="funcionActualizar" autofocus />
+            </template>
+        </Dialog>
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Dialog v-model:visible="visiblecrear" :position="position" modal header="Crear Asientodiario" :style="{ width: '70rem' }" :breakpoints="{ '1199px': '75vw', '575px': '90vw' }">
+            <template #header>
+                <div class="inline-flex align-items-center justify-content-center gap-2">
+                    <span class="font-bold white-space-nowrap">Modal Crear</span>
+                </div>
+            </template>
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">Asientodiario</legend>
+     <form id="formularioActualizarAsientodiario" action="" method="">
+         <div  style="margin-top: 15px;color: #34AAB2;" class="row">
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="numeroAgregarDatos">NUMERO</label>
+<input type="input" v-model="datoscamposAsientodiario.numero" name="numero"  class="form-control " id="numeroAgregarDatos"  placeholder="numero" maxlength="250" readonly>
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="fechaAgregarDatos">FECHA</label>
+<input type="input" v-model="datoscamposAsientodiario.fecha" name="fecha"  class="form-control " id="fechaAgregarDatos" v-datepicker  placeholder="fecha" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="horaAgregarDatos">HORA</label>
+<input type="input" v-model="datoscamposAsientodiario.hora" name="hora"  class="form-control " id="horaAgregarDatos"  placeholder="hora" maxlength="250">
+</div>
+
+<div class="form-group col-12" >
+<label for="descripcionAgregarDatos">DESCRIPCION</label>
+<input type="input" v-model="datoscamposAsientodiario.descripcion" name="descripcion"  class="form-control " id="descripcionAgregarDatos"  placeholder="Descripcion" maxlength="250">
+</div>
+
+
+<div class="form-group col-12 col-md-4" >
+<label for="debitoAgregarDatos">DEBITO</label>
+            <awesomplete
+                    class="dropdown-input"
+                    v-model="datoscamposAsientodiario.debito"
+                    @change="fnAwesomplete"
+                    @selectComplete="handleSelectCompleteDebito"
+                    :list="cuentasNombres">
+            </awesomplete>
+</div>
+<div class="form-group col-12 col-md-2" >
+<label for="debitoAgregarDatos">CANT. DEBITO</label>
+<input type="input" @keyup="fnigualarCantidad" v-model="datoscamposAsientodiario.cantidadDebito" name="cantidadDebito"  class="form-control "  placeholder="hora" v-solonumeros v-decimales v-numeroFocusinOut maxlength="250">
+</div>
+
+<div class="form-group col-12 col-md-4" >
+<label for="debitoAgregarDatos">CREDITO</label>
+            <awesomplete
+                    class="dropdown-input"
+                    v-model="datoscamposAsientodiario.credito"
+                    @change="fnAwesomplete"
+                    @selectComplete="handleSelectCompleteCredito"
+                    :list="cuentasNombres">
+            </awesomplete>
+</div>
+<div class="form-group col-12 col-md-2" >
+<label for="debitoAgregarDatos">CANT. CREDITO</label>
+<input type="input" v-model="datoscamposAsientodiario.cantidadCredito" name="cantidadCredito"  class="form-control "  placeholder="hora" v-solonumeros v-decimales v-numeroFocusinOut maxlength="250">
+</div>
+
+<div class="form-group col-12 col-md-2" >
+<Button label="Agregar + " severity="info" @click="fnAgregarAsiento" raised />
+
+</div>
+
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="asientoAgregarDatos">ASIENTO</label>
+
+<div class="table-responsive">
+  <div v-html="generarTablaFromStringJSON(datoscamposAsientodiario.asiento)" class="border p-3 rounded mb-2"></div>
+</div>
+
+
+</div>
+<div class="form-group col-6" hidden>
+<label for="created_atAgregarDatos">CREATED_AT</label>
+<input type="input" v-model="datoscamposAsientodiario.created_at" name="created_at"  class="form-control " id="created_atAgregarDatos"  placeholder="created_at" maxlength="">
+</div>
+<div class="form-group col-6" hidden>
+<label for="updated_atAgregarDatos">UPDATED_AT</label>
+<input type="input" v-model="datoscamposAsientodiario.updated_at" name="updated_at"  class="form-control " id="updated_atAgregarDatos"  placeholder="updated_at" maxlength="">
+</div>
+<div class="form-group col-12" hidden>
+<label for="usuarioAgregarDatos">USUARIO</label>
+<input type="input" v-model="datoscamposAsientodiario.usuario" name="usuario"  class="form-control " id="usuarioAgregarDatos"  placeholder="usuario" maxlength="250">
+</div>
+
+        </div>
+        </form>
+</fieldset>
+            <template #footer>
+                <Button label="Cancel" text severity="secondary" @click="visiblecrear = false" autofocus />
+                <Button label="Crear" outlined severity="secondary" @click="funcionCrear" autofocus />
+            </template>
+        </Dialog>
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Toast />
+  </div>
+</main>
+</template>
+<style scoped>
+</style>

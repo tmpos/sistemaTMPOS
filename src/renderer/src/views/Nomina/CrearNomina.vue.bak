@@ -1,0 +1,289 @@
+
+<script setup>
+import { ref, onMounted, nextTick, watchEffect } from 'vue';
+import { useToast } from "primevue/usetoast";
+import { useRouter, useRoute } from 'vue-router';
+const router = useRouter();
+const route = useRoute(); 
+import {enviarDatosPorPost,
+  eliminarDatos, 
+  obtenerIdsSeleccionados,
+  borrarTodoslosDatos,
+  lenguajeDataTable,
+  nfecha,
+  arrayToObjetoFromTabla,
+  peticionesFetch,
+  encryptarPassword,
+  envioElectron,
+  generadorCodigo,
+  generarCodigoUnico,
+  peticiones,
+  agregarDiasalaFechaActual,
+  mensajetoast,
+  lasMayusculas} from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+/************************************************************************/
+import Awesomplete from '../../components/Awesomplete.vue';
+/************************************************************************/
+const listaEmpleados = ref([])
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const tokenCorto = ref('');
+/************************************************************************/
+const datoscamposNomina = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+const position = "top";
+/************************************************************************/
+const fetchAndSetupData = async () => {
+    const jsonData = await arrayToObjetoFromTabla(link.value+api.value,tokenCifrado.value,'nomina');
+    datoscamposNomina.value = jsonData;
+};
+/************************************************************************/
+
+const fetchUsuarios = async () => {
+  try {
+    const response = await peticionesFetch(
+      `${link.value}${api.value}`,
+      'datosarraypost',
+      { tabla: 'usuarios' },
+      tokenCifrado.value,
+      'POST'
+    );
+    //usuariosData.value = response;
+    //usuariosDataNames.value = response.map(usuarios=>usuarios.name);
+    for(let empleado of response){
+      listaEmpleados.value.push(empleado)
+    }
+      console.log("listaEmpleados.value", listaEmpleados.value);
+  } catch (error) {
+    toast.add({ 
+      severity: 'error', 
+      summary: 'Error', 
+      detail: 'Failed to fetch data from usuarios', 
+      life: 3000 
+    });
+  }
+};
+
+/************************************************************************/
+onMounted(async() => {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+
+const ultimaNC = await peticiones(`${link.value}${api.value}/datosmax`, {"tabla":"nomina","campo":"no_nomina"},'POST',tokenCifrado.value);
+
+await fetchAndSetupData()
+await fetchUsuarios()
+datoscamposNomina.value.no_nomina = generadorCodigo(ultimaNC[0], '', 8);
+datoscamposNomina.value.estado = 'ACTIVA';
+datoscamposNomina.value.fecha_inicio = nfecha('fecha');
+datoscamposNomina.value.fecha_final = agregarDiasalaFechaActual(15);
+datoscamposNomina.value.cargo = 'EMPLEADO';
+datoscamposNomina.value.sueldo = '0.00';
+datoscamposNomina.value.comision = '0.00';
+datoscamposNomina.value.hora_extra = '0.00';
+datoscamposNomina.value.ingreso_sdss = '0.00';
+datoscamposNomina.value.sf_salud = '0.00';
+datoscamposNomina.value.svejez_discap = '0.00';
+datoscamposNomina.value.desc_percapita = '0.00';
+datoscamposNomina.value.base_isr = '0.00';
+datoscamposNomina.value.imp_sobre_renta = '0.00';
+datoscamposNomina.value.prestamos = '0.00';
+datoscamposNomina.value.avance_sueldo = '0.00';
+datoscamposNomina.value.total_deducciones = '0.00';
+datoscamposNomina.value.total_neto_pagar = '0.00';
+
+
+});
+/************************************************************************/
+async function enviarDatos(event) {
+    event.preventDefault();
+  const url = link.value+api.value+"/insertar/nomina";
+  if (!datoscamposNomina.value) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Datos incompletos, no se puede Enviar.', life: 3000 });
+    return;
+  }
+  if (datoscamposNomina.value.hasOwnProperty('created_at')) {
+     datoscamposNomina.value.created_at = nfecha('timestamp')
+     datoscamposNomina.value.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await enviarDatosPorPost(url, datoscamposNomina.value,tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Agregados con éxito.', life: 3000 });
+Swal.fire({
+  title: "Datos Agregados",
+  text: "Que hacemos ahora?",
+  icon: "warning",
+  showCancelButton: true,
+  confirmButtonText: "Agregar Otro!",
+  cancelButtonText: "No, Regresar al Inicio!",
+ }).then(async(result) => {
+  if (result.isConfirmed) {
+      fetchAndSetupData()
+} else if (result.dismiss === Swal.DismissReason.cancel) {
+    router.push({ path: `/nomina` });
+  }
+})
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+const handleSelectComplete = ()=>{
+
+}
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="container-fluid mt-5 card">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Nomina</legend>
+    <div class="row">
+      <div class="col-sm-12">
+       <router-link to="/nomina" class="btn btn-dark text-white "><i class="icon-home"></i></router-link>
+      </div>
+    </div>
+</fieldset>
+<section>
+<fieldset class="border p-3 rounded mb-2">
+  <legend class="float-none w-auto px-2">Campos</legend>
+    <form id="formularioGenerar" action="" method="">
+         <div class="box-body">
+          <div class="grid grid-cols-12 gap-4 mt-4 text-blue-600" id="campos">
+
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="no_nomina" class="block text-sm font-medium text-gray-700 dark:text-gray-400">No nomina</label>
+                    <InputText type="text" class="form-input w-full "  v-solonumeros readonly v-model="datoscamposNomina.no_nomina" placeholder="no_nomina" name="crearno_nomina" id="no_nomina" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-4 xl:col-span-4 2xl:col-span-4">
+                    <label for="fecha_inicio" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Fecha inicio</label>
+                   <DatePicker  v-model="datoscamposNomina.fecha_inicio" dateFormat="dd/mm/yy" showButtonBar fluid />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-4 xl:col-span-4 2xl:col-span-4">
+                    <label for="fecha_final" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Fecha final</label>
+                   <DatePicker  v-model="datoscamposNomina.fecha_final" dateFormat="dd/mm/yy" showButtonBar fluid />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="estado" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Estado</label>
+
+              <Dropdown v-model="datoscamposNomina.estado" :options="['ACTIVA','PAGADA','CANCELADA']" placeholder="Seleccione estado" class="w-full" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-4 xl:col-span-4 2xl:col-span-4">
+                    <label for="cedula" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Cedula</label>
+                    <InputText type="text" class="form-input w-full "  v-solonumeros v-model="datoscamposNomina.cedula" placeholder="cedula" name="crearcedula" id="cedula" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-6 xl:col-span-6 2xl:col-span-6">
+                    <label for="nombre" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Nombre</label>
+<!--                     <InputText type="text" class="form-input w-full "  v-mayuscula v-model="datoscamposNomina.nombre" placeholder="nombre" name="crearnombre" id="nombre" /> -->
+
+               <Awesomplete
+                    class="dropdown-input"
+                    v-model="datoscamposNomina.nombre"
+                    @selectComplete="handleSelectComplete"
+                    :filter-field="'nombre'"
+                    :list="listaEmpleados" />
+
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="cargo" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Cargo</label>
+                    <InputText type="text" class="form-input w-full "  v-mayuscula v-model="datoscamposNomina.cargo" placeholder="cargo" name="crearcargo" id="cargo" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="sueldo" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Sueldo</label>
+                    <InputText type="text" class="form-input w-full "  v-solonumeros v-decimales v-numeroFocusinOut v-model="datoscamposNomina.sueldo" placeholder="sueldo" name="crearsueldo" id="sueldo" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="comision" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Comision</label>
+                    <InputText type="text" class="form-input w-full "  v-solonumeros v-decimales v-numeroFocusinOut v-model="datoscamposNomina.comision" placeholder="comision" name="crearcomision" id="comision" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="hora_extra" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Hora extra</label>
+                    <InputText type="text" class="form-input w-full "  v-solonumeros v-decimales v-numeroFocusinOut v-model="datoscamposNomina.hora_extra" placeholder="hora_extra" name="crearhora_extra" id="hora_extra" />
+                </div>
+
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="ingreso_sdss" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Ingreso sdss</label>
+                    <InputText type="text" class="form-input w-full "  v-solonumeros v-decimales v-numeroFocusinOut v-model="datoscamposNomina.ingreso_sdss" placeholder="ingreso_sdss" name="crearingreso_sdss" id="ingreso_sdss" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="sf_salud" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Sf salud</label>
+                    <InputText type="text" class="form-input w-full "  v-solonumeros v-decimales v-numeroFocusinOut v-model="datoscamposNomina.sf_salud" placeholder="sf_salud" name="crearsf_salud" id="sf_salud" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="svejez_discap" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Svejez discap</label>
+                    <InputText type="text" class="form-input w-full "  v-solonumeros v-decimales v-numeroFocusinOut v-model="datoscamposNomina.svejez_discap" placeholder="svejez_discap" name="crearsvejez_discap" id="svejez_discap" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="desc_percapita" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Desc percapita</label>
+                    <InputText type="text" class="form-input w-full "  v-solonumeros v-decimales v-numeroFocusinOut v-model="datoscamposNomina.desc_percapita" placeholder="desc_percapita" name="creardesc_percapita" id="desc_percapita" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="base_isr" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Base isr</label>
+                    <InputText type="text" class="form-input w-full "  v-solonumeros v-decimales v-numeroFocusinOut v-model="datoscamposNomina.base_isr" placeholder="base_isr" name="crearbase_isr" id="base_isr" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="imp_sobre_renta" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Imp sobre renta</label>
+                    <InputText type="text" class="form-input w-full "  v-solonumeros v-decimales v-numeroFocusinOut v-model="datoscamposNomina.imp_sobre_renta" placeholder="imp_sobre_renta" name="crearimp_sobre_renta" id="imp_sobre_renta" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="prestamos" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Prestamos</label>
+                    <InputText type="text" class="form-input w-full "  v-solonumeros v-decimales v-numeroFocusinOut v-model="datoscamposNomina.prestamos" placeholder="prestamos" name="crearprestamos" id="prestamos" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="avance_sueldo" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Avance sueldo</label>
+                    <InputText type="text" class="form-input w-full "  v-solonumeros v-decimales v-numeroFocusinOut v-model="datoscamposNomina.avance_sueldo" placeholder="avance_sueldo" name="crearavance_sueldo" id="avance_sueldo" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="total_deducciones" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Total deducciones</label>
+                    <InputText type="text" class="form-input w-full "  v-solonumeros v-decimales v-numeroFocusinOut v-model="datoscamposNomina.total_deducciones" placeholder="total_deducciones" name="creartotal_deducciones" id="total_deducciones" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+                    <label for="total_neto_pagar" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Total neto pagar</label>
+                    <InputText type="text" class="form-input w-full "  v-solonumeros v-decimales v-numeroFocusinOut v-model="datoscamposNomina.total_neto_pagar" placeholder="total_neto_pagar" name="creartotal_neto_pagar" id="total_neto_pagar" />
+                </div>
+
+<div class="form-group col-6" hidden>
+<label for="created_atAgregarDatos">CREATED_AT</label>
+<input type="input" v-model="datoscamposNomina.created_at" name="created_at"  class="form-control " id="created_atAgregarDatos"  placeholder="created_at" maxlength="">
+</div>
+<div class="form-group col-6" hidden>
+<label for="updated_atAgregarDatos">UPDATED_AT</label>
+<input type="input" v-model="datoscamposNomina.updated_at" name="updated_at"  class="form-control " id="updated_atAgregarDatos"  placeholder="updated_at" maxlength="">
+</div>
+
+<div class="form-group col-12" hidden>
+<label for="usuarioAgregarDatos">USUARIO</label>
+<input type="input" v-model="datoscamposNomina.usuario" name="usuario"  class="form-control " id="usuarioAgregarDatos"  placeholder="usuario" maxlength="250">
+</div>
+<div class="form-group col-sm-12 mb-5 mt-5">
+<button type="submit" @click="enviarDatos" class="btn btn-primary elboton w-100">Enviar Datos</button>
+  </div>
+  </div>
+  </div>
+   </form>
+   </fieldset>
+</section>
+  </div>
+   </main>
+<Toast />
+</template>
+<style scoped>
+</style>
+

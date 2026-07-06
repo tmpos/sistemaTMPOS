@@ -1,0 +1,22 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Registrocaja",
+"to": "/registrocaja",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/registrocaja',
+        name: 'registrocaja',
+        component: () => import('../views/Registrocaja/Registrocaja.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********
+**********************|-CAMPOS-|******************
+"id, ganancias, taller, cuentas_cobrar, cuentas_pagar, propinas, turno, nombre, username, fecha, hora_inicio, hora_cierre, cant_inicio, ventas, efectivo, tarjeta, transferencia, cheque, entradas, inversiones, gastos, devoluciones, estado, abono, otro, created_at, updated_at, usuario"
+******************************************************

@@ -1,0 +1,60 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Inventario_accesorios",
+"to": "/inventario_accesorios",
+"permiso": "Administrador,Soporte",
+"icon": "pi pi-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/inventario_accesorios',
+        name: 'inventario_accesorios',
+        component: () => import('../views/Inventario_accesorios/Inventario_accesorios.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/crearinventario_accesorios',
+        name: 'crearinventario_accesorios',
+        component: () => import('@/views/Inventario_accesorios/CrearInventario_accesorios.vue'),
+    },
+    {
+        path: '/editarinventario_accesorios/:id',
+        name: 'editarinventario_accesorios',
+        component: () => import('@/views/Inventario_accesorios/EditarInventario_accesorios.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'fecha', 'hora', 'total_accesorioses', 'total_inventario', 'accesorioses_iventariados'"
+******************************************************
+{
+        
+      "fecha": "fecha",
+      "FECHA": "FECHA",
+      "Fecha": "Fecha",
+     
+      "hora": "hora",
+      "HORA": "HORA",
+      "Hora": "Hora",
+     
+      "total_accesorioses": "total_accesorioses",
+      "TOTAL_accesoriosES": "TOTAL_accesoriosES",
+      "Total_accesorioses": "Total_accesorioses",
+     
+      "total_inventario": "total_inventario",
+      "TOTAL_INVENTARIO": "TOTAL_INVENTARIO",
+      "Total_inventario": "Total_inventario",
+     
+      "accesorioses_iventariados": "accesorioses_iventariados",
+      "accesoriosES_IVENTARIADOS": "accesoriosES_IVENTARIADOS",
+      "accesorioses_iventariados": "accesorioses_iventariados",
+}
+

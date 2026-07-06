@@ -1,0 +1,32 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Cuentasxpagar",
+"to": "/cuentasxpagar",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/cuentasxpagar',
+        name: 'cuentasxpagar',
+        component: () => import('../views/Cuentasxpagar/Cuentasxpagar.vue'),
+    },
+    {
+        path: '/crearcuentasxpagar',
+        name: 'crearcuentasxpagar',
+        component: () => import('../views/Cuentasxpagar/CrearCuentasxpagar.vue'),
+    },
+    {
+        path: '/editarcuentasxpagar/:id',
+        name: 'editarcuentasxpagar',
+        component: () => import('../views/Cuentasxpagar/EditarCuentasxpagar.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********
+**********************|-CAMPOS-|******************
+"id, no_emision, no_factura, fecha, hora, ncf, rnc, proveedor, productos, estado, fecha_pago, hora_pago, subtotal, impuestos, total, saldo, abono, nota, created_at, updated_at, usuario"
+******************************************************

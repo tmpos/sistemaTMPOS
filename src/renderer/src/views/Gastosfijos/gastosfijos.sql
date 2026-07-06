@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS `gastosfijos` (
+  `id` int(11) AUTO_INCREMENT PRIMARY KEY,
+  `descripcion` TEXT(250) NOT NULL,
+  `valor` TEXT(250) NOT NULL,
+  `fecha_pago` TEXT(250),
+  `alerta` TEXT(250),
+  `dias_alerta` TEXT(250),
+  `tipo` TEXT(250) NOT NULL,
+  `cuentaporpagar` TEXT(250),
+  `ultimo_pago` TEXT(250),
+  `almacen` TEXT(250) NOT NULL,
+  `estado` TEXT(50) DEFAULT 'PENDIENTE',
+  `categoria` TEXT(100),
+  `proveedor` TEXT(250),
+  `notas` TEXT,
+  `historial_pagos` TEXT,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `usuario` text(250) COLLATE utf8_spanish_ci
+);

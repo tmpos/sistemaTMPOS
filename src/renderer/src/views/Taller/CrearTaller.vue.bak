@@ -1,0 +1,954 @@
+<script setup>
+import { ref, onMounted, nextTick, watchEffect, watch } from 'vue';
+import { useToast } from "primevue/usetoast";
+import Awesomplete from '../../components/Awesomplete.vue';
+import Stepper from 'primevue/stepper';
+//import StepPanels from 'primevue/steppanels';
+import LoadingOverlay from '../../Loading/LoadingOverlay.vue';
+import { useRouter, useRoute } from 'vue-router';
+const router = useRouter();
+
+import StepList from 'primevue/steplist';
+import StepPanels from 'primevue/steppanels';
+import StepItem from 'primevue/stepitem';
+import Step from 'primevue/step';
+import StepPanel from 'primevue/steppanel';
+/*************************************************************/
+import flatPickr from 'vue-flatpickr-component';
+import 'flatpickr/dist/flatpickr.css';
+/*************************************************************/
+  const basic = ref({
+    dateFormat: 'd/m/Y',
+    // position: store.rtlClass === 'rtl' ? 'auto right' : 'auto left',
+  });
+/*************************************************************/
+
+const route = useRoute();
+
+import {enviarDatosPorPost,
+  eliminarDatos,
+  obtenerIdsSeleccionados,
+  borrarTodoslosDatos,
+  lenguajeDataTable,
+  nfecha,
+  peticiones,
+  generadorCodigo,
+  arrayToObjetoFromTabla,
+  convertirStringAArrayDeObjetos,
+  enviarDatosLocalStorage,
+  peticionesFetch,
+  encryptarPassword,
+  envioElectron,
+  ultimoRegistro,
+  arrayToObjetoFromTablaOffline,
+  peticionesFetchOffline,
+  generarCodigoUnico,
+  mensajetoast,
+  lasMayusculas} from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+/************************************************************************/
+/************************************************************************/
+const clientes = ref([]);
+const clientesNombre = ref([]);
+const clientesCedula = ref([]);
+const tecnicos = ref([]);
+const abono = ref('0.00');
+const prioridad = ref('3');
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref(null);
+/************************************************************************/
+const loading = ref(false)
+/************************************************************************/
+const visibleIMEI = ref(false);
+const rowCount = ref(3);
+const columnCount = ref(3);
+const isDrawing = ref(false);
+const pattern = ref([]);
+const usuariosData = ref([]);
+/************************************************************************/
+const datoscamposTaller = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+/************************************************************************/
+const fetchAndSetupData = async () => {
+    const jsonData = await arrayToObjetoFromTablaOffline('taller');
+    datoscamposTaller.value = jsonData;
+    datoscamposTaller.value.equipo = datoscamposTaller.value.equipo || 'CELULAR';
+    datoscamposTaller.value.marca = datoscamposTaller.value.marca || 'APPLE';
+    datoscamposTaller.value.accesorios = datoscamposTaller.value.accesorios || [];
+    datoscamposTaller.value.fallas = datoscamposTaller.value.fallas || [];
+    datoscamposTaller.value.abono = datoscamposTaller.value.abono || [];
+    datoscamposTaller.value.tecnico = datoscamposTaller.value.tecnico || tecnicos.value[0];
+    datoscamposTaller.value.estado = datoscamposTaller.value.estado || 'En Revision';
+    datoscamposTaller.value.metodopago = datoscamposTaller.value.metodopago || 'EFECTIVO';
+    datoscamposTaller.value.metodopago = datoscamposTaller.value.metodopago || 'EFECTIVO';
+    datoscamposTaller.value.total = datoscamposTaller.value.total || '0.00';
+    datoscamposTaller.value.saldo = datoscamposTaller.value.saldo || '0.00';
+    datoscamposTaller.value.manodeobra = datoscamposTaller.value.manodeobra || '0.00';
+    datoscamposTaller.value.preciopiezas = datoscamposTaller.value.preciopiezas || '0.00';
+    datoscamposTaller.value.fecha_entrega = datoscamposTaller.value.fecha_entrega || nfecha('fechaManana');
+    datoscamposTaller.value.fecha_entrada = datoscamposTaller.value.fecha_entrada || nfecha('fecha');
+};
+/************************************************************************/
+const fetchDataClientes = async () => {
+const response = await peticionesFetchOffline('getDataAsArray', 'clientes');
+    const jsonData = response;
+    const cedulas = response;
+    clientes.value = jsonData.reverse();
+    clientesNombre.value = jsonData.map(cliente=>cliente.nombre);
+    clientesCedula.value = cedulas
+  .map(cliente => cliente.cedula)
+  .filter(cedula => cedula !== "" && cedula !== null);
+
+
+};
+/************************************************************************/
+const fetchDataTecnicos = async () => {
+const response = await peticionesFetchOffline('getDataAsArray', 'tecnicos');
+    const jsonData = response;
+   // tecnicos.value = jsonData.reverse();
+};
+/************************************************************************/
+const datosBarcode = ref({})
+/************************************************************************/
+const fetchDataBarcode = async () => {
+const response = await peticionesFetchOffline('getDataAsArray', 'barcode');
+    const jsonData = response[0];
+    datosBarcode.value = jsonData;
+};
+/************************************************************************/
+const fetchUsuariosDatosarraypost = async () => {
+  try {
+const response = await peticionesFetchOffline('getDataAsArray', 'usuarios');
+    usuariosData.value = response;
+    tecnicos.value = response.filter(user=>user.nivel_seguridad === 'Tecnico');
+    //usuariosDataNames.value = response.map(usuarios=>usuarios.name);
+  } catch (error) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to fetch data from usuarios',
+      life: 3000
+    });
+  }
+};
+
+/************************************************************************/
+onMounted(async() => {
+
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+
+await fetchDataTecnicos();
+await fetchDataClientes();
+await fetchAndSetupData();
+await fetchDataBarcode()
+await fetchUsuariosDatosarraypost()
+    datoscamposTaller.value.tecnico = datoscamposTaller.value.tecnico || tecnicos.value[0];
+});
+/************************************************************************/
+watchEffect(() => {
+  if (visibleIMEI.value) {
+    nextTick(() => {
+       drawExistingPattern();
+    });
+  }
+});
+/************************************************************************/
+async function imprimirUltimo() {
+  const ultimoRegistro = await peticionesFetchOffline('getLastXRows', 'taller','1');
+
+/*  window.electron.ipcRenderer.invoke('open-new-window', link.value+'/vista/tallertermica?factura='+ultimoRegistro[0].no_factura,'url', true,false)*/
+
+ const datosEmpresa = JSON.stringify(enviarDatosLocalStorage())
+ const datos = JSON.stringify(ultimoRegistro[0])
+await window.electron.ipcRenderer.invoke('recibotaller',datos,datosEmpresa,true,false,false);
+await printBarcode(ultimoRegistro[0].no_factura,ultimoRegistro[0].nombre)
+
+}
+/************************************************************************/
+async function enviarDatos(event) {
+    event.preventDefault();
+
+var ultimoReg = await ultimoRegistro(link.value+api.value,'taller');
+
+if (ultimoReg.length >0) {
+  datoscamposTaller.value.no_factura = generadorCodigo(ultimoReg[0].no_factura,'',7);
+}else{
+  datoscamposTaller.value.no_factura = '0000001';
+}
+
+  const url = link.value+api.value+"/insertar/taller";
+  if (!datoscamposTaller.value) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Datos incompletos, no se puede Enviar.', life: 3000 });
+    return;
+  }
+
+
+//datoscamposTaller.value.nombre = datoscamposTaller.value.nombre.nombre;
+datoscamposTaller.value.tecnico = datoscamposTaller.value.tecnico?.nombre;
+
+datoscamposTaller.value.almacen = datosEmpresa.empresa.nombre;
+
+  if (datoscamposTaller.value.hasOwnProperty('created_at')) {
+     datoscamposTaller.value.created_at = nfecha('timestamp')
+     datoscamposTaller.value.updated_at = nfecha('timestamp')
+    }
+
+
+   
+  const fallas = convertirStringAArrayDeObjetos(datoscamposTaller.value.fallas)
+  const accesorios = convertirStringAArrayDeObjetos(datoscamposTaller.value.accesorios)
+
+  const datosTecnico = tecnicos.value.find(tecnico=>tecnico.nombre === datoscamposTaller.value.tecnico)
+
+    datoscamposTaller.value.fallas = JSON.stringify(fallas)
+    datoscamposTaller.value.accesorios = JSON.stringify(accesorios)
+
+    //datoscamposTaller.value.pago_tecnico = JSON.stringify({no_orden:datoscamposTaller.value.no_factura,fecha:nfecha('fecha'),equipo:datoscamposTaller.value.equipo+' '+datoscamposTaller.value.marca+' '+datoscamposTaller.value.modelo,monto_cobrado:datoscamposTaller.value.total,costo_piezas:'0.00',porcentaje_tecnico:datosTecnico.porcentaje,beneficio_tecnico:'0.00',beneficio_empresa:'0.00',estado:datoscamposTaller.value.estado,pago_tecnico:'NO COBRADO'})
+  datoscamposTaller.value.pago_tecnico = 'NO COBRADO';
+  datoscamposTaller.value.beneficio_tecnico = '0.00';
+  datoscamposTaller.value.porcentaje_tecnico = datosTecnico?.porcentaje || '0.00';
+  datoscamposTaller.value.beneficio_empresa = '0.00';
+
+  const envioDatos = await peticionesFetchOffline('insertData','taller', JSON.stringify(datoscamposTaller.value));
+  console.log("envioDatos", envioDatos);
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Agregados con éxito.', life: 3000 });
+Swal.fire({
+  title: "Datos Agregados",
+  text: "¿Qué hacemos ahora?",
+  icon: "warning",
+  showCancelButton: true,
+  showDenyButton: true, 
+  confirmButtonText: "Agregar Otro!",
+  cancelButtonText: "No, Regresar al Inicio!",
+  denyButtonText: "Imprimir y Salir!", // Texto del nuevo botón
+}).then(async (result) => {
+  if (result.isConfirmed) {
+    fetchAndSetupData();
+  } else if (result.dismiss === Swal.DismissReason.cancel) {
+    router.push({ path: `/taller` });
+  } else if (result.isDenied) {
+    await imprimirUltimo(); 
+
+    router.push({ path: `/taller` }); 
+  }
+});
+
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+const seleccionarCliente = async(datos)=>{
+  const nombre = datos.value.nombre;
+  datoscamposTaller.value.cedula = datos.value.cedula;
+  datoscamposTaller.value.telefono = datos.value.telefono;
+  datoscamposTaller.value.whatsapp = datos.value.whatsapp;
+  datoscamposTaller.value.email = datos.value.email;
+  datoscamposTaller.value.direccion = datos.value.direccion;
+}
+/************************************************************************/
+
+/************************************************************************/
+const actualizarCliente = async()=>{
+  const datosCLiente = clientes.value.find(cliente=>cliente.cedula === datoscamposTaller.value.cedula)
+  if (datosCLiente) {
+    //datosCLiente.nombre = datoscamposTaller.value.nombre;
+    datosCLiente.telefono = datoscamposTaller.value.telefono;
+    datosCLiente.whatsapp = datoscamposTaller.value.whatsapp;
+    datosCLiente.email = datoscamposTaller.value.email;
+    datosCLiente.direccion = datoscamposTaller.value.direccion;
+
+      const url = link.value+api.value+"/actualizarcampos/clientes";
+  if (!datosCLiente) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+
+  if (datosCLiente.hasOwnProperty('created_at')) {
+      datosCLiente.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await peticionesFetchOffline('updateData','clientes', JSON.stringify(datosCLiente));
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos del cliente Actualizados', life: 3000 });
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+
+  }
+}
+/************************************************************************/
+const verificaIMEI = async ()=>{
+  if (datoscamposTaller.value.imei == '') {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Debe escribir un IMEI válido', life: 3000 });
+    return
+  }
+  const datos =
+{
+  "service": "0",
+  "imei": datoscamposTaller.value.imei,
+  "imei2": "",
+  "serial": "",
+  "key": "WLZ-OJ2-7HJ-0XH-DJ6-AVZ-OXU-1XB"
+}
+    try {
+        const prueba = await enviarDatosPorPost('https://api.ifreeicloud.co.uk', datos,tokenCifrado.value);
+
+        if (prueba.success) {
+            toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos encontrados ('+prueba.object.modelName+')', life: 3000 });
+               datoscamposTaller.value.marca = prueba.object.brand;
+               datoscamposTaller.value.modelo = prueba.object.modelName;
+        } else {
+            toast.add({ severity: 'error', summary: 'Error', detail: 'No se encuentran Datos', life: 3000 });
+        }
+    } catch (error) {
+         toast.add({ severity: 'error', summary: 'Error', detail: 'Error de peticion', life: 3000 });
+    }
+
+}
+/************************************************************************/
+const resetPattern = () => {
+  const dots = document.querySelectorAll('.pattern-dot');
+  dots.forEach(dot => {
+    dot.style.backgroundColor = 'black';
+  });
+  pattern.value = [];
+};
+
+const startDrawing = (rowIndex, colIndex) => {
+  isDrawing.value = true;
+  pattern.value = [];
+  drawPattern(rowIndex, colIndex);
+};
+
+const stopDrawing = () => {
+  isDrawing.value = false;
+  datoscamposTaller.value.clave = pattern.value.join('-');
+};
+
+/*const drawPattern = (rowIndex, colIndex) => {
+  if (isDrawing.value) {
+    event.target.style.backgroundColor = 'black';
+        const position = `${rowIndex}-${colIndex}`;
+      if (!pattern.value.includes(position)) {
+        pattern.value.push(position);
+      }
+  }
+};*/
+
+const drawPattern = (rowIndex, colIndex) => {
+  if (isDrawing.value) {
+    event.target.style.backgroundColor = '#059669';
+    const number = rowIndex * columnCount.value + colIndex + 1;
+    if (!pattern.value.includes(number)) {
+      pattern.value.push(number);
+    }
+  }
+};
+
+const drawExistingPattern = () => {
+  resetPattern();
+  if (datoscamposTaller.value.clave) {
+    const positions = datoscamposTaller.value.clave.split('-');
+    positions.forEach(position => {
+      const number = parseInt(position, 10);
+      const rowIndex = Math.floor((number - 1) / columnCount.value);
+      const colIndex = (number - 1) % columnCount.value;
+      nextTick(() => {
+        const dot = document.querySelector(`.pattern-row:nth-child(${rowIndex + 2}) .pattern-dot:nth-child(${colIndex + 1})`);
+        if (dot) {
+          dot.style.backgroundColor = '#059669';
+        }
+      });
+    });
+  }
+};
+
+watch([rowCount, columnCount], () => {
+  resetPattern();
+});
+
+const markPattern = () => {
+  visibleIMEI.value = false;
+  stopDrawing();
+  datoscamposTaller.value.clave = pattern.value.join('-')
+};
+
+/************************************************************************/
+const addAccesorios = (accesorio) => {
+  if (datoscamposTaller.value.accesorios.length === 0) {
+    datoscamposTaller.value.accesorios = [accesorio];
+  } else {
+    if (!datoscamposTaller.value.accesorios.includes(accesorio)) {
+      datoscamposTaller.value.accesorios.push(accesorio);
+    }
+  }
+
+};
+/************************************************************************/
+const addFallas = (accesorio) => {
+  if (datoscamposTaller.value.fallas.length === 0) {
+    datoscamposTaller.value.fallas = [accesorio];
+  } else {
+    if (!datoscamposTaller.value.fallas.includes(accesorio)) {
+      datoscamposTaller.value.fallas.push(accesorio);
+    }
+  }
+
+};
+/************************************************************************/
+const seleccionarTecnico = async(datos)=>{
+  const nombre = datos.value.nombre;
+}
+/************************************************************************/
+const calcularTotalYSaldo = () => {
+  const manoDeObra = parseFloat(datoscamposTaller.value.manodeobra) || 0;
+  const precioPiezas = parseFloat(datoscamposTaller.value.preciopiezas) || 0;
+  const abono2 = parseFloat(abono.value) || 0;
+
+  const total = manoDeObra + precioPiezas;
+  const saldo = total - abono2;
+
+  datoscamposTaller.value.total = total.toFixed(2);
+  datoscamposTaller.value.saldo = saldo.toFixed(2);
+  const datos = {"abono":abono.value,"prioridad":prioridad.value,"recibidopor":"Soporte","turno":"280420241514073","cajero":"soporte@versatframework.com","metodo_pago":datoscamposTaller.value.metodopago,"hora":nfecha('hora'),"fecha":nfecha('fecha')};
+  datoscamposTaller.value.abono = JSON.stringify([datos]);
+
+
+};
+watch(
+  () => [datoscamposTaller.value.manodeobra, datoscamposTaller.value.preciopiezas, abono.value],
+  calcularTotalYSaldo
+);
+/************************************************************************/
+const fnAwesomplete = ()=>{
+
+}
+const handleSelectComplete = async(selected)=>{
+ const datos = clientes.value.find(cliente=>cliente.nombre === selected.value)
+ datoscamposTaller.value.nombre = datos.nombre
+ datoscamposTaller.value.cedula = datos.cedula
+ datoscamposTaller.value.telefono = datos.telefono
+ datoscamposTaller.value.whatsapp = datos.whatsapp
+ datoscamposTaller.value.email = datos.email
+ datoscamposTaller.value.direccion = datos.direccion
+
+}
+/************************************************************************/
+const fnAwesompleteCed = ()=>{
+
+}
+const handleSelectCompleteCed = (selected)=>{
+   const datos = clientes.value.find(cliente=>cliente.cedula === selected.value)
+ datoscamposTaller.value.nombre = datos.nombre
+ datoscamposTaller.value.cedula = datos.cedula
+ datoscamposTaller.value.telefono = datos.telefono
+ datoscamposTaller.value.whatsapp = datos.whatsapp
+ datoscamposTaller.value.email = datos.email
+ datoscamposTaller.value.direccion = datos.direccion
+}
+/************************************************************************/
+const fnBuscarCedula = async()=>{
+  loading.value = true;
+  let response = null;
+
+  try{
+    response = await peticionesFetch(
+                'https://demo.tmposrd.com/api2',
+                'buscarcedula',
+                { cedula: datoscamposTaller.value.cedula },
+                tokenCifrado.value,
+                'POST'
+              );
+    if(response && response.nombre){
+      datoscamposTaller.value.nombre = response.name 
+    }
+  loading.value = false;
+  toast.add({ severity: 'success', summary: 'OK', detail: 'Datos encontrados', life: 3000 });
+  }catch(error){
+  loading.value = false;
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Ocurrió un error al consultar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+const printBarcode = async(barcode,texto) => {
+    const content = {
+        barcodeData: {
+            barcodetype: datosBarcode.value.barcodetype,
+            barwidth: parseInt(datosBarcode.value.barwidth),
+            barheight: parseInt(datosBarcode.value.barheight),
+            labelwidth: parseInt(datosBarcode.value.labelwidth),
+            labelheight: parseInt(datosBarcode.value.labelheight),
+            fontsize: parseInt(datosBarcode.value.fontsize),
+            margen_izq: parseInt(datosBarcode.value.margen_izq),
+            margen_der: parseInt(datosBarcode.value.margen_der),
+            margen_sup: parseInt(datosBarcode.value.margen_sup),
+            margen_inf: parseInt(datosBarcode.value.margen_inf),
+            codigo: barcode,
+        },
+        labelWidth: parseInt(datosBarcode.value.labelwidth),
+        labelHeight: parseInt(datosBarcode.value.labelheight),
+        margins: {
+            top: parseInt(datosBarcode.value.margen_sup),
+            right: parseInt(datosBarcode.value.margen_der),
+            bottom: parseInt(datosBarcode.value.margen_inf),
+            left: parseInt(datosBarcode.value.margen_izq)
+        },
+        incluirCabecera:true,
+        incluirTexto:true,
+        incluirCodigo:true,
+        incluirOtro:false,
+        incluirPrecio:false,
+        headerText: datosEmpresa.empresa.nombre,
+        code: barcode,
+        text: texto,
+        precio: '',
+        width: parseInt(datosBarcode.value.barwidth),
+        height: parseInt(datosBarcode.value.barheight),
+        fontSize: parseInt(datosBarcode.value.fontsize),
+        cantidad: 1,
+        tipo: datosBarcode.value.barcodetype,
+        printerName: datosBarcode.value.impresora
+    };
+    await window.electron.ipcRenderer.invoke('print-barcode', content);
+
+};
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="container-fluid mt-5 card">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Taller</legend>
+    <div class="row">
+      <div class="col-sm-12">
+       <router-link to="/taller" class="btn btn-dark text-white "><i class="icon-home"></i></router-link>
+      </div>
+    </div>
+</fieldset>
+<section>
+
+<fieldset class="border p-3 rounded mb-2 bg-white" >
+          <legend class="float-none w-auto px-2">Datos Taller</legend>
+<Stepper value="1">
+  <StepList>
+        <Step value="1">CLIENTE</Step>
+        <Step value="2">EQUIPO</Step>
+        <Step value="3">ACCESORIOS</Step>
+        <Step value="4">FALLAS</Step>
+        <Step value="5">GENERAR</Step>
+    </StepList>
+    <StepPanels>
+    <StepPanel v-slot="{ activateCallback }" value="1">
+
+            <div class="flex flex-column h-12remA">
+              <div class="row">
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="nombreAgregarDatos">NOMBRE</label>
+
+               <Awesomplete
+                    class="dropdown-input"
+                    v-model="datoscamposTaller.nombre"
+                    @change="fnAwesomplete"
+                    v-mayuscula
+                    @selectComplete="handleSelectComplete"
+                    :list="clientesNombre" />
+         <!--    </awesomplete> -->
+
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="cedulaAgregarDatos">CEDULA</label>
+
+<InputGroup>
+            <Awesomplete
+                    class="dropdown-input"
+                    v-model="datoscamposTaller.cedula"
+                    @change="actualizarCliente"
+                    @selectComplete="handleSelectCompleteCed"
+                    :list="clientesCedula" />
+          <!--   </awesomplete> -->
+    <InputGroupAddon>
+        <Button icon="pi pi-search" severity="secondary" variant="text" @click="fnBuscarCedula" />
+    </InputGroupAddon>
+</InputGroup>
+
+
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="telefonoAgregarDatos">TELEFONO</label>
+<InputMask id="telefonoAgregarDatos" class="form-control" @change="actualizarCliente" v-model="datoscamposTaller.telefono" :mask="patronTelefono" :placeholder="patronTelefono" />
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="whatsappAgregarDatos">WHATSAPP</label>
+<InputMask id="whatsappAgregarDatos" class="form-control" @change="actualizarCliente" v-model="datoscamposTaller.whatsapp" :mask="patronTelefono" :placeholder="patronTelefono" />
+</div>
+<div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+<label for="emailAgregarDatos">EMAIL</label><br>
+<!-- <Input type="input" v-model="datoscamposTaller.email" @change="actualizarCliente" name="email"  class="form-controlS " id="emailAgregarDatos"  placeholder="email" maxlength="250" /> -->
+<InputText v-model="datoscamposTaller.email" @change="actualizarCliente" placeholder="email" />
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="direccionAgregarDatos">DIRECCION</label>
+<textarea class="form-control " @change="actualizarCliente" v-model="datoscamposTaller.direccion" id="direccionAgregarDatos" name="direccion" cols="30" rows="3" ></textarea>
+</div>
+              </div>
+
+
+        </div>
+        <div class="flex pt-4 justify-content-end">
+              <Button label="Next" icon="pi pi-arrow-right" iconPos="right" @click="activateCallback('2')" />
+            </div>
+    </StepPanel>
+    <StepPanel  v-slot="{ activateCallback }" value="2">
+
+            <div class="flex flex-column h-12rem">
+              <div class="row">
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4 flex flex-col gap-1" >
+<label for="equipoAgregarDatos">EQUIPO</label>
+<!-- <input type="input" v-model="datoscamposTaller.equipo" name="equipo"  class="form-control mayusc" id="equipoAgregarDatos" v-mayuscula placeholder="equipo" maxlength="250"> -->
+<InputText type="text" id="equipoAgregarDatos" v-model="datoscamposTaller.equipo" placeholder="Equipo" />
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4 flex flex-col gap-1" >
+<label for="marcaAgregarDatos">MARCA</label>
+<!-- <input type="input" v-model="datoscamposTaller.marca" name="marca"  class="form-control mayusc" id="marcaAgregarDatos" v-mayuscula placeholder="marca" maxlength="250"> -->
+<InputText type="text" id="marcaAgregarDatos" v-model="datoscamposTaller.marca" placeholder="Marca" />
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4 flex flex-col gap-1" >
+<label for="modeloAgregarDatos">MODELO</label>
+<!-- <input type="input" v-model="datoscamposTaller.modelo" name="modelo"  class="form-control " id="modeloAgregarDatos"  placeholder="modelo" maxlength="250"> -->
+<InputText type="text" id="modeloAgregarDatos" v-model="datoscamposTaller.modelo" placeholder="Modelo" />
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4 flex flex-col gap-1" >
+<label for="serialAgregarDatos">SERIAL</label>
+<!-- <input type="input" v-model="datoscamposTaller.serial" name="serial"  class="form-control " id="serialAgregarDatos"  placeholder="serial" maxlength="250"> -->
+<InputText type="text" id="serialAgregarDatos" v-model="datoscamposTaller.serial" placeholder="Serial" />
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="imeiAgregarDatos">IMEI</label>
+<InputGroup>
+<InputMask id="imei" @blur="verificaIMEI" v-model="datoscamposTaller.imei" mask="999999999999999" placeholder="999999999999999" />
+</InputGroup>
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="claveAgregarDatos">CLAVE</label>
+
+<InputGroup>
+
+<InputText v-model="datoscamposTaller.clave" placeholder="Clave" />
+    <Button label="Patron" @click="visibleIMEI = true" icon="pi pi-ellipsis-v" severity="contrast" />
+</InputGroup>
+
+
+</div>
+              </div>
+
+            </div>
+            <div class="flex pt-4 justify-content-between">
+              <Button label="Back" severity="secondary" icon="pi pi-arrow-left" @click="activateCallback('1')" />
+              <Button label="Next" icon="pi pi-arrow-right" iconPos="right" @click="activateCallback('3')" />
+            </div>
+    </StepPanel>
+    <StepPanel  v-slot="{ activateCallback }" value="3">
+         <div class="flex flex-column h-12rem">
+              <div class="row">
+
+              <div class="col-12 mb-2 mt-2 ">
+              <InputGroup>
+                <div class="flex align-items-center">
+                  <Checkbox id="simcard" @change="addAccesorios('Simcard')" value="Simcard" />
+                  <label for="simcard" class="ms-2"> Simcard </label>
+                </div>
+
+                <div class="flex align-items-center ms-2">
+                  <Checkbox id="sdcard" @change="addAccesorios('Memoria SD')" value="Memoria SD" />
+                  <label for="sdcard" class="ms-2"> Memoria SD </label>
+                </div>
+
+                <div class="flex align-items-center ms-2">
+                  <Checkbox id="cargador" @change="addAccesorios('Cargador')" value="Cargador" />
+                  <label for="cargador" class="ms-2"> Cargador </label>
+                </div>
+
+                <div class="flex align-items-center ms-2">
+                  <Checkbox id="bateria" @change="addAccesorios('Batería')" value="Batería" />
+                  <label for="bateria" class="ms-2"> Batería </label>
+                </div>
+
+                <div class="flex align-items-center ms-2">
+                  <Checkbox id="cover" @change="addAccesorios('Cover')" value="Cover" />
+                  <label for="cover" class="ms-2"> Cover </label>
+                </div>
+
+                <div class="flex align-items-center ms-2">
+                  <label for="cover" class="ms-2 text-danger">POR FAVOR NO RECIBIR LOS EQUIPOS CON ACCESORIOS </label>
+                </div>
+
+              </InputGroup>
+              </div>
+              <div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+              <label for="accesoriosAgregarDatos">ACCESORIOS</label>
+              <InputGroup>
+               <Chips v-model="datoscamposTaller.accesorios" separator="," :allowDuplicate="false"  />
+              </InputGroup>
+              </div>
+                <div class="col-12 mb-2 mt-2">
+                <Button label="Garantía" severity="secondary" text raised />
+              </div>
+              <div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+              <label for="observacionesAgregarDatos">OBSERVACIONES</label>
+              <textarea class="form-control " id="observacionesAgregarDatos" v-model="datoscamposTaller.observaciones" name="observaciones" cols="30" rows="3" ></textarea>
+              </div>
+        </div>
+        </div>
+        <div class="flex pt-4 justify-content-between">
+              <Button label="Back" severity="secondary" icon="pi pi-arrow-left" @click="activateCallback('2')" />
+              <Button label="Next" icon="pi pi-arrow-right" iconPos="right" @click="activateCallback('4')" />
+        </div>
+    </StepPanel>
+    <StepPanel v-slot="{ activateCallback }" value="4">
+        <div class="flex flex-col h-48">
+            <div class="flex flex-column h-12rem">
+              <div class="row">
+              <div class="col-12 mb-2 mt-2 ">
+              <InputGroup>
+                <div class="flex align-items-center ">
+                  <Checkbox id="noenciende" @change="addFallas('No Enciende')" value="No Enciende" />
+                  <label for="noenciende" class="ms-2"> No Enciende </label>
+                </div>
+                <div class="flex align-items-center ms-2">
+                  <Checkbox id="Pantalla" @change="addFallas('Pantalla')" value="Pantalla" />
+                  <label for="Pantalla" class="ms-2"> Pantalla </label>
+                </div>
+                <div class="flex align-items-center ms-2">
+                  <Checkbox id="Bateria" @change="addFallas('Bateria')" value="Bateria" />
+                  <label for="Bateria" class="ms-2"> Bateria </label>
+                </div>
+                <div class="flex align-items-center ms-2">
+                  <Checkbox id="FlexdeCarga" @change="addFallas('Flex de Carga')" value="Flex de Carga" />
+                  <label for="FlexdeCarga" class="ms-2"> Flex de Carga </label>
+                </div>
+
+                <div class="flex align-items-center ms-2">
+                  <Checkbox id="CamaraDelantera" @change="addFallas('Camara Delantera')" value="Camara Delantera" />
+                  <label for="CamaraDelantera" class="ms-2"> Camara Delantera </label>
+                </div>
+
+                <div class="flex align-items-center ms-2">
+                  <Checkbox id="MIcroSoldadura" @change="addFallas('Micro Soldadura')" value="MIcro Soldadura" />
+                  <label for="MIcroSoldadura" class="ms-2"> Micro Soldadura </label>
+                </div>
+
+                <div class="flex align-items-center ms-2">
+                  <Checkbox id="ChequeoGeneral" @change="addFallas('Chequeo General')" value="Chequeo General" />
+                  <label for="ChequeoGeneral" class="ms-2"> Chequeo General </label>
+                </div>
+
+              </InputGroup>
+              </div>
+                <div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+                <label for="fallasAgregarDatos">FALLAS</label>
+                <InputGroup>
+                 <Chips v-model="datoscamposTaller.fallas" separator="," :allowDuplicate="false"  />
+                  </InputGroup>
+                </div>
+              </div>
+           </div>
+           <div class="flex pt-4 justify-content-between">
+              <Button label="Back" severity="secondary" icon="pi pi-arrow-left" @click="activateCallback('3')" />
+              <Button label="Next" icon="pi pi-arrow-right" iconPos="right" @click="activateCallback('5')" />
+            </div>
+        </div>
+    </StepPanel>
+    <StepPanel  v-slot="{ activateCallback }" value="5">
+      <div class="flex flex-col h-48">
+            <div class="flex flex-column h-12rem">
+              <div class="row">
+
+        <div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" hidden>
+        <label for="reparacionAgregarDatos">REPARACION</label>
+        <textarea class="form-control " id="reparacionAgregarDatos" v-model="datoscamposTaller.reparacion" name="reparacion" cols="30" rows="3" ></textarea>
+        </div>
+        <div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" hidden>
+        <label for="piezasAgregarDatos">PIEZAS</label>
+        <textarea class="form-control " id="piezasAgregarDatos" v-model="datoscamposTaller.piezas" name="piezas" cols="30" rows="3" ></textarea>
+        </div>
+
+        <div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+        <label for="tecnicoAgregarDatos">TECNICO</label>
+
+        <InputGroup>
+        <Dropdown v-model="datoscamposTaller.tecnico" @change="seleccionarTecnico"  :options="tecnicos" optionLabel="nombre" placeholder="Seleccione un Técnico" class="w-full md:w-14rem" />
+        </InputGroup>
+
+      </div>
+        <div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+        <label for="metodopagoAgregarDatos">METODOPAGO</label>
+
+        <select v-model="datoscamposTaller.metodopago" name="metodopago"  class="form-control " id="metodopagoAgregarDatos">
+          <option value="EFECTIVO">EFECTIVO</option>
+          <option value="TRANSFERENCIA">TRANSFERENCIA</option>
+          <option value="TARJETA">TARJETA</option>
+        </select>
+        </div>
+        <div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+        <label for="fecha_entradaAgregarDatos">FECHA ENTRADA</label>
+        <input type="input" v-model="datoscamposTaller.fecha_entrada" name="fecha_entrada"  class="form-control " id="fecha_entradaAgregarDatos"  placeholder="fecha_entrada" maxlength="250" readonly>
+        </div>
+        <div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+        <label for="fecha_entregaAgregarDatos">FECHA ENTREGA</label>
+<!--         <input type="input" v-model="datoscamposTaller.fecha_entrega" name="fecha_entrega"  class="form-control " id="fecha_entregaAgregarDatos"  placeholder="fecha_entrega" maxlength="250"> -->
+        <flat-pickr v-model="datoscamposTaller.fecha_entrega"  class="form-input " :config="basic"></flat-pickr>
+        </div>
+        <div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+        <label for="no_facturaAgregarDatos">NO ORDEN</label>
+        <input type="input" v-model="datoscamposTaller.no_factura" name="no_factura"  class="form-control " id="no_facturaAgregarDatos"  placeholder="no_factura" maxlength="250" readonly>
+        </div>
+        <div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+        <label for="estadoAgregarDatos">ESTADO</label>
+        <select class="form-control " v-model="datoscamposTaller.estado" id="estadoAgregarDatos" name="estado" >
+          <option value="En Revision">En Revision</option>
+        </select></div>
+        <div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+        <label for="metodopagoAgregarDatos">PRIORIDAD</label>
+
+        <select v-model="prioridad" name="metodopago"  class="form-control " id="prioridadAgregarDatos">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+        </select>
+        </div>
+
+<!--         <div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+        <label for="preciopiezasAgregarDatos">PRECIO PIEZAS</label>
+        <input type="input" v-model="datoscamposTaller.preciopiezas" name="preciopiezas"  class="form-control soloNumero" v-numeroFocusinOut v-decimales id="preciopiezasAgregarDatos" v-solonumeros placeholder="preciopiezas" maxlength="250">
+        </div> -->
+        <div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+        <label for="manodeobraAgregarDatos">COSTO REPARACION</label>
+        <input type="input" v-model="datoscamposTaller.manodeobra" name="manodeobra"  class="form-control soloNumero" v-focus-in-focus-out v-decimales id="manodeobraAgregarDatos" v-solonumeros placeholder="manodeobra" maxlength="250">
+        </div>
+        <div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+        <label for="abonoAgregarDatos">ABONO</label>
+        <input type="input"  name="abono" v-model="abono"  class="form-control soloNumero" id="abonoAgregarDatos" v-focus-in-focus-out v-decimales v-solonumeros placeholder="abono" maxlength="250">
+        </div>
+        <div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+        <label for="saldoAgregarDatos">SALDO</label>
+        <input type="input" v-model="datoscamposTaller.saldo" name="saldo"  class="form-control soloNumero" id="saldoAgregarDatos" v-solonumeros placeholder="saldo" maxlength="250" readonly>
+        </div>
+        <div class="form-group col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2" >
+        <label for="totalAgregarDatos">TOTAL</label>
+        <input type="input" v-model="datoscamposTaller.total" name="total"  class="form-control soloNumero" id="totalAgregarDatos" v-solonumeros placeholder="total" maxlength="250" readonly>
+        </div>
+
+        <div class="form-group col-12" hidden>
+        <label for="usuarioAgregarDatos">USUARIO</label>
+        <input type="input" v-model="datoscamposTaller.usuario" name="usuario"  class="form-control " id="usuarioAgregarDatos"  placeholder="usuario" maxlength="250">
+        </div>
+        <div class="form-group col-sm-12 mb-5 mt-5">
+        <button type="submit" @click="enviarDatos" class="btn btn-primary elboton w-100">Enviar Datos</button>
+          </div>
+              </div>
+            </div>
+          </div>
+            <div class="flex pt-4 justify-content-start mt-2">
+              <Button label="Back" severity="secondary" icon="pi pi-arrow-left" @click="activateCallback('4')" />
+            </div>
+    </StepPanel>
+    </StepPanels>
+
+</Stepper>
+</fieldset>
+
+</section>
+  </div>
+   </main>
+
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+  <Dialog v-model:visible="visibleIMEI" modal header="Crear Patrón" :style="{ width: '30rem' }">
+    <fieldset class="border p-3 rounded mb-2">
+      <legend class="float-none w-auto px-2">PATRON</legend>
+      <form id="formularioActualizarCuentas">
+        <div class="row">
+          <div id="rowInput" class="form-group col-4">
+            <label for="rowCount">Filas: </label>
+            <input type="number" class="form-control" id="rowCount" v-model="rowCount">
+          </div>
+          <div id="columnInput" class="form-group col-4">
+            <label for="columnCount">Columnas: </label>
+            <input type="number" class="form-control" id="columnCount" v-model="columnCount">
+          </div>
+          <div id="reseteadorDiv" class="form-group col-4">
+            <label>Reseteador: </label>
+            <Button label="Resetear" @click.prevent="resetPattern" />
+          </div>
+        </div>
+        <div v-for="(row, rowIndex) in rowCount" :key="rowIndex" class="pattern-row">
+          <div v-for="(col, colIndex) in columnCount" :key="colIndex"
+               class="pattern-dot"
+               @mousedown="() => startDrawing(rowIndex, colIndex)"
+               @mouseup="stopDrawing"
+               @mouseover="drawPattern(rowIndex, colIndex)">
+          </div>
+        </div>
+      </form>
+    </fieldset>
+    <template #footer>
+      <Button label="Agregar Patrón" outlined severity="secondary" @click="markPattern" />
+    </template>
+  </Dialog>
+ <!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+
+ <LoadingOverlay :visible="loading" />
+<Toast />
+</template>
+<style scoped>
+.p-stepper {
+    flex-basis: 50rem;
+}
+
+#pattern-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+}
+
+.pattern-row {
+  display: flex;
+  justify-content: center; /* Esto asegura que las bolitas estén centradas horizontalmente */
+}
+
+.pattern-dot {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background-color: black;
+  margin: 5px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 16px;
+  color: white;
+  transition: background-color 0.3s;
+}
+
+.pattern-dot:hover {
+  cursor: pointer;
+}
+</style>

@@ -1,0 +1,5 @@
+C:\Users\Tomas Taveras\Desktop\Sistemas\Sistema AA\resources\iphone-helper\bin\Release\net8.0\win-x64\publish\IPhoneReaderHelper.exe
+C:\Users\Tomas Taveras\Desktop\Sistemas\Sistema AA\resources\iphone-helper\bin\Release\net8.0\win-x64\publish\IPhoneReaderHelper.dll
+C:\Users\Tomas Taveras\Desktop\Sistemas\Sistema AA\resources\iphone-helper\bin\Release\net8.0\win-x64\publish\IPhoneReaderHelper.deps.json
+C:\Users\Tomas Taveras\Desktop\Sistemas\Sistema AA\resources\iphone-helper\bin\Release\net8.0\win-x64\publish\IPhoneReaderHelper.runtimeconfig.json
+C:\Users\Tomas Taveras\Desktop\Sistemas\Sistema AA\resources\iphone-helper\bin\Release\net8.0\win-x64\publish\IPhoneReaderHelper.pdb

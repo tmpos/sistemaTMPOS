@@ -1,0 +1,44 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Categorias",
+"to": "/categorias",
+"permiso": "Administrador,Soporte",
+"icon": "pi pi-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/categorias',
+        name: 'categorias',
+        component: () => import('../views/Categorias/Categorias.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/crearcategorias',
+        name: 'crearcategorias',
+        component: () => import('@/views/Categorias/CrearCategorias.vue'),
+    },
+    {
+        path: '/editarcategorias/:id',
+        name: 'editarcategorias',
+        component: () => import('@/views/Categorias/EditarCategorias.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'nombre'"
+******************************************************
+{
+        
+      "nombre": "nombre",
+      "NOMBRE": "NOMBRE",
+      "Nombre": "Nombre",
+}
+

@@ -1,0 +1,275 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                    CONFIGURACIÓN DE INTERNACIONALIZACIÓN (i18n)            ║
+║                                                                            ║
+║  Instrucciones para integrar los archivos de traducción generados         ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 ARCHIVOS GENERADOS
+────────────────────────────────────────────────────────────────────────────
+
+Los siguientes archivos de traducción han sido generados:
+
+  - pre-facturas.es.json (ES)
+  - pre-facturas.en.json (EN)
+
+Idioma predeterminado: ES
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📦 PASO 1: Instalar vue-i18n
+────────────────────────────────────────────────────────────────────────────
+
+Ejecuta el siguiente comando en tu proyecto:
+
+npm install vue-i18n@9
+# o
+yarn add vue-i18n@9
+# o
+pnpm add vue-i18n@9
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📁 PASO 2: Organizar archivos de traducción
+────────────────────────────────────────────────────────────────────────────
+
+Crea la siguiente estructura de carpetas en tu proyecto:
+
+src/
+  locales/
+    es/
+      pre-facturas.json
+    en/
+      pre-facturas.json
+    index.js
+
+Mueve los archivos .json generados a las carpetas correspondientes.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚙️ PASO 3: Configurar vue-i18n
+────────────────────────────────────────────────────────────────────────────
+
+Crea el archivo src/locales/index.js:
+
+import { createI18n } from 'vue-i18n'
+
+// Import translations
+import es from './es/pre-facturas.json'
+import en from './en/pre-facturas.json'
+
+// Create i18n instance
+const i18n = createI18n({
+  legacy: false, // Use Composition API mode
+  locale: 'es', // Default language
+  fallbackLocale: 'es',
+  messages: {
+    es: {
+      pre-facturas: es
+    },
+    en: {
+      pre-facturas: en
+    }
+  }
+})
+
+export default i18n
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔌 PASO 4: Integrar en tu aplicación Vue
+────────────────────────────────────────────────────────────────────────────
+
+Modifica tu archivo main.js:
+
+import { createApp } from 'vue'
+import App from './App.vue'
+import i18n from './locales'
+
+const app = createApp(App)
+app.use(i18n)
+app.mount('#app')
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📝 PASO 5: Usar traducciones en tus componentes
+────────────────────────────────────────────────────────────────────────────
+
+En tus componentes generados, usa el composable useI18n:
+
+<script setup>
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
+// Usar traducciones
+console.log(t('pre-facturas.title'))
+console.log(t('pre-facturas.actions.new'))
+console.log(t('pre-facturas.fields.nombre.label'))
+</script>
+
+<template>
+  <div>
+    <h1>{{ t('pre-facturas.list.title') }}</h1>
+    <button>{{ t('pre-facturas.actions.new') }}</button>
+  </div>
+</template>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🌐 PASO 6: Cambiar idioma dinámicamente (Opcional)
+────────────────────────────────────────────────────────────────────────────
+
+Crea un componente de selector de idioma:
+
+<script setup>
+import { useI18n } from 'vue-i18n'
+
+const { locale, availableLocales } = useI18n()
+
+function changeLanguage(lang) {
+  locale.value = lang
+  // Opcional: guardar en localStorage
+  localStorage.setItem('language', lang)
+}
+</script>
+
+<template>
+  <select v-model="locale">
+    <option v-for="lang in availableLocales" :key="lang" :value="lang">
+      {{ lang.toUpperCase() }}
+    </option>
+  </select>
+</template>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔑 CLAVES DE TRADUCCIÓN DISPONIBLES
+────────────────────────────────────────────────────────────────────────────
+
+Todas las claves están bajo el namespace 'pre-facturas':
+
+- pre-facturas.title
+- pre-facturas.entityName
+- pre-facturas.entityNamePlural
+
+Acciones:
+- pre-facturas.actions.new
+- pre-facturas.actions.create
+- pre-facturas.actions.edit
+- pre-facturas.actions.update
+- pre-facturas.actions.delete
+- pre-facturas.actions.cancel
+- pre-facturas.actions.save
+- pre-facturas.actions.search
+- pre-facturas.actions.back
+- pre-facturas.actions.view
+- pre-facturas.actions.viewDetails
+
+Lista:
+- pre-facturas.list.title
+- pre-facturas.list.subtitle
+- pre-facturas.list.empty
+- pre-facturas.list.total
+- pre-facturas.list.active
+
+Crear:
+- pre-facturas.create.title
+- pre-facturas.create.subtitle
+- pre-facturas.create.generalInfo
+
+Editar:
+- pre-facturas.edit.title
+- pre-facturas.edit.subtitle
+- pre-facturas.edit.loading
+
+Mensajes:
+- pre-facturas.messages.createSuccess
+- pre-facturas.messages.updateSuccess
+- pre-facturas.messages.deleteSuccess
+- pre-facturas.messages.deleteConfirm
+
+Campos (ejemplo):
+- pre-facturas.fields.{nombre_campo}.label
+- pre-facturas.fields.{nombre_campo}.placeholder
+- pre-facturas.fields.{nombre_campo}.required
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 EJEMPLO DE INTEGRACIÓN COMPLETA
+────────────────────────────────────────────────────────────────────────────
+
+<template>
+  <div>
+    <h1>{{ t('pre-facturas.list.title') }}</h1>
+    <p>{{ t('pre-facturas.list.subtitle') }}</p>
+
+    <Button :label="t('pre-facturas.actions.new')" />
+
+    <DataTable>
+      <Column :header="t('pre-facturas.actions.actions')" />
+    </DataTable>
+  </div>
+</template>
+
+<script setup>
+import { useI18n } from 'vue-i18n'
+import { useToast } from 'primevue/usetoast'
+
+const { t } = useI18n()
+const toast = useToast()
+
+async function createItem() {
+  try {
+    // ... crear item
+    toast.add({
+      severity: 'success',
+      summary: t('pre-facturas.messages.createSuccess'),
+      life: 3000
+    })
+  } catch (error) {
+    toast.add({
+      severity: 'error',
+      summary: t('pre-facturas.messages.createError'),
+      life: 3000
+    })
+  }
+}
+</script>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ CHECKLIST DE INTEGRACIÓN
+────────────────────────────────────────────────────────────────────────────
+
+[ ] 1. Instalar vue-i18n
+[ ] 2. Crear estructura de carpetas locales/
+[ ] 3. Mover archivos .json a carpetas correspondientes
+[ ] 4. Crear archivo locales/index.js
+[ ] 5. Integrar i18n en main.js
+[ ] 6. Actualizar componentes para usar useI18n()
+[ ] 7. Reemplazar textos hardcoded con claves t()
+[ ] 8. Probar cambio de idioma
+[ ] 9. Verificar todas las traducciones
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 RECURSOS ADICIONALES
+────────────────────────────────────────────────────────────────────────────
+
+- Documentación vue-i18n: https://vue-i18n.intlify.dev/
+- Composition API: https://vue-i18n.intlify.dev/guide/advanced/composition.html
+- Pluralización: https://vue-i18n.intlify.dev/guide/essentials/pluralization.html
+- Formateo de fechas: https://vue-i18n.intlify.dev/guide/essentials/datetime.html
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎉 ¡Listo! Ahora tu aplicación está lista para ser traducida a múltiples idiomas.
+
+Generado por: Generador CRUD - Sistema i18n
+Fecha: 22/11/2025, 11:10:01
+
+╚════════════════════════════════════════════════════════════════════════════╝

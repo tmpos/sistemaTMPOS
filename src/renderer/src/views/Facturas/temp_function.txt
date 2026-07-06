@@ -1,0 +1,15 @@
+const fnImpresoraGrande = async()=>{
+
+  if(window.electron){
+
+     const datosEmpresa1 = JSON.stringify(enviarDatosLocalStorage());
+         const datosFactura = currentRowData.value
+         const datosCliente = await peticionesFetchOffline('getDataByField', 'clientes','codigo',currentRowData.value.cod_cliente);
+
+     const envio = await window.electron.ipcRenderer.invoke('facturaPDF', JSON.stringify(datosFactura),JSON.stringify(datosCliente), datosEmpresa1,null);
+
+  }else{
+      router.push({ path: `/factura/${currentRowData.value.no_factura}/facturas` });
+    }
+
+}

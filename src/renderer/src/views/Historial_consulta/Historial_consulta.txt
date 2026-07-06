@@ -1,0 +1,55 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Historial_consulta",
+"to": "/historial_consulta",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/historial_consulta',
+        name: 'historial_consulta',
+        component: () => import('../views/Historial_consulta/Historial_consulta.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/crearhistorial_consulta',
+        name: 'crearhistorial_consulta',
+        component: () => import('@/views/Historial_consulta/CrearHistorial_consulta.vue'),
+    },
+    {
+        path: '/editarhistorial_consulta/:id',
+        name: 'editarhistorial_consulta',
+        component: () => import('@/views/Historial_consulta/EditarHistorial_consulta.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'imei', 'fecha', 'hora', 'datos_recibidos'"
+******************************************************
+{
+        
+      "imei": "imei",
+      "IMEI": "IMEI",
+      "Imei": "Imei",
+     
+      "fecha": "fecha",
+      "FECHA": "FECHA",
+      "Fecha": "Fecha",
+     
+      "hora": "hora",
+      "HORA": "HORA",
+      "Hora": "Hora",
+     
+      "datos_recibidos": "datos_recibidos",
+      "DATOS_RECIBIDOS": "DATOS_RECIBIDOS",
+      "Datos_recibidos": "Datos_recibidos",
+}
+

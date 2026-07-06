@@ -1,0 +1,21 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Asientodiario2",
+"to": "/asientodiario2",
+"icon": "fas fa-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*********************|-CAMPOS -|*****************
+
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/asientodiario2',
+        name: 'asientodiario2',
+        component: () => import('../views/Asientodiario2/Asientodiario2.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********

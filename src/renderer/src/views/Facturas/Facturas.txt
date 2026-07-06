@@ -1,0 +1,29 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"name": "Facturas",
+"link": "/facturas",
+"icon": "fas icon-doc"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/facturas',
+        name: 'facturas',
+        component: () => import('../views/Facturas/Facturas.vue'),
+    },
+    {
+        path: '/crearfacturas',
+        name: 'crearfacturas',
+        component: () => import('../views/Facturas/CrearFacturas.vue'),
+    },
+    {
+        path: '/editarfacturas/:id',
+        name: 'editarfacturas',
+        component: () => import('../views/Facturas/EditarFacturas.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********

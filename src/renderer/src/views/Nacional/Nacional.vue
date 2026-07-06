@@ -1,0 +1,453 @@
+
+<script setup>
+import { ref, onMounted, nextTick, watchEffect,computed } from 'vue';
+import axios from 'axios';
+import { enviarDatosPorPost, eliminarDatos, obtenerIdsSeleccionados, borrarTodoslosDatos, lenguajeDataTable, nfecha, arrayToObjetoFromTabla, peticionesFetch, encryptarPassword, envioElectron, mensajetoast, crearTablaSiNoExiste, peticiones, lasMayusculas } from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+import { useToast } from "primevue/usetoast";
+const toast = useToast();
+/************************************************************************/
+/************************************************************************/
+const usuarioLocal = ref({})
+/************************************************************************/
+const camposArray = ['fecha', 'primero', 'segundo', 'tercero'];
+/************************************************************************/
+import { useDatosEmpresa } from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const tokenCorto = ref('');
+/************************************************************************/
+const selectedItems = ref([]);
+/************************************************************************/
+const position = ref('top');
+const openPosition = (pos) => {
+    position.value = pos;
+    visible.value = true;
+}
+/************************************************************************/
+const datoscamposNacional = ref({})
+/************************************************************************/
+const visible = ref(false);
+const visiblecrear = ref(false);
+const value = ref(null);
+const id = ref(null);
+const datoscampos = ref({});
+const data = ref([]);
+const searchQuery = ref('');
+const NacionalEditar = ref(null);
+/************************************************************************/
+async function limpiarCamposCrear() {
+datoscamposNacional.value = {}
+await campos();
+}
+/************************************************************************/
+watchEffect(() => {
+  if (visiblecrear.value) {
+  }
+});
+/************************************************************************/
+const fetchAndSetupData = async () => {
+const response = await peticionesFetch(`${link.value}${api.value}`, `datosarray/nacional`, {}, tokenCifrado.value, 'GET');
+    const jsonData = response.reverse();
+    data.value = jsonData;
+};
+/************************************************************************/
+async function campos() {
+  const campos = await arrayToObjetoFromTabla(link.value+api.value, tokenCifrado.value, 'nacional', true,camposArray,'usuario');
+  datoscamposNacional.value = campos;
+}
+/************************************************************************/
+onMounted(async () => {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCorto.value = datosJSON.VITE_TOKEN_CORTO;
+
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+await crearTablaSiNoExiste(link.value, api.value, 'nacional', camposArray, tokenCifrado.value);
+usuarioLocal.value = JSON.parse(window.localStorage.getItem('usuarioLocal'))[0] || {};
+await campos();
+await fetchAndSetupData();
+});
+/************************************************************************/
+  async function borrarTodo() {
+    Swal.fire({
+        title: "¿Estás seguro?",
+        text: "¡Se borrarán los datos!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, de acuerdo",
+        cancelButtonText: "No, cancelar"
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            const { value: password } = await Swal.fire({
+                title: 'Introduce la contraseña',
+                input: 'password',
+                inputPlaceholder: 'Contraseña',
+                showCancelButton: true,
+                confirmButtonText: 'Confirmar',
+                cancelButtonText: 'Cancelar'
+            });
+            if (password) {
+               if (password === token.value || password === tokenCorto.value) {
+                    const envioDatos = await borrarTodoslosDatos(link.value + api.value + '/borrartodo', 'nacional', tokenCifrado.value);
+                    if (envioDatos[0] == 'ok') {
+                        fetchAndSetupData();
+                        toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos borrados', life: 3000 });
+                    } else {
+                        toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al borrar datos.', life: 3000 });
+                   }
+                } else {
+                    toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+                }
+            }
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+            toast.add({ severity: 'success', summary: 'No te preocupes', detail: 'Datos seguros', life: 3000 });
+        }
+    });
+}
+/************************************************************************/
+async function funcionActualizar() {
+  const url = link.value+api.value+"/actualizarcampos/nacional";
+  if (!datoscampos.value) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+  }
+  if (datoscampos.value.hasOwnProperty('created_at')) {
+    datoscampos.value.updated_at = nfecha('timestamp');
+  }
+  const envioDatos = await enviarDatosPorPost(url, datoscampos.value, tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+    visible.value = false;
+    fetchAndSetupData();
+    toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+async function funcionCrear() {
+  const url = link.value+api.value+"/insertar/nacional";
+  if (datoscamposNacional.value.hasOwnProperty('created_at')) {
+    datoscamposNacional.value.created_at = nfecha('timestamp');
+    datoscamposNacional.value.updated_at = nfecha('timestamp');
+  }
+  const envioDatos = await enviarDatosPorPost(url, datoscamposNacional.value, tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+    fetchAndSetupData();
+    toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Agregados', life: 3000 });
+    limpiarCamposCrear();
+    visiblecrear.value = false;
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+async function borrarSeleccionados() {
+  const ids = obtenerIdsSeleccionados(selectedItems.value);
+    Swal.fire({
+        title: "¿Estas Seguro?",
+        text: "Se Borraran los Datos!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, de acuerdo!",
+        cancelButtonText: "No, cancelar!",
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            const { value: password } = await Swal.fire({
+                title: 'Introduce la contraseña',
+                input: 'password',
+                inputPlaceholder: 'Contraseña',
+                showCancelButton: true,
+                confirmButtonText: 'Confirmar',
+                cancelButtonText: 'Cancelar'
+            });
+            if (password) {
+                if (password === token.value || password === tokenCorto.value) {
+                    let exitoTotal = true;
+                    if (ids.length > 0) {
+                        for (const id of ids) {
+                            try {
+                                const envioDatos = await eliminarDatos(`${link.value}${api.value}/borrar/nacional`, id, tokenCifrado.value);
+                            } catch (error) {
+                                console.error(`Error al eliminar datos para ID: ${id}`, error);
+                                exitoTotal = false;
+                            }
+                        }
+                        if (exitoTotal) {
+                            fetchAndSetupData();
+                            toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Borrados', life: 3000 });
+                        } else {
+                            toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Borrar los datos.', life: 3000 });
+                        }
+                    } else {
+                        toast.add({ severity: 'error', summary: 'Error', detail: 'No hay datos para borrar', life: 3000 });
+                    }
+                } else {
+                    toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+                }
+            }
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+            toast.add({ severity: 'success', summary: 'No te preocupes', detail: 'Datos Seguros', life: 3000 });
+        }
+    });
+}
+/************************************************************************/
+const itemsNacional = ref([]);
+const menu = ref(null);
+const currentRowData = ref(null);
+const toggleNacional = (event, rowData) => {
+currentRowData.value = rowData;
+itemsNacional.value = [
+{ label: 'Editar', icon: 'pi pi-pencil', command: () => { 
+visible.value = true;
+datoscampos.value = currentRowData.value;
+} },
+{ label: 'Eliminar', icon: 'pi pi-trash', command: () => {
+            Swal.fire({
+                title: 'Introduce la contraseña',
+                input: 'password',
+                inputPlaceholder: 'Contraseña',
+                showCancelButton: true,
+                confirmButtonText: 'Eliminar',
+                cancelButtonText: 'Cancelar'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    const contrasenaIngresada = result.value;
+                    if (contrasenaIngresada === token.value || contrasenaIngresada === tokenCorto.value) {
+                        const datosFactura = await peticionesFetch(`${link.value}${api.value}`, `borrarporcampo/nacional`, { campo: 'id', valor: rowData.id }, tokenCifrado.value, 'POST');
+                        if (datosFactura[0] == 'ok') {
+                            toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos eliminados correctamente', life: 3000 });
+                            await fetchAndSetupData()
+                        } else {
+                            toast.add({ severity: 'error', summary: 'Error', detail: 'Error al eliminar los datos', life: 3000 });
+                        }
+                    } else {
+                        toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 });
+                    }
+                }
+            });
+        } 
+    },
+];
+menu.value.toggle(event);
+};
+/************************************************************************/
+const filteredNacional = computed(() => {
+if (!searchQuery.value) return data.value;
+return data.value.filter(busqueda => {
+  return Object.values(busqueda).some(value =>
+    String(value).toLowerCase().includes(searchQuery.value.toLowerCase())
+   );
+  });
+});
+/************************************************************************/
+const fnAwesomplete = ()=>{
+}
+const handleSelectComplete = async(selected)=>{
+}
+/************************************************************************/
+const onRowSelect = (event) => {
+ 
+datoscampos.value = event.data;
+visible.value = true;
+
+
+};
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="mt-5">
+<Card>
+      <template #content>
+<div class="flex flex-col space-y-4">
+<div class="w-full">
+<fieldset class="border p-3 rounded-md mb-2">
+  <legend class="px-2">Datos de Nacional</legend>
+  <div class="flex items-center">
+    <div class="flex space-x-2">
+      <Button icon="pi pi-refresh" severity="primary" @click="fetchAndSetupData" data-toggle="tooltip" title="Recargar" id="reload" />
+      <Button icon="pi pi-plus" severity="primary" title="Agregar Nuevo" id="nuevoregistro" @click="visiblecrear = true" />
+      <Button icon="pi pi-trash" severity="danger" @click="borrarSeleccionados" data-toggle="tooltip" title="Borrar Selección" id="borrador" />
+    </div>
+    <div class="ml-auto">
+      <Button
+        v-if="usuarioLocal.usuario == 'Soporte'"
+        label="Borrar Todo"
+        icon="pi pi-trash"
+        severity="danger"
+        @click="borrarTodo"
+        id="borrartodo"
+      />
+    </div>
+  </div>
+</fieldset>
+</div>
+
+      <div class="w-full">
+        <div class="flex justify-end mb-4">
+          <InputText v-model="searchQuery" placeholder="Buscar nacional..." class="p-inputtext p-component" />
+        </div>
+        <DataTable
+          :value="filteredNacional"
+          scrollable
+          scrollHeight="600px"
+          dataKey="id"
+          paginator
+          :rows="10"
+          v-model:selection="selectedItems"
+          @rowSelect="onRowSelect"
+          selectionMode="single"
+          :rowsPerPageOptions="[5, 10, 20, 50]"
+          tableStyle="min-width: 50rem">
+         <Column selectionMode="multiple" headerStyle="width: 3rem"></Column>
+          <Column header="Options">
+            <template #body="slotProps">
+              <Button
+                icon="pi pi-cog"
+                @click="toggleNacional($event, slotProps.data)"
+                aria-haspopup="true"
+                aria-controls="overlay_menu_factura"
+              />
+              <Menu
+                ref="menu"
+                id="overlay_menu_Nacional"
+                :model="itemsNacional"
+                :popup="true"
+              />
+            </template>
+          </Column>
+          <Column field="fecha" header="Fecha"></Column>
+<Column field="primero" header="Primero"></Column>
+<Column field="segundo" header="Segundo"></Column>
+<Column field="tercero" header="Tercero"></Column>
+        </DataTable>
+      </div>
+    </div>
+      </template>
+</Card>
+
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Dialog v-model:visible="visible" :position="position" modal header="Modificar Nacional" :style="{ width: '50rem' }" :breakpoints="{ '1199px': '75vw', '575px': '90vw' }">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold whitespace-nowrap">Modal Editar</span>
+    </div>
+  </template>
+  <fieldset class="border p-3 rounded-md mb-2">
+    <legend class="px-2">Nacional</legend>
+    <form id="formularioActualizarNacional" action="" method="">
+      <div class="grid grid-cols-12 gap-4 mt-4 text-blue-600">
+        <div class="hidden col-span-12">
+          <label for="id-Actualizador" class="block text-sm font-medium text-gray-700">ID</label>
+          <InputText v-model="datoscampos.id" name="id" id="id-Actualizador" readonly placeholder="id" maxlength="11" class="w-full" />
+        </div>
+
+         <div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-400" for="fecha">FECHA</label>
+                    <flat-pickr v-model="datoscampos.fecha"  class="form-input w-full p-inputtext p-component p-filled p-inputtext-fluid" :config="basic"></flat-pickr>
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-400" for="primero">PRIMERO</label>
+                <InputText type="text"  v-solonumeros class=" " v-model="datoscampos.primero" name="primero" placeholder="primero" id="actualizarprimero" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-400" for="segundo">SEGUNDO</label>
+                <InputText type="text"  v-solonumeros class=" " v-model="datoscampos.segundo" name="segundo" placeholder="segundo" id="actualizarsegundo" />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-400" for="tercero">TERCERO</label>
+                <InputText type="text"  v-solonumeros class=" " v-model="datoscampos.tercero" name="tercero" placeholder="tercero" id="actualizartercero" />
+            </div>
+        <div class="hidden col-span-12">
+          <label for="created_at-Actualizador" class="block text-sm font-medium text-gray-700">CREATED_AT</label>
+          <InputText v-model="datoscampos.created_at" name="created_at" id="created_at-Actualizador" placeholder="created_at" class="w-full" />
+        </div>
+        <div class="hidden col-span-12">
+          <label for="updated_at-Actualizador" class="block text-sm font-medium text-gray-700">UPDATED_AT</label>
+          <InputText v-model="datoscampos.updated_at" name="updated_at" id="updated_at-Actualizador" placeholder="updated_at" class="w-full" />
+        </div>
+        <div class="hidden col-span-12">
+          <label for="usuario-Actualizador" class="block text-sm font-medium text-gray-700">USUARIO</label>
+          <InputText v-model="datoscampos.usuario" name="usuario" id="usuario-Actualizador" placeholder="usuario" maxlength="250" class="w-full" />
+        </div>
+      </div>
+    </form>
+  </fieldset>
+  <template #footer>
+    <Button label="Cancel" text severity="secondary" @click="visible = false" autofocus />
+    <Button label="Save" outlined severity="secondary" @click="funcionActualizar" autofocus />
+  </template>
+</Dialog>
+
+
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Dialog v-model:visible="visiblecrear" :position="position" modal header="Crear Nacional" :style="{ width: '50rem' }" :breakpoints="{ '1199px': '75vw', '575px': '90vw' }">
+  <template #header>
+    <div class="inline-flex align-items-center justify-content-center gap-2">
+      <span class="font-bold whitespace-nowrap">Modal Crear</span>
+    </div>
+  </template>
+  <fieldset class="border p-3 rounded-md mb-2">
+    <legend class="px-2">Nacional</legend>
+    <form id="formularioCrearNacional" action="" method="">
+      <div class="grid grid-cols-12 gap-4 mt-4 text-blue-600">
+
+<div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-400" for="fecha">FECHA</label>
+                   <flat-pickr v-model="datoscamposNacional.fecha"  class="form-input w-full p-inputtext p-component p-filled p-inputtext-fluid" :config="basic"></flat-pickr>
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                    <label for="primero" class="block text-sm font-medium text-gray-700 dark:text-gray-400">PRIMERO</label>
+                    <InputText type="text" fluid class=" "  v-solonumeros v-model="datoscamposNacional.primero" placeholder="primero" name="crearprimero" id="primero" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                    <label for="segundo" class="block text-sm font-medium text-gray-700 dark:text-gray-400">SEGUNDO</label>
+                    <InputText type="text" fluid class=" "  v-solonumeros v-model="datoscamposNacional.segundo" placeholder="segundo" name="crearsegundo" id="segundo" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                    <label for="tercero" class="block text-sm font-medium text-gray-700 dark:text-gray-400">TERCERO</label>
+                    <InputText type="text" fluid class=" "  v-solonumeros v-model="datoscamposNacional.tercero" placeholder="tercero" name="creartercero" id="tercero" />
+                </div>
+
+
+        <div class="hidden col-span-6">
+          <label for="created_atAgregarDatos" class="block text-sm font-medium text-gray-700">CREATED_AT</label>
+          <InputText v-model="datoscamposNacional.created_at" name="created_at" id="created_atAgregarDatos" placeholder="created_at" class="w-full" />
+        </div>
+        <div class="hidden col-span-6">
+          <label for="updated_atAgregarDatos" class="block text-sm font-medium text-gray-700">UPDATED_AT</label>
+          <InputText v-model="datoscamposNacional.updated_at" name="updated_at" id="updated_atAgregarDatos" placeholder="updated_at" class="w-full" />
+        </div>
+        <div class="hidden col-span-12">
+          <label for="usuarioAgregarDatos" class="block text-sm font-medium text-gray-700">USUARIO</label>
+          <InputText v-model="datoscamposNacional.usuario" name="usuario" id="usuarioAgregarDatos" placeholder="usuario" maxlength="250" class="w-full" />
+        </div>
+      </div>
+    </form>
+  </fieldset>
+  <template #footer>
+    <Button label="Cancel" text severity="secondary" @click="visiblecrear = false" autofocus />
+    <Button label="Crear" outlined severity="secondary" @click="funcionCrear" autofocus />
+  </template>
+</Dialog>
+
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Toast />
+  </div>
+</main>
+</template>
+<style scoped>
+</style>
+

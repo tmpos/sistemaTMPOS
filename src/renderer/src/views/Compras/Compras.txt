@@ -1,0 +1,32 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Compras",
+"to": "/compras",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/compras',
+        name: 'compras',
+        component: () => import('../views/Compras/Compras.vue'),
+    },
+    {
+        path: '/crearcompras',
+        name: 'crearcompras',
+        component: () => import('../views/Compras/CrearCompras.vue'),
+    },
+    {
+        path: '/editarcompras/:id',
+        name: 'editarcompras',
+        component: () => import('../views/Compras/EditarCompras.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********
+**********************|-CAMPOS-|******************
+"id, proveedor, rnc_proveedor, fecha, no_factura, ncf_proveedor, productos, estado, subtotal, descuento, impuesto, total, abono, saldo, nota, created_at, updated_at, usuario"
+******************************************************

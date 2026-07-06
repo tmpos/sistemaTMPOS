@@ -1,0 +1,38 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"name": "Cuentas_cobrar",
+"link": "cuentas_cobrar",
+"icon": "fas "
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+------------------------------------------------
+*******************|LEER|***********************
+------------------------------------------------
+    {
+        path: '/cuentas_cobrar',
+        name: 'cuentas_cobrar',
+        component: () => import('../views/Cuentas_cobrar/Cuentas_cobrar.vue'),
+    },
+------------------------------------------------
+******************|CREAR|***********************
+------------------------------------------------
+    {
+        path: '/crearcuentas_cobrar',
+        name: 'crearcuentas_cobrar',
+        component: () => import('../views/Cuentas_cobrar/CrearCuentas_cobrar.vue'),
+    },
+------------------------------------------------
+******************|EDITAR|***********************
+------------------------------------------------
+    {
+        path: '/editarcuentas_cobrar/:id',
+        name: 'editarcuentas_cobrar',
+        component: () => import('../views/Cuentas_cobrar/EditarCuentas_cobrar.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********

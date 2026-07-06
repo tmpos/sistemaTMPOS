@@ -1,0 +1,310 @@
+<script setup>
+import { ref, onMounted, nextTick, watchEffect } from 'vue';
+import { useToast } from "primevue/usetoast";
+import { useRouter,useRoute } from 'vue-router';
+const router = useRouter();
+const route = useRoute(); 
+import {enviarDatosPorPost,
+  eliminarDatos, 
+  obtenerIdsSeleccionados,
+  borrarTodoslosDatos,
+  lenguajeDataTable,
+  nfecha,
+  arrayToObjetoFromTabla,
+  peticionesFetch,
+  encryptarPassword,
+  envioElectron,
+  generadorCodigo,
+  generarCodigoUnico,
+  peticiones,
+  sumaFiscal,
+  mensajetoast,
+  lasMayusculas} from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+import Awesomplete from '../../components/Awesomplete.vue';
+/************************************************************************/
+//import config from '../../../../../resources/config.json';
+/************************************************************************/
+document.body.classList.add('sidebar-close');
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref(null);
+/************************************************************************/
+const datoscamposNotacredito = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+const listaBuscador = ref([]);
+const arrayCliente = ref([]);
+const listaBuscadorNombre = ref([]);
+const listaBuscadorCodigo = ref([]);
+const arrayFacturas = ref([]);
+const objetoConfiscal = ref({});
+/************************************************************************/
+/************************************************************************/
+const fetchAndSetupData = async () => {
+    const jsonData = await arrayToObjetoFromTabla(link.value+api.value,tokenCifrado.value,'notacredito');
+    datoscamposNotacredito.value = jsonData;
+      const ultimaFactura = await peticiones(`${link.value}${api.value}/datosmax`, {"tabla":"notacredito","campo":"no_credito"},'POST',tokenCifrado.value);
+      datoscamposNotacredito.value.no_credito = generadorCodigo(ultimaFactura[0], '', 7);
+
+      const arrayConfiscal = await peticionesFetch(`${link.value}${api.value}`, `datosarray/confiscal`, {}, tokenCifrado.value, 'GET');
+      
+      const ultimaB04 = arrayConfiscal.find(tipo=>tipo.prefijo == 'B04')  
+
+      objetoConfiscal.value = ultimaB04;
+      datoscamposNotacredito.value.b04 = generadorCodigo(ultimaB04.contador, 'B04', 8);
+
+};
+/************************************************************************/
+const fetchfacturas = async () => {
+   const response = await peticionesFetch(`${link.value}${api.value}`, `datosarray/facturas`, {}, tokenCifrado.value, 'GET');
+   arrayFacturas.value = response;
+
+    let arraybuscador = [];
+    response.forEach((index) => {
+        const keys = Object.keys(index);
+        const values = Object.values(index);
+        for (let i = 0; i < keys.length; i++) {
+            if (keys[i] === 'no_factura') {
+                arraybuscador.push(values[i]);
+            }
+        }
+    });
+    listaBuscador.value = arraybuscador;
+
+
+
+};
+/************************************************************************/
+const fetchClientes = async () => {
+   const response = await peticionesFetch(`${link.value}${api.value}`, `datosarray/clientes`, {}, tokenCifrado.value, 'GET');
+   arrayCliente.value = response;
+   listaBuscadorNombre.value = response.map(cliente=>cliente.nombre)
+   listaBuscadorCodigo.value = response.map(cliente=>cliente.codigo)
+
+
+};
+/************************************************************************/
+onMounted(async() => {
+
+
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+    if (!datosEmpresa.empresa.nombre) {
+    await datosEmpresa.inicializarDatosEmpresa(link.value+api.value);
+  }
+
+await fetchAndSetupData()
+await fetchfacturas()
+await fetchClientes()
+
+      datoscamposNotacredito.value.total = '0.00'
+      datoscamposNotacredito.value.fecha = nfecha('fecha')
+      datoscamposNotacredito.value.hora = nfecha('hora')
+
+});
+/************************************************************************/
+async function enviarDatos(event) {
+    event.preventDefault();
+  const url = link.value+api.value+"/insertar/notacredito";
+  if (!datoscamposNotacredito.value) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Datos incompletos, no se puede Enviar.', life: 3000 });
+    return;
+  }
+  if (datoscamposNotacredito.value.hasOwnProperty('created_at')) {
+     datoscamposNotacredito.value.created_at = nfecha('timestamp')
+     datoscamposNotacredito.value.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await enviarDatosPorPost(url, datoscamposNotacredito.value,tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+    await sumaFiscal(link.value,api.value,objetoConfiscal.value,'B04',tokenCifrado.value);
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Agregados con éxito.', life: 3000 });
+Swal.fire({
+  title: "Datos Agregados",
+  text: "Que hacemos ahora?",
+  icon: "warning",
+  showCancelButton: true,
+  confirmButtonText: "Agregar Otro!",
+  cancelButtonText: "No, Regresar al Inicio!",
+ }).then(async(result) => {
+  if (result.isConfirmed) {
+      fetchAndSetupData()
+} else if (result.dismiss === Swal.DismissReason.cancel) {
+    router.push({ path: `/notacredito` });
+  }
+})
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+const fnAwesomplete = ()=>{
+
+}
+const handleSelectComplete = (selected)=>{
+
+    const datosFactura = arrayFacturas.value.find((factura) =>
+        factura.no_factura === selected.value
+    );
+
+    if (datosFactura) {
+      const productos = JSON.parse(datosFactura.productos);
+      datoscamposNotacredito.value.concepto = `PRODUCTOS DEVUELTOS (` +productos.map(prod=>prod.nombre).join(',')+')'
+      datoscamposNotacredito.value.ncf = datosFactura.comprobante
+      datoscamposNotacredito.value.cliente = datosFactura.nombre_cliente
+      datoscamposNotacredito.value.cod_cliente = datosFactura.cod_cliente
+      datoscamposNotacredito.value.total = datosFactura.total
+      datoscamposNotacredito.value.fecha = nfecha('fecha')
+      datoscamposNotacredito.value.hora = nfecha('hora')
+
+
+    } else {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'No se Encuentra la Factura', life: 3000 });
+    }
+
+}
+/************************************************************************/
+const fnAwesompleteNombre = ()=>{
+
+}
+const handleSelectCompleteNombre = (selected)=>{
+    const datosCliente = arrayCliente.value.find(cliente=>cliente.nombre == selected.value)
+    datoscamposNotacredito.value.cod_cliente = datosCliente.codigo
+}
+/************************************************************************/
+const fnAwesompleteCodigo = ()=>{
+
+}
+const handleSelectCompleteCodigo = (selected)=>{
+    const datosCliente = arrayCliente.value.find(cliente=>cliente.codigo == selected.value)
+    datoscamposNotacredito.value.cliente = datosCliente.nombre
+}
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper card">
+  <div class="container-fluid mt-5">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Notacredito</legend>
+    <div class="row">
+      <div class="col-sm-12">
+       <router-link to="/notacredito" class="btn btn-dark text-white "><i class="icon-home"></i></router-link>
+      </div>
+    </div>
+</fieldset>
+<section>
+    <form id="formularioActualizar" action="" method="">
+         <div class="box-body">
+          <div class="row" id="campos">
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="no_creditoAgregarDatos">NO_CREDITO</label>
+<input type="input" v-model="datoscamposNotacredito.no_credito" name="no_credito"  class="form-control " id="no_creditoAgregarDatos"  placeholder="no_credito" readonly maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-3 col-md-3 col-lg-3 col-xl-3" >
+<label for="no_facturaAgregarDatos">NO_FACTURA</label>
+
+<awesomplete
+  class="dropdown-input"
+  v-model="datoscamposNotacredito.no_factura"
+  @change="fnAwesomplete"
+  @selectComplete="handleSelectComplete"
+  :list="listaBuscador">
+</awesomplete>
+
+
+</div>
+
+<div class="form-group col-12 col-md-3" >
+<label for="b04AgregarDatos">B04</label>
+<input type="input" v-model="datoscamposNotacredito.b04" name="b04"  class="form-control " id="b04AgregarDatos"  placeholder="b04" maxlength="" readonly>
+</div>
+<div class="form-group col-12 col-md-3" >
+<label for="ncfAgregarDatos">NCF</label>
+<input type="input" v-model="datoscamposNotacredito.ncf" name="ncf"  class="form-control " id="ncfAgregarDatos"  placeholder="ncf" maxlength="">
+</div>
+
+<div class="form-group col-12 col-sm-8 col-md-8 col-lg-8 col-xl-8" >
+<label for="clienteAgregarDatos">CLIENTE</label>
+
+<awesomplete
+  class="dropdown-input"
+  v-model="datoscamposNotacredito.cliente"
+  @change="fnAwesompleteNombre"
+  @selectComplete="handleSelectCompleteNombre"
+  :list="listaBuscadorNombre">
+</awesomplete>
+
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="cod_clienteAgregarDatos">COD_CLIENTE</label>
+
+<awesomplete
+  class="dropdown-input"
+  v-model="datoscamposNotacredito.cod_cliente"
+  @change="fnAwesompleteCodigo"
+  @selectComplete="handleSelectCompleteCodigo"
+  :list="listaBuscadorCodigo">
+</awesomplete>
+
+
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="conceptoAgregarDatos">CONCEPTO</label>
+<textarea class="form-control " v-model="datoscamposNotacredito.concepto" id="conceptoAgregarDatos" name="concepto" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="totalAgregarDatos">TOTAL</label>
+<input type="input" v-model="datoscamposNotacredito.total" v-solonumeros v-decimales v-numeroFocusinOut name="total"  class="form-control " id="totalAgregarDatos"  placeholder="total" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="fechaAgregarDatos">FECHA</label>
+<input type="input" v-model="datoscamposNotacredito.fecha" name="fecha"  class="form-control " id="fechaAgregarDatos"  placeholder="fecha" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-4 col-md-4 col-lg-4 col-xl-4" >
+<label for="horaAgregarDatos">HORA</label>
+<input type="input" v-model="datoscamposNotacredito.hora" name="hora"  class="form-control " id="horaAgregarDatos"  placeholder="hora" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="notaAgregarDatos">NOTA</label>
+<textarea class="form-control " v-model="datoscamposNotacredito.nota" id="notaAgregarDatos" name="nota" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-6" hidden>
+<label for="created_atAgregarDatos">CREATED_AT</label>
+<input type="input" v-model="datoscamposNotacredito.created_at" name="created_at"  class="form-control " id="created_atAgregarDatos"  placeholder="created_at" maxlength="">
+</div>
+<div class="form-group col-6" hidden>
+<label for="updated_atAgregarDatos">UPDATED_AT</label>
+<input type="input" v-model="datoscamposNotacredito.updated_at" name="updated_at"  class="form-control " id="updated_atAgregarDatos"  placeholder="updated_at" maxlength="">
+</div>
+<div class="form-group col-12" hidden>
+<label for="usuarioAgregarDatos">USUARIO</label>
+<input type="input" v-model="datoscamposNotacredito.usuario" name="usuario"  class="form-control " id="usuarioAgregarDatos"  placeholder="usuario" maxlength="250">
+</div>
+<div class="form-group col-sm-12 mb-5 mt-5">
+<button type="submit" @click="enviarDatos" class="btn btn-primary elboton w-100">Enviar Datos</button>
+  </div>
+  </div>
+  </div>
+   </form>
+</section>
+  </div>
+   </main>
+<Toast />
+</template>
+<style scoped>
+</style>

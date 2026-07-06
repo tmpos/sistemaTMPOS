@@ -1,0 +1,32 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "resources", "resources", "{7F74F24B-7313-8368-FB46-4872DBD77787}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "iphone-helper", "iphone-helper", "{186F806A-158A-5B05-3ED1-8D9D9D66A943}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IPhoneReaderHelper", "resources\iphone-helper\IPhoneReaderHelper.csproj", "{9DD07F9A-CC9F-6359-2CFA-DC9223966A74}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9DD07F9A-CC9F-6359-2CFA-DC9223966A74}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9DD07F9A-CC9F-6359-2CFA-DC9223966A74}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9DD07F9A-CC9F-6359-2CFA-DC9223966A74}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9DD07F9A-CC9F-6359-2CFA-DC9223966A74}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{186F806A-158A-5B05-3ED1-8D9D9D66A943} = {7F74F24B-7313-8368-FB46-4872DBD77787}
+		{9DD07F9A-CC9F-6359-2CFA-DC9223966A74} = {186F806A-158A-5B05-3ED1-8D9D9D66A943}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {A028B0EB-74C8-4E52-8BB3-17BF8423FE3E}
+	EndGlobalSection
+EndGlobal

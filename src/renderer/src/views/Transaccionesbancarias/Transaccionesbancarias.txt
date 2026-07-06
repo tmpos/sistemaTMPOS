@@ -1,0 +1,32 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Transaccionesbancarias",
+"to": "/transaccionesbancarias",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/transaccionesbancarias',
+        name: 'transaccionesbancarias',
+        component: () => import('../views/Transaccionesbancarias/Transaccionesbancarias.vue'),
+    },
+    {
+        path: '/creartransaccionesbancarias',
+        name: 'creartransaccionesbancarias',
+        component: () => import('../views/Transaccionesbancarias/CrearTransaccionesbancarias.vue'),
+    },
+    {
+        path: '/editartransaccionesbancarias/:id',
+        name: 'editartransaccionesbancarias',
+        component: () => import('../views/Transaccionesbancarias/EditarTransaccionesbancarias.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********
+**********************|-CAMPOS-|******************
+"id, cuenta, monto, tipo, balance_anterior, balance_actual, metodo, descripcion, persona, fecha, hora, estado, created_at, updated_at, usuario"
+******************************************************

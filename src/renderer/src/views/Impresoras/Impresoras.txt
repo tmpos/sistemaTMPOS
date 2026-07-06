@@ -1,0 +1,22 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Impresoras",
+"to": "/impresoras",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/impresoras',
+        name: 'impresoras',
+        component: () => import('../views/Impresoras/Impresoras.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********
+**********************|-CAMPOS-|******************
+"id, nombre, fontsize, backgroundsize, barwidth, barheght, codesize, created_at, updated_at, usuario"
+******************************************************

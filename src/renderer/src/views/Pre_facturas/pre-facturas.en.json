@@ -1,0 +1,109 @@
+{
+  "title": "pre_facturas",
+  "entityName": "PreFacturas",
+  "entityNamePlural": "PreFacturass",
+  "actions": {
+    "new": "New PreFacturas",
+    "create": "Create",
+    "edit": "Edit",
+    "update": "Update",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "save": "Save",
+    "search": "Search",
+    "back": "Back",
+    "view": "View",
+    "viewDetails": "View Details",
+    "confirmDelete": "Confirm deletion",
+    "actions": "Actions",
+    "first": "First",
+    "previous": "Previous",
+    "next": "Next",
+    "last": "Last"
+  },
+  "list": {
+    "title": "pre_facturas",
+    "subtitle": "Complete management of pre_facturas",
+    "empty": "No records available",
+    "createFirst": "Create First",
+    "total": "Total PreFacturass",
+    "active": "Active Records",
+    "lastUpdate": "Last Update"
+  },
+  "create": {
+    "title": "Create PreFacturas",
+    "subtitle": "Complete the form to add a new record",
+    "generalInfo": "General Information",
+    "successTitle": "Data Added",
+    "successMessage": "What do we do now?",
+    "addAnother": "Add Another!",
+    "backToList": "No, Back to List!"
+  },
+  "edit": {
+    "title": "Edit PreFacturas",
+    "subtitle": "Modify the fields you want to update",
+    "loading": "Loading data...",
+    "notFound": "Record not found"
+  },
+  "detail": {
+    "title": "PreFacturas Details",
+    "subtitle": "Complete record information"
+  },
+  "messages": {
+    "createSuccess": "PreFacturas created successfully",
+    "updateSuccess": "PreFacturas updated successfully",
+    "deleteSuccess": "PreFacturas deleted successfully",
+    "createError": "Error creating record",
+    "updateError": "Error updating record",
+    "deleteError": "Error deleting record",
+    "loadError": "Error loading data",
+    "deleteConfirm": "Are you sure you want to delete this record?",
+    "deleteWarning": "This action cannot be undone"
+  },
+  "fields": {
+    "no_orden": {
+      "label": "No_orden",
+      "placeholder": "Enter no_orden"
+    },
+    "fecha": {
+      "label": "Fecha",
+      "placeholder": "Enter fecha"
+    },
+    "estado": {
+      "label": "Estado",
+      "placeholder": "Enter estado"
+    },
+    "total": {
+      "label": "Total",
+      "placeholder": "Enter total"
+    },
+    "no_factura": {
+      "label": "No_factura",
+      "placeholder": "Enter no_factura"
+    },
+    "cod_cliente": {
+      "label": "Cod_cliente",
+      "placeholder": "Enter cod_cliente"
+    },
+    "cliente": {
+      "label": "Cliente",
+      "placeholder": "Enter cliente"
+    },
+    "productos": {
+      "label": "Productos",
+      "placeholder": "Enter productos"
+    },
+    "nota": {
+      "label": "Nota",
+      "placeholder": "Enter nota"
+    },
+    "created_at": {
+      "label": "Created_at",
+      "placeholder": "Enter created_at"
+    },
+    "updated_at": {
+      "label": "Updated_at",
+      "placeholder": "Enter updated_at"
+    }
+  }
+}

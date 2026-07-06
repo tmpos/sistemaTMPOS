@@ -1,0 +1,84 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Nomina",
+"to": "/nomina",
+"permiso": "Administrador,Soporte",
+"icon": "pi pi-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/nomina',
+        name: 'nomina',
+        component: () => import('../views/Nomina/Nomina.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/crearnomina',
+        name: 'crearnomina',
+        component: () => import('@/views/Nomina/CrearNomina.vue'),
+    },
+    {
+        path: '/editarnomina/:id',
+        name: 'editarnomina',
+        component: () => import('@/views/Nomina/EditarNomina.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'no_nomina', 'fecha_inicio', 'fecha_final', 'estado', 'cedula', 'nombre', 'cargo', 'sueldo', 'total_deducciones', 'total_neto_pagar', 'nomina'"
+******************************************************
+{
+        
+      "no_nomina": "no_nomina",
+      "NO_NOMINA": "NO_NOMINA",
+      "No_nomina": "No_nomina",
+     
+      "fecha_inicio": "fecha_inicio",
+      "FECHA_INICIO": "FECHA_INICIO",
+      "Fecha_inicio": "Fecha_inicio",
+     
+      "fecha_final": "fecha_final",
+      "FECHA_FINAL": "FECHA_FINAL",
+      "Fecha_final": "Fecha_final",
+     
+      "estado": "estado",
+      "ESTADO": "ESTADO",
+      "Estado": "Estado",
+     
+      "cedula": "cedula",
+      "CEDULA": "CEDULA",
+      "Cedula": "Cedula",
+     
+      "nombre": "nombre",
+      "NOMBRE": "NOMBRE",
+      "Nombre": "Nombre",
+     
+      "cargo": "cargo",
+      "CARGO": "CARGO",
+      "Cargo": "Cargo",
+     
+      "sueldo": "sueldo",
+      "SUELDO": "SUELDO",
+      "Sueldo": "Sueldo",
+     
+      "total_deducciones": "total_deducciones",
+      "TOTAL_DEDUCCIONES": "TOTAL_DEDUCCIONES",
+      "Total_deducciones": "Total_deducciones",
+     
+      "total_neto_pagar": "total_neto_pagar",
+      "TOTAL_NETO_PAGAR": "TOTAL_NETO_PAGAR",
+      "Total_neto_pagar": "Total_neto_pagar",
+     
+      "nomina": "nomina",
+      "NOMINA": "NOMINA",
+      "Nomina": "Nomina",
+}
+

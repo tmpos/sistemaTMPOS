@@ -1,0 +1,195 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Phone_check",
+"to": "/phone_check",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/phone_check',
+        name: 'phone_check',
+        component: () => import('../views/Phone_check/Phone_check.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/crearphone_check',
+        name: 'crearphone_check',
+        component: () => import('@/views/Phone_check/CrearPhone_check.vue'),
+    },
+    {
+        path: '/editarphone_check/:id',
+        name: 'editarphone_check',
+        component: () => import('@/views/Phone_check/EditarPhone_check.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'proveedor', 'no_compra', 'fecha_de_compra', 'hora', 'equipo', 'marca', 'modelo', 'imei', 'serial', 'tecnico', 'costo', 'estado', 'desbloqueo_redes', 'grado', 'bateria', 'almacenamiento', 'color', 'carrier', 'test_3utool', 'icloud', 'base_id', 'status_caution', 'front_camera', 'rear_camera', 'telephoto_camera_quality', 'ultra_wide_camera_quality', 'volume_up_button', 'volume_down_button', 'primary_speaker', 'vibration', 'wifi', 'loud_speaker', 'lcd', 'touch_screen', 'proximity_sensor', 'face_id', 'display_quality', 'button_responsiveness', 'detalles'"
+******************************************************
+{
+        
+      "proveedor": "proveedor",
+      "PROVEEDOR": "PROVEEDOR",
+      "Proveedor": "Proveedor",
+     
+      "no_compra": "no_compra",
+      "NO_COMPRA": "NO_COMPRA",
+      "No_compra": "No_compra",
+     
+      "fecha_de_compra": "fecha_de_compra",
+      "FECHA_DE_COMPRA": "FECHA_DE_COMPRA",
+      "Fecha_de_compra": "Fecha_de_compra",
+     
+      "hora": "hora",
+      "HORA": "HORA",
+      "Hora": "Hora",
+     
+      "equipo": "equipo",
+      "EQUIPO": "EQUIPO",
+      "Equipo": "Equipo",
+     
+      "marca": "marca",
+      "MARCA": "MARCA",
+      "Marca": "Marca",
+     
+      "modelo": "modelo",
+      "MODELO": "MODELO",
+      "Modelo": "Modelo",
+     
+      "imei": "imei",
+      "IMEI": "IMEI",
+      "Imei": "Imei",
+     
+      "serial": "serial",
+      "SERIAL": "SERIAL",
+      "Serial": "Serial",
+     
+      "tecnico": "tecnico",
+      "TECNICO": "TECNICO",
+      "Tecnico": "Tecnico",
+     
+      "costo": "costo",
+      "COSTO": "COSTO",
+      "Costo": "Costo",
+     
+      "estado": "estado",
+      "ESTADO": "ESTADO",
+      "Estado": "Estado",
+     
+      "desbloqueo_redes": "desbloqueo_redes",
+      "DESBLOQUEO_REDES": "DESBLOQUEO_REDES",
+      "Desbloqueo_redes": "Desbloqueo_redes",
+     
+      "grado": "grado",
+      "GRADO": "GRADO",
+      "Grado": "Grado",
+     
+      "bateria": "bateria",
+      "BATERIA": "BATERIA",
+      "Bateria": "Bateria",
+     
+      "almacenamiento": "almacenamiento",
+      "ALMACENAMIENTO": "ALMACENAMIENTO",
+      "Almacenamiento": "Almacenamiento",
+     
+      "color": "color",
+      "COLOR": "COLOR",
+      "Color": "Color",
+     
+      "carrier": "carrier",
+      "CARRIER": "CARRIER",
+      "Carrier": "Carrier",
+     
+      "test_3utool": "test_3utool",
+      "TEST_3UTOOL": "TEST_3UTOOL",
+      "Test_3utool": "Test_3utool",
+     
+      "icloud": "icloud",
+      "ICLOUD": "ICLOUD",
+      "Icloud": "Icloud",
+     
+      "base_id": "base_id",
+      "BASE_ID": "BASE_ID",
+      "Base_id": "Base_id",
+     
+      "status_caution": "status_caution",
+      "STATUS_CAUTION": "STATUS_CAUTION",
+      "Status_caution": "Status_caution",
+     
+      "front_camera": "front_camera",
+      "FRONT_CAMERA": "FRONT_CAMERA",
+      "Front_camera": "Front_camera",
+     
+      "rear_camera": "rear_camera",
+      "REAR_CAMERA": "REAR_CAMERA",
+      "Rear_camera": "Rear_camera",
+     
+      "telephoto_camera_quality": "telephoto_camera_quality",
+      "TELEPHOTO_CAMERA_QUALITY": "TELEPHOTO_CAMERA_QUALITY",
+      "Telephoto_camera_quality": "Telephoto_camera_quality",
+     
+      "ultra_wide_camera_quality": "ultra_wide_camera_quality",
+      "ULTRA_WIDE_CAMERA_QUALITY": "ULTRA_WIDE_CAMERA_QUALITY",
+      "Ultra_wide_camera_quality": "Ultra_wide_camera_quality",
+     
+      "volume_up_button": "volume_up_button",
+      "VOLUME_UP_BUTTON": "VOLUME_UP_BUTTON",
+      "Volume_up_button": "Volume_up_button",
+     
+      "volume_down_button": "volume_down_button",
+      "VOLUME_DOWN_BUTTON": "VOLUME_DOWN_BUTTON",
+      "Volume_down_button": "Volume_down_button",
+     
+      "primary_speaker": "primary_speaker",
+      "PRIMARY_SPEAKER": "PRIMARY_SPEAKER",
+      "Primary_speaker": "Primary_speaker",
+     
+      "vibration": "vibration",
+      "VIBRATION": "VIBRATION",
+      "Vibration": "Vibration",
+     
+      "wifi": "wifi",
+      "WIFI": "WIFI",
+      "Wifi": "Wifi",
+     
+      "loud_speaker": "loud_speaker",
+      "LOUD_SPEAKER": "LOUD_SPEAKER",
+      "Loud_speaker": "Loud_speaker",
+     
+      "lcd": "lcd",
+      "LCD": "LCD",
+      "Lcd": "Lcd",
+     
+      "touch_screen": "touch_screen",
+      "TOUCH_SCREEN": "TOUCH_SCREEN",
+      "Touch_screen": "Touch_screen",
+     
+      "proximity_sensor": "proximity_sensor",
+      "PROXIMITY_SENSOR": "PROXIMITY_SENSOR",
+      "Proximity_sensor": "Proximity_sensor",
+     
+      "face_id": "face_id",
+      "FACE_ID": "FACE_ID",
+      "Face_id": "Face_id",
+     
+      "display_quality": "display_quality",
+      "DISPLAY_QUALITY": "DISPLAY_QUALITY",
+      "Display_quality": "Display_quality",
+     
+      "button_responsiveness": "button_responsiveness",
+      "BUTTON_RESPONSIVENESS": "BUTTON_RESPONSIVENESS",
+      "Button_responsiveness": "Button_responsiveness",
+     
+      "detalles": "detalles",
+      "DETALLES": "DETALLES",
+      "Detalles": "Detalles",
+}
+

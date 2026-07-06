@@ -1,0 +1,337 @@
+
+<script setup>
+import { ref, onMounted, nextTick, watchEffect } from 'vue';
+import { useToast } from "primevue/usetoast";
+import { useRouter, useRoute } from 'vue-router';
+const router = useRouter();
+const route = useRoute(); 
+import { enviarDatosPorPost, eliminarDatos, obtenerIdsSeleccionados, borrarTodoslosDatos, lenguajeDataTable, nfecha, arrayToObjetoFromTabla, peticionesFetch, encryptarPassword, envioElectron, generarCodigoUnico, peticiones, generadorCodigo, agregarDiasLaborablesalaFechaActual, mensajetoast, lasMayusculas, peticionesFetchOffline, arrayToObjetoFromTablaOffline, crearTablaSiNoExisteOffline } from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const link = ref('');
+const api = ref('');
+const token = ref('');
+const patronTelefono = ref('');
+const linkImpresora = ref('');
+const patroncedula = ref('');
+const tokenCifrado = ref('');
+const tokenCorto = ref('');
+/************************************************************************/
+const intitucionesData = ref([])
+const value = ref('0');
+/************************************************************************/
+const datoscamposReclamaciones = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+const position = "top";
+/************************************************************************/
+const fetchAndSetupData = async () => {
+    const jsonData = await arrayToObjetoFromTablaOffline('reclamaciones');
+    datoscamposReclamaciones.value = jsonData;
+    datoscamposReclamaciones.value.estado_reclamacion = 'ABIERTO';
+    datoscamposReclamaciones.value.resultado_reclamacion = 'EN ESPERA';
+    datoscamposReclamaciones.value.representante = datosEmpresa.usuario.nombre;
+    datoscamposReclamaciones.value.fecha_emision = nfecha('fecha');
+    datoscamposReclamaciones.value.fecha_respuesta = agregarDiasLaborablesalaFechaActual(7);
+    datoscamposReclamaciones.value.fecha_vencimiento = agregarDiasLaborablesalaFechaActual(15);
+    datoscamposReclamaciones.value.institucion = intitucionesData.value[0];
+
+      const ultimaREC = await peticionesFetchOffline('getMaxValue', 'reclamaciones', 'no_reclamacion');
+      console.log("ultimaREC", ultimaREC);
+
+    datoscamposReclamaciones.value.no_reclamacion = generadorCodigo(ultimaREC[0], 'REC', 8);
+};
+/************************************************************************/
+const fetchIntituciones = async () => {
+  try {
+    const response = await peticionesFetch(
+      `${link.value}${api.value}`,
+      'datosarraypost',
+      { tabla: 'instituciones' },
+      tokenCifrado.value,
+      'POST'
+    );
+    intitucionesData.value = response;
+   // intitucionesDataNames.value = response.map(intitucion=>intitucion.nombre);
+  } catch (error) {
+    toast.add({ 
+      severity: 'error', 
+      summary: 'Error', 
+      detail: 'Failed to fetch data from intituciones', 
+      life: 3000 
+    });
+  }
+};
+/************************************************************************/
+onMounted(async() => {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+await fetchIntituciones()
+await fetchAndSetupData()
+});
+/************************************************************************/
+async function enviarDatos(event) {
+    event.preventDefault();
+  const url = link.value+api.value+"/insertar/reclamaciones";
+  if (!datoscamposReclamaciones.value) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Datos incompletos, no se puede Enviar.', life: 3000 });
+    return;
+  }
+  if (datoscamposReclamaciones.value.hasOwnProperty('created_at')) {
+     datoscamposReclamaciones.value.created_at = nfecha('timestamp')
+     datoscamposReclamaciones.value.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await peticionesFetchOffline('insertData', 'reclamaciones', JSON.stringify(datoscamposReclamaciones.value));
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Agregados con éxito.', life: 3000 });
+Swal.fire({
+  title: "Datos Agregados",
+  text: "Que hacemos ahora?",
+  icon: "warning",
+  showCancelButton: true,
+  confirmButtonText: "Agregar Otro!",
+  cancelButtonText: "No, Regresar al Inicio!",
+ }).then(async(result) => {
+  if (result.isConfirmed) {
+      fetchAndSetupData()
+} else if (result.dismiss === Swal.DismissReason.cancel) {
+    router.push({ path: `/reclamaciones` });
+  }
+})
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+const fnBuscarFactura = async()=>{
+    const factura = datoscamposReclamaciones.value.no_factura
+    if(!factura){
+       toast.add({ severity: 'error', summary: 'Error', detail: 'Debe Agregar una Factura', life: 3000 });
+    }
+
+  const verificaFactura = await peticionesFetchOffline('getDataByField', 'facturas', 'no_factura', factura);
+
+    if(!verificaFactura){
+       toast.add({ severity: 'error', summary: 'Error', detail: 'No se encuentra la Factura', life: 3000 });
+    
+    }else{
+
+      const datosCliente = await peticionesFetchOffline('getDataByField', 'clientes', 'codigo', verificaFactura.cod_cliente);
+     datoscamposReclamaciones.value.nombre = verificaFactura.nombre_cliente
+     datoscamposReclamaciones.value.telefono = datosCliente?.telefono || 'N/A'
+     datoscamposReclamaciones.value.email = datosCliente?.email || 'N/A'
+     datoscamposReclamaciones.value.whatsapp = datosCliente?.whatsapp || 'N/A'
+     datoscamposReclamaciones.value.institucion = verificaFactura.institucion || 'N/A'
+     datoscamposReclamaciones.value.fecha_compra = verificaFactura.fecha_emision || nfecha('fecha')
+
+
+    }
+
+
+
+
+}
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="container-fluid mt-5 card">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Reclamaciones</legend>
+    <div class="row">
+      <div class="col-sm-12">
+        <Button as="router-link" icon="pi pi-home" to="/reclamaciones" />
+      </div>
+    </div>
+</fieldset>
+<section>
+<fieldset class="border p-3 rounded mb-2">
+  <legend class="float-none w-auto px-2">Campos</legend>
+    <form id="formularioGenerar" action="" method="">
+
+     <div class="box-body">
+          <div class="grid grid-cols-12 gap-4 mt-4 text-blue-600" id="campos">
+<div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                    <label for="fecha_compra" class="block text-sm font-medium text-gray-700 dark:text-gray-300">No factura</label>
+<InputGroup>
+    <InputText v-model="datoscamposReclamaciones.no_factura" @keydown.enter="fnBuscarFactura" placeholder="No Factura" v-solonumeros />
+    <InputGroupAddon>
+        <Button icon="pi pi-search"  @click="fnBuscarFactura" />
+    </InputGroupAddon>
+</InputGroup>
+
+ </div>
+ </div>
+ </div>
+
+
+ <div class="flex mb-2 gap-2 justify-end">
+            <Button @click="value = '0'" rounded label="1" class="w-8 h-8 p-0" :outlined="value !== '0'" />
+            <Button @click="value = '1'" rounded label="2" class="w-8 h-8 p-0" :outlined="value !== '1'" />
+            <Button @click="value = '2'" rounded label="3" class="w-8 h-8 p-0" :outlined="value !== '2'" />
+        </div>
+
+        <Tabs v-model:value="value">
+            <TabList>
+                <Tab value="0">Datos Cliente</Tab>
+                <Tab value="1">Detalles Reclamación</Tab>
+                <Tab value="2">Resultado Reclamación</Tab>
+            </TabList>
+            <TabPanels>
+                <TabPanel value="0">
+     <div class="box-body">
+          <div class="grid grid-cols-12 gap-4 mt-4 text-blue-600" id="campos">
+
+<div class="col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12 2xl:col-span-12">
+                    <label for="nombre" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Nombre</label>
+                    <InputText type="text" class="form-input w-full "  v-mayuscula v-model="datoscamposReclamaciones.nombre" placeholder="nombre" name="crearnombre" id="nombre" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                    <label for="telefono" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Telefono</label>
+                    <InputText type="text" class="form-input w-full "  v-maska="patronTelefono" v-model="datoscamposReclamaciones.telefono" placeholder="telefono" name="creartelefono" id="telefono" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                    <label for="whatsapp" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Whatsapp</label>
+                    <InputText type="text" class="form-input w-full "  v-maska="patronTelefono" v-model="datoscamposReclamaciones.whatsapp" placeholder="whatsapp" name="crearwhatsapp" id="whatsapp" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                    <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Email</label>
+                    <InputText type="text" class="form-input w-full "  v-model="datoscamposReclamaciones.email" placeholder="email" name="crearemail" id="email" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                    <label for="institucion" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Institucion</label>
+                    <Dropdown editable v-model="datoscamposReclamaciones.institucion" :options="intitucionesData" optionLabel="nombre" placeholder="Seleccione institucion" class="w-full" />
+            </div>
+            </div>
+            </div>
+
+
+                </TabPanel>
+                <TabPanel value="1">
+        <div class="box-body">
+          <div class="grid grid-cols-12 gap-4 mt-4 text-blue-600" id="campos">
+
+<div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                    <label for="no_reclamacion" class="block text-sm font-medium text-gray-700 dark:text-gray-400">No reclamacion</label>
+                    <InputText type="text" class="form-input w-full "  v-model="datoscamposReclamaciones.no_reclamacion" placeholder="no_reclamacion" name="crearno_reclamacion" id="no_reclamacion" readonly />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                    <label for="fecha_emision" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Fecha emision</label>
+                    <InputText type="text" class="form-input w-full "  v-model="datoscamposReclamaciones.fecha_emision" readonly placeholder="fecha_emision" name="crearfecha_emision" id="fecha_emision" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                    <label for="fecha_respuesta" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Fecha respuesta</label>
+                   <DatePicker  v-model="datoscamposReclamaciones.fecha_respuesta" showButtonBar fluid />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                    <label for="fecha_vencimiento" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Fecha vencimiento</label>
+                   <DatePicker  v-model="datoscamposReclamaciones.fecha_vencimiento" showButtonBar fluid />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12 2xl:col-span-12">
+                    <label for="descripcion_reclamo" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Descripcion reclamo</label>
+                   <Textarea id="creardescripcion_reclamo" rows="3" class="form-textarea w-full "  v-model="datoscamposReclamaciones.descripcion_reclamo" placeholder="Descripcion_reclamo"></textarea>
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12 2xl:col-span-12">
+                    <label for="articulo_reclamado" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Articulo reclamado</label>
+                    <InputText type="text" class="form-input w-full "  v-mayuscula v-model="datoscamposReclamaciones.articulo_reclamado" placeholder="articulo_reclamado" name="creararticulo_reclamado" id="articulo_reclamado" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                    <label for="fecha_compra" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Fecha compra</label>
+                   <DatePicker  v-model="datoscamposReclamaciones.fecha_compra" showButtonBar fluid />
+            </div>
+
+<div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                    <label for="fecha_compra" class="block text-sm font-medium text-gray-700 dark:text-gray-300">No factura</label>
+<InputGroup>
+    <InputText v-model="datoscamposReclamaciones.no_factura" placeholder="No Factura" v-solonumeros />
+    <InputGroupAddon>
+        <Button icon="pi pi-search"  @click="fnBuscarFactura" />
+    </InputGroupAddon>
+</InputGroup>
+
+            </div>
+
+
+<div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                    <label for="estado_reclamacion" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Estado reclamacion</label>
+
+              <Dropdown v-model="datoscamposReclamaciones.estado_reclamacion" :options="['ABIERTO','CERRADO']" placeholder="Seleccione estado_reclamacion" class="w-full" />
+            </div>
+
+<div class="col-span-12 sm:col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-3 2xl:col-span-3">
+                    <label for="resultado_reclamacion" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Resultado reclamacion</label>
+
+              <Dropdown v-model="datoscamposReclamaciones.resultado_reclamacion" :options="['EN ESPERA','FAVORABLE','DESFAVORABLE']" placeholder="Seleccione resultado_reclamacion" class="w-full" />
+            </div>
+
+            </div>
+            </div>
+                </TabPanel>
+                <TabPanel value="2">
+        <div class="box-body">
+          <div class="grid grid-cols-12 gap-4 mt-4 text-blue-600" id="campos">
+
+<div class="col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12 2xl:col-span-12">
+                    <label for="respuesta_reclamo" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Respuesta reclamo</label>
+                    <TextArea class="form-input w-full "  v-model="datoscamposReclamaciones.respuesta_reclamo" placeholder="respuesta_reclamo" name="crearrespuesta_reclamo" id="respuesta_reclamo" />
+                </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-6 xl:col-span-6 2xl:col-span-6">
+                    <label for="fecha_cierre" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Fecha cierre</label>
+                   <DatePicker  v-model="datoscamposReclamaciones.fecha_cierre" showButtonBar fluid />
+            </div>
+<div class="col-span-12 sm:col-span-12 md:col-span-6 lg:col-span-6 xl:col-span-6 2xl:col-span-6">
+                    <label for="representante" class="block text-sm font-medium text-gray-700 dark:text-gray-400">Representante</label>
+                    <InputText type="text" class="form-input w-full "  v-mayuscula v-model="datoscamposReclamaciones.representante" placeholder="representante" name="crearrepresentante" id="representante" />
+                </div>
+                </div>
+                </div>
+                </TabPanel>
+            </TabPanels>
+        </Tabs>
+
+
+
+         <div class="box-body">
+          <div class="grid grid-cols-12 gap-4 mt-4 text-blue-600" id="campos">
+
+
+
+<div class="form-group col-6" hidden>
+<label for="created_atAgregarDatos">CREATED_AT</label>
+<input type="input" v-model="datoscamposReclamaciones.created_at" name="created_at"  class="form-control " id="created_atAgregarDatos"  placeholder="created_at" maxlength="">
+</div>
+<div class="form-group col-6" hidden>
+<label for="updated_atAgregarDatos">UPDATED_AT</label>
+<input type="input" v-model="datoscamposReclamaciones.updated_at" name="updated_at"  class="form-control " id="updated_atAgregarDatos"  placeholder="updated_at" maxlength="">
+</div>
+
+<div class="form-group col-12" hidden>
+<label for="usuarioAgregarDatos">USUARIO</label>
+<input type="input" v-model="datoscamposReclamaciones.usuario" name="usuario"  class="form-control " id="usuarioAgregarDatos"  placeholder="usuario" maxlength="250">
+</div>
+
+<div class="form-group col-span-12 mb-5 mt-5">
+  <Button label="Enviar Datos" fluid  @click="enviarDatos" autofocus />
+</div>
+
+  </div>
+  </div>
+   </form>
+   </fieldset>
+</section>
+  </div>
+   </main>
+<Toast />
+</template>
+<style scoped>
+</style>
+

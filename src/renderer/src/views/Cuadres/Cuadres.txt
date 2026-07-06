@@ -1,0 +1,92 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Cuadres",
+"to": "/cuadres",
+"permiso": "Administrador,Soporte",
+"icon": "pi pi-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/cuadres',
+        name: 'cuadres',
+        component: () => import('../views/Cuadres/Cuadres.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/crearcuadres',
+        name: 'crearcuadres',
+        component: () => import('@/views/Cuadres/CrearCuadres.vue'),
+    },
+    {
+        path: '/editarcuadres/:id',
+        name: 'editarcuadres',
+        component: () => import('@/views/Cuadres/EditarCuadres.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'token', 'fecha', 'fecha_inicio', 'fecha_fin', 'cantidad_inicio', 'efectivo', 'tarjeta', 'transferencia', 'otro', 'gastos', 'total', 'turno', 'nota'"
+******************************************************
+{
+        
+      "token": "token",
+      "TOKEN": "TOKEN",
+      "Token": "Token",
+     
+      "fecha": "fecha",
+      "FECHA": "FECHA",
+      "Fecha": "Fecha",
+     
+      "fecha_inicio": "fecha_inicio",
+      "FECHA_INICIO": "FECHA_INICIO",
+      "Fecha_inicio": "Fecha_inicio",
+     
+      "fecha_fin": "fecha_fin",
+      "FECHA_FIN": "FECHA_FIN",
+      "Fecha_fin": "Fecha_fin",
+     
+      "cantidad_inicio": "cantidad_inicio",
+      "CANTIDAD_INICIO": "CANTIDAD_INICIO",
+      "Cantidad_inicio": "Cantidad_inicio",
+     
+      "efectivo": "efectivo",
+      "EFECTIVO": "EFECTIVO",
+      "Efectivo": "Efectivo",
+     
+      "tarjeta": "tarjeta",
+      "TARJETA": "TARJETA",
+      "Tarjeta": "Tarjeta",
+     
+      "transferencia": "transferencia",
+      "TRANSFERENCIA": "TRANSFERENCIA",
+      "Transferencia": "Transferencia",
+     
+      "otro": "otro",
+      "OTRO": "OTRO",
+      "Otro": "Otro",
+     
+      "gastos": "gastos",
+      "GASTOS": "GASTOS",
+      "Gastos": "Gastos",
+     
+      "total": "total",
+      "TOTAL": "TOTAL",
+      "Total": "Total",
+     
+      "turno": "turno",
+      "TURNO": "TURNO",
+      "Turno": "Turno",
+     
+      "nota": "nota",
+      "NOTA": "NOTA",
+      "Nota": "Nota",
+}
+

@@ -1,0 +1,56 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Nacional",
+"to": "/nacional",
+"permiso": "Administrador,Soporte",
+"icon": "pi pi-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/nacional',
+        name: 'nacional',
+        component: () => import('../views/Nacional/Nacional.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/crearnacional',
+        name: 'crearnacional',
+        component: () => import('@/views/Nacional/CrearNacional.vue'),
+    },
+    {
+        path: '/editarnacional/:id',
+        name: 'editarnacional',
+        component: () => import('@/views/Nacional/EditarNacional.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'fecha', 'primero', 'segundo', 'tercero'"
+******************************************************
+{
+        
+      "fecha": "fecha",
+      "FECHA": "FECHA",
+      "Fecha": "Fecha",
+     
+      "primero": "primero",
+      "PRIMERO": "PRIMERO",
+      "Primero": "Primero",
+     
+      "segundo": "segundo",
+      "SEGUNDO": "SEGUNDO",
+      "Segundo": "Segundo",
+     
+      "tercero": "tercero",
+      "TERCERO": "TERCERO",
+      "Tercero": "Tercero",
+}
+

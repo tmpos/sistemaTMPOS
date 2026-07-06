@@ -1,0 +1,56 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Config_correo",
+"to": "/config_correo",
+"permiso": "Administrador,Soporte",
+"icon": "pi pi-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/config_correo',
+        name: 'config_correo',
+        component: () => import('../views/Config_correo/Config_correo.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/crearconfig_correo',
+        name: 'crearconfig_correo',
+        component: () => import('@/views/Config_correo/CrearConfig_correo.vue'),
+    },
+    {
+        path: '/editarconfig_correo/:id',
+        name: 'editarconfig_correo',
+        component: () => import('@/views/Config_correo/EditarConfig_correo.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'host', 'port', 'username', 'password'"
+******************************************************
+{
+        
+      "host": "host",
+      "HOST": "HOST",
+      "Host": "Host",
+     
+      "port": "port",
+      "PORT": "PORT",
+      "Port": "Port",
+     
+      "username": "username",
+      "USERNAME": "USERNAME",
+      "Username": "Username",
+     
+      "password": "password",
+      "PASSWORD": "PASSWORD",
+      "Password": "Password",
+}
+

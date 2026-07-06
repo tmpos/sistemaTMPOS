@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS `banco` (
+  `id` int(11) AUTO_INCREMENT PRIMARY KEY,
+  `nombre` TEXT(250) NOT NULL,
+  `saldo` TEXT(250) NOT NULL,
+  `cuenta` TEXT(250) NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `usuario` text(250) COLLATE utf8_spanish_ci NOT NULL
+);

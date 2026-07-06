@@ -1,0 +1,19 @@
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"name": "Informepordia",
+"link": "/informepordia",
+"icon": "fas fa-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+******************************************************
+    {
+        path: '/informepordia',
+        name: 'informepordia',
+        component: () => import('../views/Informepordia/Informepordia.vue'),
+    },
+******************************************************
+************|-FIN DE LA PARTE DEL ROUTER -|********

@@ -1,0 +1,160 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Empleados",
+"to": "/empleados",
+"permiso": "Administrador,Soporte",
+"icon": "pi pi-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/empleados',
+        name: 'empleados',
+        component: () => import('../views/Empleados/Empleados.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/crearempleados',
+        name: 'crearempleados',
+        component: () => import('@/views/Empleados/CrearEmpleados.vue'),
+    },
+    {
+        path: '/editarempleados/:id',
+        name: 'editarempleados',
+        component: () => import('@/views/Empleados/EditarEmpleados.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'codigo_empleado', 'cedula', 'nombre', 'sexo', 'fecha_nacimiento', 'telefono', 'email', 'direccion', 'cargo', 'departamento', 'fecha_ingreso', 'tipo_contrato', 'estado', 'turno', 'supervisor', 'banco', 'no_cuenta', 'sueldo_base', 'comision_porcentaje', 'retencion_afp', 'retencion_sfs', 'retencion_isr', 'bono_fijo', 'otros_descuentos', 'tipo_pago', 'monto_prestamos', 'monto_horas_extras', 'fecha_creacion', 'fecha_actualizacion', 'notas'"
+******************************************************
+{
+        
+      "codigo_empleado": "codigo_empleado",
+      "CODIGO_EMPLEADO": "CODIGO_EMPLEADO",
+      "Codigo_empleado": "Codigo_empleado",
+     
+      "cedula": "cedula",
+      "CEDULA": "CEDULA",
+      "Cedula": "Cedula",
+     
+      "nombre": "nombre",
+      "NOMBRE": "NOMBRE",
+      "Nombre": "Nombre",
+     
+      "sexo": "sexo",
+      "SEXO": "SEXO",
+      "Sexo": "Sexo",
+     
+      "fecha_nacimiento": "fecha_nacimiento",
+      "FECHA_NACIMIENTO": "FECHA_NACIMIENTO",
+      "Fecha_nacimiento": "Fecha_nacimiento",
+     
+      "telefono": "telefono",
+      "TELEFONO": "TELEFONO",
+      "Telefono": "Telefono",
+     
+      "email": "email",
+      "EMAIL": "EMAIL",
+      "Email": "Email",
+     
+      "direccion": "direccion",
+      "DIRECCION": "DIRECCION",
+      "Direccion": "Direccion",
+     
+      "cargo": "cargo",
+      "CARGO": "CARGO",
+      "Cargo": "Cargo",
+     
+      "departamento": "departamento",
+      "DEPARTAMENTO": "DEPARTAMENTO",
+      "Departamento": "Departamento",
+     
+      "fecha_ingreso": "fecha_ingreso",
+      "FECHA_INGRESO": "FECHA_INGRESO",
+      "Fecha_ingreso": "Fecha_ingreso",
+     
+      "tipo_contrato": "tipo_contrato",
+      "TIPO_CONTRATO": "TIPO_CONTRATO",
+      "Tipo_contrato": "Tipo_contrato",
+     
+      "estado": "estado",
+      "ESTADO": "ESTADO",
+      "Estado": "Estado",
+     
+      "turno": "turno",
+      "TURNO": "TURNO",
+      "Turno": "Turno",
+     
+      "supervisor": "supervisor",
+      "SUPERVISOR": "SUPERVISOR",
+      "Supervisor": "Supervisor",
+     
+      "banco": "banco",
+      "BANCO": "BANCO",
+      "Banco": "Banco",
+     
+      "no_cuenta": "no_cuenta",
+      "NO_CUENTA": "NO_CUENTA",
+      "No_cuenta": "No_cuenta",
+     
+      "sueldo_base": "sueldo_base",
+      "SUELDO_BASE": "SUELDO_BASE",
+      "Sueldo_base": "Sueldo_base",
+     
+      "comision_porcentaje": "comision_porcentaje",
+      "COMISION_PORCENTAJE": "COMISION_PORCENTAJE",
+      "Comision_porcentaje": "Comision_porcentaje",
+     
+      "retencion_afp": "retencion_afp",
+      "RETENCION_AFP": "RETENCION_AFP",
+      "Retencion_afp": "Retencion_afp",
+     
+      "retencion_sfs": "retencion_sfs",
+      "RETENCION_SFS": "RETENCION_SFS",
+      "Retencion_sfs": "Retencion_sfs",
+     
+      "retencion_isr": "retencion_isr",
+      "RETENCION_ISR": "RETENCION_ISR",
+      "Retencion_isr": "Retencion_isr",
+     
+      "bono_fijo": "bono_fijo",
+      "BONO_FIJO": "BONO_FIJO",
+      "Bono_fijo": "Bono_fijo",
+     
+      "otros_descuentos": "otros_descuentos",
+      "OTROS_DESCUENTOS": "OTROS_DESCUENTOS",
+      "Otros_descuentos": "Otros_descuentos",
+     
+      "tipo_pago": "tipo_pago",
+      "TIPO_PAGO": "TIPO_PAGO",
+      "Tipo_pago": "Tipo_pago",
+     
+      "monto_prestamos": "monto_prestamos",
+      "MONTO_PRESTAMOS": "MONTO_PRESTAMOS",
+      "Monto_prestamos": "Monto_prestamos",
+     
+      "monto_horas_extras": "monto_horas_extras",
+      "MONTO_HORAS_EXTRAS": "MONTO_HORAS_EXTRAS",
+      "Monto_horas_extras": "Monto_horas_extras",
+     
+      "fecha_creacion": "fecha_creacion",
+      "FECHA_CREACION": "FECHA_CREACION",
+      "Fecha_creacion": "Fecha_creacion",
+     
+      "fecha_actualizacion": "fecha_actualizacion",
+      "FECHA_ACTUALIZACION": "FECHA_ACTUALIZACION",
+      "Fecha_actualizacion": "Fecha_actualizacion",
+     
+      "notas": "notas",
+      "NOTAS": "NOTAS",
+      "Notas": "Notas",
+}
+

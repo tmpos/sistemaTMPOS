@@ -1,0 +1,108 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Reclamaciones",
+"to": "/reclamaciones",
+"permiso": "Administrador,Soporte",
+"icon": "pi pi-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/reclamaciones',
+        name: 'reclamaciones',
+        component: () => import('../views/Reclamaciones/Reclamaciones.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/crearreclamaciones',
+        name: 'crearreclamaciones',
+        component: () => import('@/views/Reclamaciones/CrearReclamaciones.vue'),
+    },
+    {
+        path: '/editarreclamaciones/:id',
+        name: 'editarreclamaciones',
+        component: () => import('@/views/Reclamaciones/EditarReclamaciones.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'nombre', 'telefono', 'whatsapp', 'email', 'institucion', 'no_reclamacion', 'fecha_emision', 'fecha_respuesta', 'fecha_vencimiento', 'descripcion_reclamo', 'articulo_reclamado', 'fecha_compra', 'estado_reclamacion', 'resultado_reclamacion', 'respuesta_reclamo', 'fecha_cierre', 'representante'"
+******************************************************
+{
+        
+      "nombre": "nombre",
+      "NOMBRE": "NOMBRE",
+      "Nombre": "Nombre",
+     
+      "telefono": "telefono",
+      "TELEFONO": "TELEFONO",
+      "Telefono": "Telefono",
+     
+      "whatsapp": "whatsapp",
+      "WHATSAPP": "WHATSAPP",
+      "Whatsapp": "Whatsapp",
+     
+      "email": "email",
+      "EMAIL": "EMAIL",
+      "Email": "Email",
+     
+      "institucion": "institucion",
+      "INSTITUCION": "INSTITUCION",
+      "Institucion": "Institucion",
+     
+      "no_reclamacion": "no_reclamacion",
+      "NO_RECLAMACION": "NO_RECLAMACION",
+      "No_reclamacion": "No_reclamacion",
+     
+      "fecha_emision": "fecha_emision",
+      "FECHA_EMISION": "FECHA_EMISION",
+      "Fecha_emision": "Fecha_emision",
+     
+      "fecha_respuesta": "fecha_respuesta",
+      "FECHA_RESPUESTA": "FECHA_RESPUESTA",
+      "Fecha_respuesta": "Fecha_respuesta",
+     
+      "fecha_vencimiento": "fecha_vencimiento",
+      "FECHA_VENCIMIENTO": "FECHA_VENCIMIENTO",
+      "Fecha_vencimiento": "Fecha_vencimiento",
+     
+      "descripcion_reclamo": "descripcion_reclamo",
+      "DESCRIPCION_RECLAMO": "DESCRIPCION_RECLAMO",
+      "Descripcion_reclamo": "Descripcion_reclamo",
+     
+      "articulo_reclamado": "articulo_reclamado",
+      "ARTICULO_RECLAMADO": "ARTICULO_RECLAMADO",
+      "Articulo_reclamado": "Articulo_reclamado",
+     
+      "fecha_compra": "fecha_compra",
+      "FECHA_COMPRA": "FECHA_COMPRA",
+      "Fecha_compra": "Fecha_compra",
+     
+      "estado_reclamacion": "estado_reclamacion",
+      "ESTADO_RECLAMACION": "ESTADO_RECLAMACION",
+      "Estado_reclamacion": "Estado_reclamacion",
+     
+      "resultado_reclamacion": "resultado_reclamacion",
+      "RESULTADO_RECLAMACION": "RESULTADO_RECLAMACION",
+      "Resultado_reclamacion": "Resultado_reclamacion",
+     
+      "respuesta_reclamo": "respuesta_reclamo",
+      "RESPUESTA_RECLAMO": "RESPUESTA_RECLAMO",
+      "Respuesta_reclamo": "Respuesta_reclamo",
+     
+      "fecha_cierre": "fecha_cierre",
+      "FECHA_CIERRE": "FECHA_CIERRE",
+      "Fecha_cierre": "Fecha_cierre",
+     
+      "representante": "representante",
+      "REPRESENTANTE": "REPRESENTANTE",
+      "Representante": "Representante",
+}
+

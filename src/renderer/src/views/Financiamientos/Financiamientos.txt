@@ -1,0 +1,332 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Financiamientos",
+"to": "/financiamientos",
+"permiso": "Administrador,Soporte",
+"icon": "pi pi-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/financiamientos',
+        name: 'financiamientos',
+        component: () => import('../views/Financiamientos/Financiamientos.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/crearfinanciamientos',
+        name: 'crearfinanciamientos',
+        component: () => import('@/views/Financiamientos/CrearFinanciamientos.vue'),
+    },
+    {
+        path: '/editarfinanciamientos/:id',
+        name: 'editarfinanciamientos',
+        component: () => import('@/views/Financiamientos/EditarFinanciamientos.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'cedula_cliente', 'nombre_cliente', 'telefono_cliente', 'whatsapp_cliente', 'email_cliente', 'direccion_cliente', 'referencia_direccion_cliente', 'fecha_nacimiento', 'edad_cliente', 'estado_civil', 'nombre_conyugue', 'telefono_conyugue', 'ocupcion', 'salario', 'tiempo_laborando', 'tipo_empresa', 'empresa_labora', 'contacto_empresa', 'ingresos_adicionales', 'tipo_vivienda', 'vehiculo', 'cantidad_hijos', 'cantidad_dependientes', 'referencia_familiar1', 'contacto_familiar1', 'referencia_familiar2', 'contacto_familiar2', 'referencia_personal1', 'contacto_personal1', 'referencia_personal2', 'contacto_personal2', 'redes_solciales', 'no_financiamiento', 'fecha_solicitud', 'hora_emision', 'etapa_solicitud', 'score_aa', 'agente', 'resultados_prospecto', 'resultado_analisis', 'motivo', 'cedula_garante', 'nombre_garante', 'telefono_garante', 'whatsapp_garante', 'email_garante', 'vinculo_deudor', 'direccion_garante', 'referencia_direccion_garante', 'articulos', 'inicial', 'capital', 'tasa_interes', 'interes_total', 'no_cuotas', 'valor_cuotas', 'gastos_legales', 'monto_total', 'total_abonado', 'total_pendiente', 'frecuencia_pago', 'fechas_pago', 'proximo_pago', 'prorrateo', 'proxima_cuota', 'fecha_entrega', 'responsable_entrega', 'cobrador_asignado', 'geolocalizacion', 'estado_financiamiento', 'historial_pagos', 'comentario', 'imagen'"
+******************************************************
+{
+        
+      "cedula_cliente": "cedula_cliente",
+      "CEDULA_CLIENTE": "CEDULA_CLIENTE",
+      "Cedula_cliente": "Cedula_cliente",
+     
+      "nombre_cliente": "nombre_cliente",
+      "NOMBRE_CLIENTE": "NOMBRE_CLIENTE",
+      "Nombre_cliente": "Nombre_cliente",
+     
+      "telefono_cliente": "telefono_cliente",
+      "TELEFONO_CLIENTE": "TELEFONO_CLIENTE",
+      "Telefono_cliente": "Telefono_cliente",
+     
+      "whatsapp_cliente": "whatsapp_cliente",
+      "WHATSAPP_CLIENTE": "WHATSAPP_CLIENTE",
+      "Whatsapp_cliente": "Whatsapp_cliente",
+     
+      "email_cliente": "email_cliente",
+      "EMAIL_CLIENTE": "EMAIL_CLIENTE",
+      "Email_cliente": "Email_cliente",
+     
+      "direccion_cliente": "direccion_cliente",
+      "DIRECCION_CLIENTE": "DIRECCION_CLIENTE",
+      "Direccion_cliente": "Direccion_cliente",
+     
+      "referencia_direccion_cliente": "referencia_direccion_cliente",
+      "REFERENCIA_DIRECCION_CLIENTE": "REFERENCIA_DIRECCION_CLIENTE",
+      "Referencia_direccion_cliente": "Referencia_direccion_cliente",
+     
+      "fecha_nacimiento": "fecha_nacimiento",
+      "FECHA_NACIMIENTO": "FECHA_NACIMIENTO",
+      "Fecha_nacimiento": "Fecha_nacimiento",
+     
+      "edad_cliente": "edad_cliente",
+      "EDAD_CLIENTE": "EDAD_CLIENTE",
+      "Edad_cliente": "Edad_cliente",
+     
+      "estado_civil": "estado_civil",
+      "ESTADO_CIVIL": "ESTADO_CIVIL",
+      "Estado_civil": "Estado_civil",
+     
+      "nombre_conyugue": "nombre_conyugue",
+      "NOMBRE_CONYUGUE": "NOMBRE_CONYUGUE",
+      "Nombre_conyugue": "Nombre_conyugue",
+     
+      "telefono_conyugue": "telefono_conyugue",
+      "TELEFONO_CONYUGUE": "TELEFONO_CONYUGUE",
+      "Telefono_conyugue": "Telefono_conyugue",
+     
+      "ocupcion": "ocupcion",
+      "OCUPCION": "OCUPCION",
+      "Ocupcion": "Ocupcion",
+     
+      "salario": "salario",
+      "SALARIO": "SALARIO",
+      "Salario": "Salario",
+     
+      "tiempo_laborando": "tiempo_laborando",
+      "TIEMPO_LABORANDO": "TIEMPO_LABORANDO",
+      "Tiempo_laborando": "Tiempo_laborando",
+     
+      "tipo_empresa": "tipo_empresa",
+      "TIPO_EMPRESA": "TIPO_EMPRESA",
+      "Tipo_empresa": "Tipo_empresa",
+     
+      "empresa_labora": "empresa_labora",
+      "EMPRESA_LABORA": "EMPRESA_LABORA",
+      "Empresa_labora": "Empresa_labora",
+     
+      "contacto_empresa": "contacto_empresa",
+      "CONTACTO_EMPRESA": "CONTACTO_EMPRESA",
+      "Contacto_empresa": "Contacto_empresa",
+     
+      "ingresos_adicionales": "ingresos_adicionales",
+      "INGRESOS_ADICIONALES": "INGRESOS_ADICIONALES",
+      "Ingresos_adicionales": "Ingresos_adicionales",
+     
+      "tipo_vivienda": "tipo_vivienda",
+      "TIPO_VIVIENDA": "TIPO_VIVIENDA",
+      "Tipo_vivienda": "Tipo_vivienda",
+     
+      "vehiculo": "vehiculo",
+      "VEHICULO": "VEHICULO",
+      "Vehiculo": "Vehiculo",
+     
+      "cantidad_hijos": "cantidad_hijos",
+      "CANTIDAD_HIJOS": "CANTIDAD_HIJOS",
+      "Cantidad_hijos": "Cantidad_hijos",
+     
+      "cantidad_dependientes": "cantidad_dependientes",
+      "CANTIDAD_DEPENDIENTES": "CANTIDAD_DEPENDIENTES",
+      "Cantidad_dependientes": "Cantidad_dependientes",
+     
+      "referencia_familiar1": "referencia_familiar1",
+      "REFERENCIA_FAMILIAR1": "REFERENCIA_FAMILIAR1",
+      "Referencia_familiar1": "Referencia_familiar1",
+     
+      "contacto_familiar1": "contacto_familiar1",
+      "CONTACTO_FAMILIAR1": "CONTACTO_FAMILIAR1",
+      "Contacto_familiar1": "Contacto_familiar1",
+     
+      "referencia_familiar2": "referencia_familiar2",
+      "REFERENCIA_FAMILIAR2": "REFERENCIA_FAMILIAR2",
+      "Referencia_familiar2": "Referencia_familiar2",
+     
+      "contacto_familiar2": "contacto_familiar2",
+      "CONTACTO_FAMILIAR2": "CONTACTO_FAMILIAR2",
+      "Contacto_familiar2": "Contacto_familiar2",
+     
+      "referencia_personal1": "referencia_personal1",
+      "REFERENCIA_PERSONAL1": "REFERENCIA_PERSONAL1",
+      "Referencia_personal1": "Referencia_personal1",
+     
+      "contacto_personal1": "contacto_personal1",
+      "CONTACTO_PERSONAL1": "CONTACTO_PERSONAL1",
+      "Contacto_personal1": "Contacto_personal1",
+     
+      "referencia_personal2": "referencia_personal2",
+      "REFERENCIA_PERSONAL2": "REFERENCIA_PERSONAL2",
+      "Referencia_personal2": "Referencia_personal2",
+     
+      "contacto_personal2": "contacto_personal2",
+      "CONTACTO_PERSONAL2": "CONTACTO_PERSONAL2",
+      "Contacto_personal2": "Contacto_personal2",
+     
+      "redes_solciales": "redes_solciales",
+      "REDES_SOLCIALES": "REDES_SOLCIALES",
+      "Redes_solciales": "Redes_solciales",
+     
+      "no_financiamiento": "no_financiamiento",
+      "NO_FINANCIAMIENTO": "NO_FINANCIAMIENTO",
+      "No_financiamiento": "No_financiamiento",
+     
+      "fecha_solicitud": "fecha_solicitud",
+      "FECHA_SOLICITUD": "FECHA_SOLICITUD",
+      "Fecha_solicitud": "Fecha_solicitud",
+     
+      "hora_emision": "hora_emision",
+      "HORA_EMISION": "HORA_EMISION",
+      "Hora_emision": "Hora_emision",
+     
+      "etapa_solicitud": "etapa_solicitud",
+      "ETAPA_SOLICITUD": "ETAPA_SOLICITUD",
+      "Etapa_solicitud": "Etapa_solicitud",
+     
+      "score_aa": "score_aa",
+      "SCORE_AA": "SCORE_AA",
+      "Score_aa": "Score_aa",
+     
+      "agente": "agente",
+      "AGENTE": "AGENTE",
+      "Agente": "Agente",
+     
+      "resultados_prospecto": "resultados_prospecto",
+      "RESULTADOS_PROSPECTO": "RESULTADOS_PROSPECTO",
+      "Resultados_prospecto": "Resultados_prospecto",
+     
+      "resultado_analisis": "resultado_analisis",
+      "RESULTADO_ANALISIS": "RESULTADO_ANALISIS",
+      "Resultado_analisis": "Resultado_analisis",
+     
+      "motivo": "motivo",
+      "MOTIVO": "MOTIVO",
+      "Motivo": "Motivo",
+     
+      "cedula_garante": "cedula_garante",
+      "CEDULA_GARANTE": "CEDULA_GARANTE",
+      "Cedula_garante": "Cedula_garante",
+     
+      "nombre_garante": "nombre_garante",
+      "NOMBRE_GARANTE": "NOMBRE_GARANTE",
+      "Nombre_garante": "Nombre_garante",
+     
+      "telefono_garante": "telefono_garante",
+      "TELEFONO_GARANTE": "TELEFONO_GARANTE",
+      "Telefono_garante": "Telefono_garante",
+     
+      "whatsapp_garante": "whatsapp_garante",
+      "WHATSAPP_GARANTE": "WHATSAPP_GARANTE",
+      "Whatsapp_garante": "Whatsapp_garante",
+     
+      "email_garante": "email_garante",
+      "EMAIL_GARANTE": "EMAIL_GARANTE",
+      "Email_garante": "Email_garante",
+     
+      "vinculo_deudor": "vinculo_deudor",
+      "VINCULO_DEUDOR": "VINCULO_DEUDOR",
+      "Vinculo_deudor": "Vinculo_deudor",
+     
+      "direccion_garante": "direccion_garante",
+      "DIRECCION_GARANTE": "DIRECCION_GARANTE",
+      "Direccion_garante": "Direccion_garante",
+     
+      "referencia_direccion_garante": "referencia_direccion_garante",
+      "REFERENCIA_DIRECCION_GARANTE": "REFERENCIA_DIRECCION_GARANTE",
+      "Referencia_direccion_garante": "Referencia_direccion_garante",
+     
+      "articulos": "articulos",
+      "ARTICULOS": "ARTICULOS",
+      "Articulos": "Articulos",
+     
+      "inicial": "inicial",
+      "INICIAL": "INICIAL",
+      "Inicial": "Inicial",
+     
+      "capital": "capital",
+      "CAPITAL": "CAPITAL",
+      "Capital": "Capital",
+     
+      "tasa_interes": "tasa_interes",
+      "TASA_INTERES": "TASA_INTERES",
+      "Tasa_interes": "Tasa_interes",
+     
+      "interes_total": "interes_total",
+      "INTERES_TOTAL": "INTERES_TOTAL",
+      "Interes_total": "Interes_total",
+     
+      "no_cuotas": "no_cuotas",
+      "NO_CUOTAS": "NO_CUOTAS",
+      "No_cuotas": "No_cuotas",
+     
+      "valor_cuotas": "valor_cuotas",
+      "VALOR_CUOTAS": "VALOR_CUOTAS",
+      "Valor_cuotas": "Valor_cuotas",
+     
+      "gastos_legales": "gastos_legales",
+      "GASTOS_LEGALES": "GASTOS_LEGALES",
+      "Gastos_legales": "Gastos_legales",
+     
+      "monto_total": "monto_total",
+      "MONTO_TOTAL": "MONTO_TOTAL",
+      "Monto_total": "Monto_total",
+     
+      "total_abonado": "total_abonado",
+      "TOTAL_ABONADO": "TOTAL_ABONADO",
+      "Total_abonado": "Total_abonado",
+     
+      "total_pendiente": "total_pendiente",
+      "TOTAL_PENDIENTE": "TOTAL_PENDIENTE",
+      "Total_pendiente": "Total_pendiente",
+     
+      "frecuencia_pago": "frecuencia_pago",
+      "FRECUENCIA_PAGO": "FRECUENCIA_PAGO",
+      "Frecuencia_pago": "Frecuencia_pago",
+     
+      "fechas_pago": "fechas_pago",
+      "FECHAS_PAGO": "FECHAS_PAGO",
+      "Fechas_pago": "Fechas_pago",
+     
+      "proximo_pago": "proximo_pago",
+      "PROXIMO_PAGO": "PROXIMO_PAGO",
+      "Proximo_pago": "Proximo_pago",
+     
+      "prorrateo": "prorrateo",
+      "PRORRATEO": "PRORRATEO",
+      "Prorrateo": "Prorrateo",
+     
+      "proxima_cuota": "proxima_cuota",
+      "PROXIMA_CUOTA": "PROXIMA_CUOTA",
+      "Proxima_cuota": "Proxima_cuota",
+     
+      "fecha_entrega": "fecha_entrega",
+      "FECHA_ENTREGA": "FECHA_ENTREGA",
+      "Fecha_entrega": "Fecha_entrega",
+     
+      "responsable_entrega": "responsable_entrega",
+      "RESPONSABLE_ENTREGA": "RESPONSABLE_ENTREGA",
+      "Responsable_entrega": "Responsable_entrega",
+     
+      "cobrador_asignado": "cobrador_asignado",
+      "COBRADOR_ASIGNADO": "COBRADOR_ASIGNADO",
+      "Cobrador_asignado": "Cobrador_asignado",
+     
+      "geolocalizacion": "geolocalizacion",
+      "GEOLOCALIZACION": "GEOLOCALIZACION",
+      "Geolocalizacion": "Geolocalizacion",
+     
+      "estado_financiamiento": "estado_financiamiento",
+      "ESTADO_FINANCIAMIENTO": "ESTADO_FINANCIAMIENTO",
+      "Estado_financiamiento": "Estado_financiamiento",
+     
+      "historial_pagos": "historial_pagos",
+      "HISTORIAL_PAGOS": "HISTORIAL_PAGOS",
+      "Historial_pagos": "Historial_pagos",
+     
+      "comentario": "comentario",
+      "COMENTARIO": "COMENTARIO",
+      "Comentario": "Comentario",
+     
+      "imagen": "imagen",
+      "IMAGEN": "IMAGEN",
+      "Imagen": "Imagen",
+}
+

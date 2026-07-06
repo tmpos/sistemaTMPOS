@@ -1,0 +1,574 @@
+<script setup>
+import { ref, onMounted, nextTick, watchEffect,watch } from 'vue';
+import DataTable from 'datatables.net-vue3';
+import 'datatables.net-responsive-bs5';
+import DataTablesCore from 'datatables.net-bs5';
+import 'datatables.net-select';
+import 'datatables.net-responsive';
+import 'datatables.net-buttons';
+import 'datatables.net-buttons/js/buttons.html5';
+import FileUploader from '../Componentes/FileUploader.vue';
+import jszip from 'jszip';
+import pdfmake from 'pdfmake';
+import axios from 'axios';
+import {enviarDatosPorPost,
+  eliminarDatos, 
+  obtenerIdsSeleccionados,
+  borrarTodoslosDatos,
+  lenguajeDataTable,
+  nfecha,
+  arrayToObjetoFromTabla,
+  peticionesFetch,
+  encryptarPassword,
+  envioElectron,
+  mensajetoast,
+  generarCodigoUnico,
+  peticiones,
+  lasMayusculas} from '../../funciones/funciones.js';
+  import bcrypt from 'bcryptjs';
+import Swal from 'sweetalert2'
+import { useToast } from "primevue/usetoast";
+const toast = useToast();
+/************************************************************************/
+import config from '../../../../../resources/config.json';
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const production = config.VITE_PRODUCTION;
+const link = ref(config.VITE_LINKURL);
+const api = ref(config.VITE_LINK_API);
+const token = ref(config.VITE_TOKEN);
+const patronTelefono = ref(config.VITE_PATRON_TELEFONO);
+const linkImpresora = ref(config.VITE_IMPRESORA_LOCAL);
+const patroncedula = ref(config.VITE_PATRON_CEDULA);
+const tokenCifrado = ref(null);
+/************************************************************************/
+document.body.classList.add('sidebar-close');
+/************************************************************************/
+const position = ref('top');
+const openPosition = (pos) => {
+    position.value = pos;
+    visible.value = true;
+}
+/************************************************************************/
+const datoscamposWhatsapp = ref({})
+const rutaIMAGEN = ref('')
+const urlIMAGEN = ref(null)
+const fileUpload = ref(null);
+const showButtons = ref(false);
+/************************************************************************/
+DataTable.use(DataTablesCore);
+DataTablesCore.Buttons.jszip(jszip);
+DataTablesCore.Buttons.pdfMake(pdfmake);
+const visible = ref(false);
+const visiblecrear = ref(false);
+const value = ref(null);
+const id = ref(null);
+const datoscampos = ref({});
+const data = ref([]);
+const WhatsappEditar = ref(null);
+/************************************************************************/
+const arrayIMG = ref([])
+/************************************************************************/
+async function limpiarCamposCrear() {
+datoscamposWhatsapp.value = {}
+await campos();
+}
+/************************************************************************/
+watchEffect(() => {
+  if (visiblecrear.value) {
+       datoscamposWhatsapp.value.imagen = datoscamposWhatsapp.value.imagen || generarCodigoUnico();
+       rutaIMAGEN.value = '../vista/img/whatsapp/'+datoscamposWhatsapp.value.imagen;
+  }
+
+ if (visible.value) {
+    //arrayIMG.value = 
+ }
+
+});
+/************************************************************************/
+const botones = [{
+  nombre:'editar',
+  icono:'pencil',
+  color:'success'
+},
+{
+  nombre:'eliminar',
+  icono:'trash',
+  color:'danger',
+}
+];
+let losBotones = "";
+for (let boton of botones) {
+  losBotones += `<li><a href="#" class="dropdown-item ${boton.nombre}" id="btn${boton.nombre}"><i class="icon-${boton.icono} text-${boton.color}"></i> ${boton.nombre}</a></li>`;  
+}
+/************************************************************************/
+const columns = ref([
+  {
+    data: null,
+    title: '<input type="checkbox" id="check-all" />',
+    orderable: false,
+    className: 'select-checkbox',
+    render: function(data, type, row) {
+        return '<input type="checkbox" class="dt-checkbox dt-checkboxes" value="' + row.id + '">';
+    },
+    width: "30px"
+  },
+  {
+    title: 'Acción',
+    orderable: false, 
+    data: null,
+"defaultContent":`<div class="dropdown">
+  <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+  <i class="icon-cog-alt"></i>
+  </button>
+  <ul class="dropdown-menu">
+    ${losBotones}
+  </ul>
+</div>`},
+{ data: 'id', title: 'Id' },
+{ data: 'nombre', title: 'Nombre' },
+{ data: 'cargo', title: 'Cargo' },
+{ data: 'whatsapp', title: 'Whatsapp' },
+{ data: 'otro', title: 'Otro' },
+{ data: 'imagen', title: 'Imagen' },
+{ data: 'usuario', title: 'Usuario' },
+
+]);
+const fetchAndSetupData = async () => {
+const response = await peticionesFetch(`${link.value}${api.value}`,`datosarray/whatsapp`,{},tokenCifrado.value,'GET');
+    const jsonData = response;
+    data.value = jsonData;
+};
+/************************************************************************/
+async function campos(){
+  const campos = await arrayToObjetoFromTabla(link.value+api.value,tokenCifrado.value,'whatsapp',true);
+  datoscamposWhatsapp.value = campos;
+  datoscamposWhatsapp.value.imagen = datoscamposWhatsapp.value.imagen || generarCodigoUnico();
+  rutaIMAGEN.value = '../vista/img/whatsapp/'+datoscamposWhatsapp.value.imagen;
+}
+/************************************************************************/
+onMounted(async() => {
+if (production == 'false') {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+}
+    if (!datosEmpresa.empresa.nombre) {
+    await datosEmpresa.inicializarDatosEmpresa(link.value+api.value);
+  }
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+await campos();
+await fetchAndSetupData();
+
+urlIMAGEN.value = link.value+api.value+"/subirunaimagen";
+
+
+});
+/************************************************************************/
+async function borrarTodo(){
+Swal.fire({
+  title: "Estas Seguro?",
+  text: "Se Borraran los Datos!",
+  icon: "warning",
+  showCancelButton: true,
+  confirmButtonText: "Si, de acuerdo!",
+  cancelButtonText: "No, cancelar!",
+ }).then(async(result) => {
+  if (result.isConfirmed) {
+const envioDatos = await borrarTodoslosDatos(link.value+api.value+'/borrartodo','whatsapp',tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+     fetchAndSetupData();
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Borrados', life: 3000 });
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Borrar datos.', life: 3000 });
+  }
+} else if (result.dismiss === Swal.DismissReason.cancel) {
+      toast.add({ severity: 'success', summary: 'No te preocupes', detail: 'Datos Seguros', life: 3000 });
+  }
+})
+}
+/************************************************************************/
+async function funcionActualizar() {
+  const url = link.value+api.value+"/actualizarcampos/whatsapp";
+  if (!datoscampos.value) {
+    console.error("Datos incompletos, no se puede actualizar.");
+    return;
+}
+if (datoscampos.value.hasOwnProperty('created_at')) {
+      datoscampos.value.updated_at = nfecha('timestamp')
+}
+const envioDatos = await enviarDatosPorPost(url, datoscampos.value,tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+     visible.value = false
+     fetchAndSetupData();
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+}else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+async function funcionCrear(){
+  const url = link.value+api.value+"/insertar/whatsapp";
+  if (datoscamposWhatsapp.value.hasOwnProperty('created_at')) {
+     datoscamposWhatsapp.value.created_at = nfecha('timestamp')
+     datoscamposWhatsapp.value.updated_at = nfecha('timestamp')
+    }
+  const envioDatos = await enviarDatosPorPost(url, datoscamposWhatsapp.value,tokenCifrado.value);
+  if (envioDatos[0] == 'ok') {
+    await uploadImages()
+     fetchAndSetupData();
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Agregados', life: 3000 });
+     limpiarCamposCrear()
+     visiblecrear.value = false
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar los datos.', life: 3000 });
+}
+}
+/************************************************************************/
+async function borrarSeleccionados() {
+    const ids = obtenerIdsSeleccionados();
+Swal.fire({
+  title: "Estas Seguro?",
+  text: "Se Borraran los Datos!",
+  icon: "warning",
+  showCancelButton: true,
+  confirmButtonText: "Si, de acuerdo!",
+  cancelButtonText: "No, cancelar!",
+ }).then(async(result) => {
+  if (result.isConfirmed) {
+let exitoTotal = true; 
+    if (ids.length > 0) {
+        for (const id of ids) {
+            try {
+               const envioDatos = await eliminarDatos(`${link.value}${api.value}/borrar/whatsapp`, id,tokenCifrado.value);
+            } catch (error) {
+                console.error(`Error al eliminar datos para ID: ${id}`, error);
+                exitoTotal = false;
+            }
+        }
+        if (exitoTotal) {
+         fetchAndSetupData();
+         toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Borrados', life: 3000 });
+        } else {
+            toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Borrar los datos.', life: 3000 });
+        }
+    } else {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'No hay datos para borrar', life: 3000 });
+    }
+} else if (result.dismiss === Swal.DismissReason.cancel) {
+      toast.add({ severity: 'success', summary: 'No te preocupes', detail: 'Datos Seguros', life: 3000 });
+  }
+})
+}
+/************************************************************************/
+const options = ref({
+  responsive: true,
+  "processing": true,
+  dom: `
+    <'row'<'col-sm-12 col-md-6'B><'col-sm-12 col-md-6'f>>
+    <'row'<'col-sm-12'tr>>
+    <'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>
+  `,
+   columnDefs:[ {
+      targets:0, width:"30px", className:"", orderable:!1, render:function(e, a, t, n) {
+          return `
+           <div class="form-check-primary d-block new-control">
+            <a class="btn"></a>
+            </div>`
+           }
+        }],
+  buttons: [
+    'copy', 'excel', 'csv', 
+    {
+      extend: 'pdfHtml5',
+      text: 'PDF',
+      titleAttr: 'Exportar a PDF',
+      customize: function (doc) {}
+    }
+  ],
+    language:lenguajeDataTable(),
+  columns: columns.value,
+  drawCallback: function () {
+    const apiDatatable = this.api();
+     document.getElementById('check-all').addEventListener('click', function(e) {
+      const checkboxes = apiDatatable.table().container().querySelectorAll('.dt-checkboxes');
+      checkboxes.forEach(checkbox => {
+        checkbox.checked = e.target.checked;
+      });
+    });
+/************************************************************************/
+   apiDatatable.table().container().querySelectorAll('.editar').forEach(button => {
+    button.addEventListener('click', async(e) => {
+      e.preventDefault();
+      const tr = e.target.closest('tr');
+      const rowData = apiDatatable.row(tr).data();
+      visible.value = true;
+      datoscampos.value = rowData;
+      rutaIMAGEN.value = '../vista/img/whatsapp/'+rowData.imagen;
+      arrayIMG.value = await peticiones(link.value+api.value+'/peticionimagenes',{"origen":`../vista/img/whatsapp/${rowData.imagen}`},'POST',tokenCifrado.value)
+    });
+  });
+/************************************************************************/
+  apiDatatable.table().container().querySelectorAll('.eliminar').forEach(button => {
+    button.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const tr = e.target.closest('tr');
+      const rowData = apiDatatable.row(tr).data();
+Swal.fire({
+  title: "Estas Seguro?",
+  text: "Se Borraran los Datos!",
+  icon: "warning",
+  showCancelButton: true,
+  confirmButtonText: "Si, de acuerdo!",
+  cancelButtonText: "No, cancelar!",
+ }).then(async(result) => {
+  if (result.isConfirmed) {
+const envioDatos = await eliminarDatos(link.value+api.value+'/borrar/whatsapp',rowData.id,tokenCifrado.value);
+    if (envioDatos[0] == 'ok') {
+       fetchAndSetupData();
+       toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Borrados', life: 3000 });
+    }else{
+      toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Borrar los datos.', life: 3000 });
+    }
+  } else if (result.dismiss === Swal.DismissReason.cancel) {
+      toast.add({ severity: 'success', summary: 'No te preocupes', detail: 'Datos Seguros', life: 3000 });
+  }
+});
+    });
+  });
+  }
+});
+/***************************************************************************/
+  const handleUploadSuccess = async(result) => {
+  arrayIMG.value = await peticiones(link.value+api.value+'/peticionimagenes',{"origen":`${rutaIMAGEN.value}`},'POST',tokenCifrado.value)
+};
+/***************************************************************************/
+
+const handleUploadError = (error) => {
+  console.error('Upload failed:', error);
+};
+/***************************************************************************/
+const handleAfterUpload = async()=>{
+  //arrayIMG.value = await peticiones(link.value+api.value+'/peticionimagenes',{"origen":`${rutaIMAGEN.value}`},'POST',tokenCifrado.value)
+}
+/***************************************************************************/
+const uploadImages = async() => {
+  if (fileUpload.value) {
+    fileUpload.value.fnSubirIMG();
+  }
+};
+/***************************************************************************/
+
+const deleteImage = async(ruta,imagen) => {
+  const url = link.value+api.value+"/borrararchivo";
+  const datos = {
+    ruta:'../vista/img/whatsapp/'+ruta,
+    archivo:imagen,
+  }
+  const envioDatos = await enviarDatosPorPost(url, datos,tokenCifrado.value);
+
+    if (envioDatos[0] == 'ok') {
+    
+     arrayIMG.value = await peticiones(link.value+api.value+'/peticionimagenes',{"origen":`../vista/img/whatsapp/${ruta}`},'POST',tokenCifrado.value)
+
+       toast.add({ severity: 'success', summary: 'Éxito', detail: 'Imagen Borrada', life: 3000 });
+    }else{
+      toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Borrar la Imagen.', life: 3000 });
+    }
+
+};
+
+
+</script>
+<template>
+<main class="content-wrapper">
+  <div class="container-fluid mt-5">
+<Card>
+<template #content>
+    <div class="row">
+      <div class="col-md-12">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Whatsapp</legend>
+            <div class="row">
+              <div class="col-sm-12">
+                <a href="#" @click="fetchAndSetupData" class="btn btn-warning text-white cartelito" data-toggle="tooltip" title="Recargar" id="reload"><i class="icon-arrows-cw"></i></a>
+               <a href="#" class="btn btn-success cartelito ms-1" title="Agregar Nuevo" id="nuevoregistro" @click="visiblecrear = true"><i class="icon-plus"></i></a>
+               <a href="#" @click="borrarSeleccionados" class="btn btn-danger btnaccion cartelito ms-1" data-toggle="tooltip" title="Borrar Selección" id="borrador"><i class="icon-trash-4"></i></a>
+               <a href="#"  @click="borrarTodo" class="btn btn-danger btnaccion cartelito float-end ms-1" data-toggle="tooltip" title="Borrar Todo" id="borrartodo"><i class="icon-trash"></i> Borrar Todo</a>
+              </div>
+            </div>
+        </fieldset>
+      </div>
+      <div class="col-md-12">
+          <DataTable :options="options"  :data="data" class="display table dt-responsive" id="tabla" />
+      </div>
+    </div>
+  </template>
+</Card>
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Dialog v-model:visible="visible" :position="position" modal header="Modificar Whatsapp" :style="{ width: '50rem' }" :breakpoints="{ '1199px': '75vw', '575px': '90vw' }">
+            <template #header>
+                <div class="inline-flex align-items-center justify-content-center gap-2">
+                    <span class="font-bold white-space-nowrap">Modal Editar</span>
+                </div>
+            </template>
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">Whatsapp</legend>
+     <form id="formularioActualizarWhatsapp" action="" method="">
+         <div  style="margin-top: 15px;color: #34AAB2;" class="row">
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" hidden>
+<label for="id-Actualizador">ID</label>
+<input type="input" v-model="datoscampos.id" name="id"  class="form-control" id="id-Actualizador"  placeholder="id"  maxlength="11">
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="nombre-Actualizador">NOMBRE</label>
+<input type="input" v-model="datoscampos.nombre" name="nombre"  class="form-control" id="nombre-Actualizador"  placeholder="nombre" v-mayuscula maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="cargo-Actualizador">CARGO</label>
+<input type="input" v-model="datoscampos.cargo" name="cargo"  class="form-control" id="cargo-Actualizador"  placeholder="cargo" v-mayuscula maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="whatsapp-Actualizador">WHATSAPP</label>
+<InputMask id="whatsapp-Actualizador" class="form-control" v-model="datoscampos.whatsapp" :mask="patronTelefono" :placeholder="patronTelefono" />
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="otro-Actualizador">OTRO</label>
+<textarea class="form-control " id="otro-Actualizador" name="otro" v-model="datoscampos.otro" cols="30" rows="3" ></textarea>
+</div>
+
+<div class="form-group col-12" >
+<label for="imagen-Actualizador">IMAGEN</label>
+
+    <FileUploader
+       ref="fileUpload"
+      :url-IMAGEN="urlIMAGEN"
+      :ruta-IMAGEN="rutaIMAGEN"
+      :autoUpload="true"
+      @uploadSuccess="handleUploadSuccess"
+      @uploadError="handleUploadError"
+    />
+
+<div class="row">
+  
+ <div class="border-1 surface-border border-round m-2 col-12 col-md-3  p-3" v-for="imagen in arrayIMG">
+     <div class="mb-3">
+         <div class="relative mx-auto">
+             <img :src="`${link}/vista/img/whatsapp/${datoscampos.imagen}/${imagen}`" alt="Image" class="w-full border-round" />
+ 
+         </div>
+     </div>
+     <div class="">
+         <span>
+             <button class="w-100 btn btn-danger" @click.prevent="deleteImage(datoscampos.imagen,imagen)">Eliminar</button>
+         </span>
+     </div>
+ </div>
+ </div>
+
+ 
+
+</div>
+<div class="form-group col-12" hidden>
+<label for="usuario-Actualizador">USUARIO</label>
+<input type="input" v-model="datoscampos.usuario" name="usuario"  class="form-control" id="usuario-Actualizador"  placeholder="usuario"  maxlength="250">
+</div>
+
+        </div>
+        </form>
+</fieldset>
+            <template #footer>
+                <Button label="Cancel" text severity="secondary" @click="visible = false" autofocus />
+                <Button label="Save" outlined severity="secondary" @click="funcionActualizar" autofocus />
+            </template>
+        </Dialog>
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+        <Dialog v-model:visible="visiblecrear" :position="position" modal header="Crear Whatsapp" :style="{ width: '50rem' }" :breakpoints="{ '1199px': '75vw', '575px': '90vw' }">
+            <template #header>
+                <div class="inline-flex align-items-center justify-content-center gap-2">
+                    <span class="font-bold white-space-nowrap">Modal Crear</span>
+                </div>
+            </template>
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">Whatsapp</legend>
+     <form id="formularioActualizarWhatsapp" action="" method="">
+         <div  style="margin-top: 15px;color: #34AAB2;" class="row">
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="nombreAgregarDatos">NOMBRE</label>
+<input type="input" v-model="datoscamposWhatsapp.nombre" name="nombre"  class="form-control mayusc" id="nombreAgregarDatos" v-mayuscula placeholder="nombre" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="cargoAgregarDatos">CARGO</label>
+<input type="input" v-model="datoscamposWhatsapp.cargo" name="cargo"  class="form-control mayusc" id="cargoAgregarDatos" v-mayuscula placeholder="cargo" maxlength="250">
+</div>
+<div class="form-group col-12 col-sm-6 col-md-6 col-lg-6 col-xl-6" >
+<label for="whatsappAgregarDatos">WHATSAPP</label>
+<InputMask id="whatsappAgregarDatos" class="form-control" v-model="datoscamposWhatsapp.whatsapp" :mask="patronTelefono" :placeholder="patronTelefono" />
+</div>
+<div class="form-group col-12 col-sm-12 col-md-12 col-lg-12 col-xl-12" >
+<label for="otroAgregarDatos">OTRO</label>
+<textarea class="form-control " v-model="datoscamposWhatsapp.otro" id="otroAgregarDatos" name="otro" cols="30" rows="3" ></textarea>
+</div>
+
+<div class="form-group col-12" >
+<label for="imagenAgregarDatos">IMAGEN</label>
+
+    <FileUploader
+       ref="fileUpload"
+      :url-IMAGEN="urlIMAGEN"
+      :ruta-IMAGEN="rutaIMAGEN"
+      @uploadSuccess="handleUploadSuccess"
+      @uploadError="handleUploadError"
+      @afterUpload="handleAfterUpload"
+    />
+
+</div>
+<div class="form-group col-12" hidden>
+<label for="usuarioAgregarDatos">USUARIO</label>
+<input type="input" v-model="datoscamposWhatsapp.usuario" name="usuario"  class="form-control " id="usuarioAgregarDatos"  placeholder="usuario" maxlength="250">
+</div>
+
+        </div>
+        </form>
+</fieldset>
+            <template #footer>
+                <Button label="Cancel" text severity="secondary" @click="visiblecrear = false" autofocus />
+                <Button label="Crear" outlined severity="secondary" @click="funcionCrear" autofocus />
+            </template>
+        </Dialog>
+ <!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Toast />
+  </div>
+</main>
+</template>
+<style scoped>
+.card {
+  position: relative;
+}
+
+.button-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  gap: 10px;
+}
+
+button {
+  padding: 5px 10px;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: rgba(0, 0, 0, 0.9);
+}
+</style>

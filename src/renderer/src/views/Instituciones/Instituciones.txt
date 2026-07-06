@@ -1,0 +1,47 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Instituciones",
+"to": "/instituciones",
+"icon": "fas icon-circle-empty"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/instituciones',
+        name: 'instituciones',
+        component: () => import('../views/Instituciones/Instituciones.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/crearinstituciones',
+        name: 'crearinstituciones',
+        component: () => import('@/views/Instituciones/CrearInstituciones.vue'),
+    },
+    {
+        path: '/editarinstituciones/:id',
+        name: 'editarinstituciones',
+        component: () => import('@/views/Instituciones/EditarInstituciones.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'nombre', 'porciento'"
+******************************************************
+{
+        
+      "nombre": "nombre",
+      "NOMBRE": "NOMBRE",
+      "Nombre": "Nombre",
+     
+      "porciento": "porciento",
+      "PORCIENTO": "PORCIENTO",
+      "Porciento": "Porciento",
+}
+

@@ -1,0 +1,124 @@
+
+******************************************************
+************|- INICIO DE LA PARTE DEL MENU -|********
+******************************************************
+{
+"label": "Garantia_global",
+"to": "/garantia_global",
+"permiso": "Administrador,Soporte",
+"icon": "pi pi-circle"
+},
+************|-FIN DE LA PARTE DEL MENU -|********
+*******************************************************
+************|- INICIO DE LA PARTE DEL ROUTER -|********
+*******************************************************
+    {
+        path: '/garantia_global',
+        name: 'garantia_global',
+        component: () => import('../views/Garantia_global/Garantia_global.vue'),
+    },
+******************************************************
+//ESTA PARTE ES SOLO SI ES MULTIPAGE
+******************************************************
+    {
+        path: '/creargarantia_global',
+        name: 'creargarantia_global',
+        component: () => import('@/views/Garantia_global/CrearGarantia_global.vue'),
+    },
+    {
+        path: '/editargarantia_global/:id',
+        name: 'editargarantia_global',
+        component: () => import('@/views/Garantia_global/EditarGarantia_global.vue'),
+    },
+
+************|-FIN DE LA PARTE DEL ROUTER -|***********
+**********************|-CAMPOS-|**********************
+"'no_garantia', 'cliente', 'equipo', 'marca', 'modelo', 'imei', 'tipo', 'proveedor', 'fecha_venta', 'fecha_ingreso', 'hora', 'fallas', 'solucion', 'tecnico', 'estado', 'fecha_reparacion', 'fecha_entrega', 'no_taller', 'recibido_por', 'entregado_por', 'nota'"
+******************************************************
+{
+        
+      "no_garantia": "no_garantia",
+      "NO_GARANTIA": "NO_GARANTIA",
+      "No_garantia": "No_garantia",
+     
+      "cliente": "cliente",
+      "CLIENTE": "CLIENTE",
+      "Cliente": "Cliente",
+     
+      "equipo": "equipo",
+      "EQUIPO": "EQUIPO",
+      "Equipo": "Equipo",
+     
+      "marca": "marca",
+      "MARCA": "MARCA",
+      "Marca": "Marca",
+     
+      "modelo": "modelo",
+      "MODELO": "MODELO",
+      "Modelo": "Modelo",
+     
+      "imei": "imei",
+      "IMEI": "IMEI",
+      "Imei": "Imei",
+     
+      "tipo": "tipo",
+      "TIPO": "TIPO",
+      "Tipo": "Tipo",
+     
+      "proveedor": "proveedor",
+      "PROVEEDOR": "PROVEEDOR",
+      "Proveedor": "Proveedor",
+     
+      "fecha_venta": "fecha_venta",
+      "FECHA_VENTA": "FECHA_VENTA",
+      "Fecha_venta": "Fecha_venta",
+     
+      "fecha_ingreso": "fecha_ingreso",
+      "FECHA_INGRESO": "FECHA_INGRESO",
+      "Fecha_ingreso": "Fecha_ingreso",
+     
+      "hora": "hora",
+      "HORA": "HORA",
+      "Hora": "Hora",
+     
+      "fallas": "fallas",
+      "FALLAS": "FALLAS",
+      "Fallas": "Fallas",
+     
+      "solucion": "solucion",
+      "SOLUCION": "SOLUCION",
+      "Solucion": "Solucion",
+     
+      "tecnico": "tecnico",
+      "TECNICO": "TECNICO",
+      "Tecnico": "Tecnico",
+     
+      "estado": "estado",
+      "ESTADO": "ESTADO",
+      "Estado": "Estado",
+     
+      "fecha_reparacion": "fecha_reparacion",
+      "FECHA_REPARACION": "FECHA_REPARACION",
+      "Fecha_reparacion": "Fecha_reparacion",
+     
+      "fecha_entrega": "fecha_entrega",
+      "FECHA_ENTREGA": "FECHA_ENTREGA",
+      "Fecha_entrega": "Fecha_entrega",
+     
+      "no_taller": "no_taller",
+      "NO_TALLER": "NO_TALLER",
+      "No_taller": "No_taller",
+     
+      "recibido_por": "recibido_por",
+      "RECIBIDO_POR": "RECIBIDO_POR",
+      "Recibido_por": "Recibido_por",
+     
+      "entregado_por": "entregado_por",
+      "ENTREGADO_POR": "ENTREGADO_POR",
+      "Entregado_por": "Entregado_por",
+     
+      "nota": "nota",
+      "NOTA": "NOTA",
+      "Nota": "Nota",
+}
+

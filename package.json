@@ -1,0 +1,193 @@
+{
+  "name": "tm-pos",
+  "version": "49.6.0",
+  "description": "Sistema de Facturación",
+  "main": "./out/main/index.js",
+  "author": "Tomas Taveras",
+  "homepage": "https://tmposrd.com",
+  "scripts": {
+    "format": "prettier --write .",
+    "lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
+    "start": "electron-vite preview",
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "rebuild:native": "electron-builder install-app-deps",
+    "dist": "npm run rebuild:native && electron-builder",
+    "postinstall": "electron-builder install-app-deps",
+    "build:unpack": "npm run build && electron-builder --dir",
+    "build:win": "npm run build && electron-builder --win",
+    "build:mac": "npm run build && electron-builder --mac",
+    "build:linux": "npm run build && electron-builder --linux"
+  },
+  "dependencies": {
+    "@alvarosacari/electron-pos-printer": "^1.2.7",
+    "@api/e-api-a-la-nube-dom": "file:.api/apis/e-api-a-la-nube-dom",
+    "@capacitor/android": "^7.0.1",
+    "@capacitor/cli": "^7.0.1",
+    "@capacitor/core": "^7.0.1",
+    "@electron-toolkit/preload": "^3.0.0",
+    "@electron-toolkit/utils": "^3.0.0",
+    "@faker-js/faker": "^9.7.0",
+    "@fullcalendar/core": "^6.1.15",
+    "@fullcalendar/daygrid": "^6.1.15",
+    "@fullcalendar/interaction": "^6.1.15",
+    "@fullcalendar/timegrid": "^6.1.15",
+    "@fullcalendar/vue3": "^6.1.15",
+    "@popperjs/core": "^2.11.8",
+    "@primevue/themes": "^4.0.0",
+    "@suadelabs/vue3-multiselect": "^1.0.2",
+    "@techassi/vue-youtube-iframe": "^1.0.6",
+    "@vueup/vue-quill": "^1.2.0",
+    "adm-zip": "^0.5.16",
+    "audio-loader": "^1.0.3",
+    "audio-play": "^2.3.1",
+    "awesomplete": "^1.1.7",
+    "axios": "^1.7.2",
+    "bcryptjs": "^2.4.3",
+    "bootstrap": "^5.3.3",
+    "bootstrap-datepicker": "^1.10.0",
+    "bootswatch": "^5.3.3",
+    "buffer": "^6.0.3",
+    "bwip-js": "^4.5.2",
+    "canvas-confetti": "^1.9.4",
+    "chart.js": "^4.4.3",
+    "crypto-js": "^4.2.0",
+    "datatables.net-buttons": "^3.0.2",
+    "datatables.net-buttons-dt": "^3.0.2",
+    "datatables.net-responsive": "^3.0.2",
+    "datatables.net-responsive-bs5": "^3.0.2",
+    "datatables.net-select": "^2.0.3",
+    "datatables.net-vue3": "^3.0.1",
+    "dexie": "^4.3.0",
+    "electron-log": "^5.1.7",
+    "electron-updater": "^6.2.1",
+    "html2pdf.js": "^0.10.3",
+    "html5-qrcode": "^2.3.8",
+    "i18n": "^0.15.1",
+    "install": "^0.13.0",
+    "jquery": "^3.7.1",
+    "jsbarcode": "^3.11.6",
+    "jspdf": "^2.5.1",
+    "jspdf-autotable": "^3.8.2",
+    "jszip": "^3.10.1",
+    "nice-invoice": "^1.1.8",
+    "node-fetch": "^3.3.2",
+    "nodemailer": "^7.0.3",
+    "npm": "^10.8.1",
+    "openai": "^4.77.0",
+    "pdfkit": "^0.16.0",
+    "pdfmake": "^0.2.10",
+    "pinia": "^2.1.7",
+    "primeflex": "^3.3.1",
+    "primeicons": "^6.0.1",
+    "primevue": "^4.0.0",
+    "puppeteer": "^23.11.1",
+    "puppeteer-core": "^23.11.1",
+    "puppeteer-in-electron": "^3.0.5",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
+    "quill": "^2.0.3",
+    "semver": "^7.6.2",
+    "simple-keyboard": "^3.7.101",
+    "soap": "^1.1.3",
+    "sqlite3": "^6.0.1",
+    "sweetalert2": "^11.12.4",
+    "virtual-keyboard": "^1.30.4",
+    "vue": "^3.4.34",
+    "vue-chartjs": "^5.3.1",
+    "vue-flatpickr-component": "^11.0.5",
+    "vue-i18n": "^9.14.1",
+    "vue-lazyload": "^3.0.0",
+    "vue-loading-overlay": "6.0",
+    "vue-router": "^4.4.0",
+    "vue-social-chat": "^1.0.0",
+    "vue-sweetalert2": "^5.0.11",
+    "vue-to-print": "^1.3.1",
+    "vue-touch-keyboard": "^0.3.2",
+    "vue3-print-nb": "^0.1.4",
+    "vue3-tags-input": "^1.0.12",
+    "vue3-youtube": "^0.1.9",
+    "xlsx": "^0.18.5",
+    "xml2js": "^0.6.2"
+  },
+  "devDependencies": {
+    "@electron-toolkit/eslint-config": "^1.0.1",
+    "@primevue/auto-import-resolver": "^4.0.1",
+    "@rushstack/eslint-patch": "^1.8.0",
+    "@vitejs/plugin-vue": "^5.0.5",
+    "@vue/eslint-config-prettier": "^9.0.0",
+    "autoprefixer": "^10.4.19",
+    "electron": "^28.2.0",
+    "electron-builder": "^24.9.1",
+    "electron-vite": "^2.0.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-vue": "^9.23.0",
+    "postcss": "^8.4.40",
+    "prettier": "^3.2.5",
+    "sass": "^1.55.0",
+    "tailwindcss": "^3.4.6",
+    "tailwindcss-primeui": "^0.3.2",
+    "unplugin-vue-components": "^0.27.3",
+    "vite": "^5.3.1",
+    "vite-plugin-pwa": "^0.21.1",
+    "vue": "^3.4.15"
+  },
+  "build": {
+    "appId": "com.tmpos.tmpos",
+    "productName": "TM-POS",
+    "npmRebuild": false,
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "resources/**/*",
+      "out/**/*",
+      "main.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/",
+        "to": "resources/",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "resources/config.json",
+        "to": "config.json"
+      },
+      {
+        "from": "resources/database.db",
+        "to": "database.db"
+      },
+      {
+        "from": "resources/sounds",
+        "to": "resources/sounds",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "directories": {
+      "buildResources": "build"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico",
+      "artifactName": "${productName}-${version}.${ext}",
+      "signAndEditExecutable": true,
+      "verifyUpdateCodeSignature": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://actualizaciones.tmposrd.com/windows/"
+      }
+    ]
+  }
+}

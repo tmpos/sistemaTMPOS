@@ -1,0 +1,552 @@
+<script setup>
+import { ref, onMounted, nextTick, watchEffect } from 'vue';
+import { useRoute} from 'vue-router';
+import { useToast } from "primevue/usetoast";
+import router from '../../router';
+import Awesomplete from '../../components/Awesomplete.vue';
+const route = useRoute(); 
+import { enviarDatosPorPost, eliminarDatos, obtenerIdsSeleccionados, borrarTodoslosDatos, lenguajeDataTable, nfecha, arrayToObjetoFromTabla, peticionesFetch, encryptarPassword, envioElectron, generarCodigoUnico, peticiones, generadorCodigo, mensajetoast, lasMayusculas, peticionesFetchOffline, arrayToObjetoFromTablaOffline, crearTablaSiNoExisteOffline } from '../../funciones/funciones.js';
+import Swal from 'sweetalert2'
+const toast = useToast();
+/************************************************************************/
+import config from '../../../../../resources/config.json';
+/************************************************************************/
+document.body.classList.add('sidebar-close');
+/************************************************************************/
+import {useDatosEmpresa} from '../../stores'
+const datosEmpresa = useDatosEmpresa();
+const production = config.VITE_PRODUCTION;
+const link = ref(config.VITE_LINKURL);
+const api = ref(config.VITE_LINK_API);
+const token = ref(config.VITE_TOKEN);
+const patronTelefono = ref(config.VITE_PATRON_TELEFONO);
+const linkImpresora = ref(config.VITE_IMPRESORA_LOCAL);
+const patroncedula = ref(config.VITE_PATRON_CEDULA);
+const tokenCifrado = ref(null);
+/************************************************************************/
+const noOrden = ref(0)
+const arrayClientesObjetos = ref([])
+const listaClientes = ref([])
+/************************************************************************/
+const tecnicosArray = ref([])
+/************************************************************************/
+const datoscamposHojaentrada = ref({})
+const codigoUnico = ref(generarCodigoUnico());
+const fecha = ref(nfecha('fecha'));
+/************************************************************************/
+const fetchAndSetupData = async () => {
+    const jsonData = await arrayToObjetoFromTablaOffline('hojaentrada');
+    datoscamposHojaentrada.value = jsonData;
+        datoscamposHojaentrada.value.fecha = datoscamposHojaentrada.value.fecha || nfecha('fecha');
+    datoscamposHojaentrada.value.hora = datoscamposHojaentrada.value.hora || nfecha('hora');
+    datoscamposHojaentrada.value.no_orden = datoscamposHojaentrada.value.no_orden || noOrden.value;
+    datoscamposHojaentrada.value.costo_reparacion = datoscamposHojaentrada.value.costo_reparacion || '0.00';
+    datoscamposHojaentrada.value.grua = datoscamposHojaentrada.value.grua || 'NO';
+    datoscamposHojaentrada.value.tipo_combustible = datoscamposHojaentrada.value.tipo_combustible || 'GASOLINA';
+    datoscamposHojaentrada.value.combustible = datoscamposHojaentrada.value.combustible || '50';
+    datoscamposHojaentrada.value.km = datoscamposHojaentrada.value.km || '1000';
+    datoscamposHojaentrada.value.color = datoscamposHojaentrada.value.color || '000000';
+    datoscamposHojaentrada.value.fallas_electronicas_en_tablero = {
+  check_engine : false,
+  abs : false,
+  airbag : false,
+  sk_suspension : false,
+  generation_batery : false,
+  brake : false,
+  safety_belt : false,
+  temperature : false,
+  oil_presion : false,
+  otro : '',
+}
+
+datoscamposHojaentrada.value.abolladuras_rayaduras = {
+  bumper_delantero : false,
+  bonete : false,
+  tapa_baul : false,
+  bomper_trasero : false,
+  capota : false,
+  defensa : false,
+  mata_perro : false,
+  parte_inferior_bumper : false,
+  parrilla : false,
+  puerta_del_r : false,
+  puerta_del_l : false,
+  puerta_tras_l : false,
+  puerta_tras_r : false,
+  guardalodo_del_l : false,
+  guardalodo_del_r : false,
+  guardalodo_tras_r : false,
+  guardalodo_tras_l : false,
+}
+
+datoscamposHojaentrada.value.rotura = {
+  cristal_delantero : false,
+  cristal_trasero : false,
+  retrovisor_l : false,
+  retrovisor_r : false,
+  cable_emergencia : false,
+  parrilla_del : false,
+  parrilla_techo : false,
+  cristal_puerta_del_r : false,
+  cristal_puerta_del_l : false,
+  pantalla : false,
+  halogeno_r : false,
+  halogeno_l : false,
+  espejo_taleral : false,
+  faro_luz_direccional_del_l : false,
+  faro_luz_direccional_del_r : false,
+  faro_luz_direccional_tras_r : false,
+  faro_luz_direccional_tras_r : false,
+  farol_tras_l : false,
+  farol_tras_r : false,
+}
+
+datoscamposHojaentrada.value.no_funciona = {
+  limpia_vidrio : false,
+  aire_acondicionado : false,
+  seguro_puerta_del_l : false,
+  seguro_puerta_del_r : false,
+  seguro_puerta_tras_l : false,
+  seguro_puerta_tras_r : false,
+  luz_del_l : false,
+  luz_del_r : false,
+  luz_stop_l : false,
+  luz_stop_r : false,
+  retrovisor_l : false,
+  retrovisor_r : false,
+  sun_roof : false,
+  encendedor : false,
+  cinturon_l : false,
+  cinturon_r : false,
+  antena : false,
+  bocina : false,
+  otro : false,
+
+}
+
+
+datoscamposHojaentrada.value.equipos = {
+  radio : false,
+  aros_alum_mag : false,
+  tapa_bocina : false,
+  centro_aros : false,
+  herramientas : false,
+  gato : false,
+  goma_respuesto : false,
+  alfombra : false,
+  luz_xenon : false,
+  halogeno_l : false,
+  halogeno_r : false,
+
+}
+};
+/************************************************************************/
+const ultimaOrden = async()=>{
+  const ultimaOrden = await peticionesFetchOffline('getMaxValue', 'hojaentrada', 'no_orden');
+  if (ultimaOrden) {
+    noOrden.value = generadorCodigo(ultimaOrden[0], '', 7);
+  }else{
+    noOrden.value = '0000001';
+  }
+}
+/************************************************************************/
+const arrayClientes = async () => {
+  try {
+    const response = await peticionesFetchOffline('getDataAsArray', 'clientes');
+     arrayClientesObjetos.value = response;
+     listaClientes.value = response.map(clientes=>clientes.nombre);
+    /*********************************************/
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to fetch Clientes', life: 3000 });
+  }
+};
+
+/************************************************************************/
+const arrayTecnicos = async () => {
+  try {
+    const response = await peticionesFetchOffline('getDataAsArray', 'instaladores');
+     tecnicosArray.value = response.map(clientes=>clientes.nombre);
+     datoscamposHojaentrada.value.tecnico = datoscamposHojaentrada.value.tecnico || tecnicosArray.value[0]
+    /*********************************************/
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to fetch Clientes', life: 3000 });
+  }
+};
+/************************************************************************/
+
+
+onMounted(async() => {
+if (production == 'false') {
+const datosJSON = await envioElectron('datosarchivo');
+link.value = datosJSON.VITE_LINKURL;
+api.value = datosJSON.VITE_LINK_API;
+token.value = datosJSON.VITE_TOKEN;
+patronTelefono.value = datosJSON.VITE_PATRON_TELEFONO;
+linkImpresora.value = datosJSON.VITE_IMPRESORA_LOCAL;
+patroncedula.value = datosJSON.VITE_PATRON_CEDULA;
+}
+tokenCifrado.value = await encryptarPassword(token.value, 10);
+if (!datosEmpresa.empresa.nombre) {
+    await datosEmpresa.inicializarDatosEmpresa(link.value+api.value);
+  }
+await arrayClientes();
+await ultimaOrden();
+fetchAndSetupData()
+await arrayTecnicos();
+
+
+});
+/************************************************************************/
+
+/************************************************************************/
+async function enviarDatos(event) {
+    event.preventDefault();
+  const url = link.value+api.value+"/insertar/hojaentrada";
+  if (!datoscamposHojaentrada.value) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Datos incompletos, no se puede Enviar.', life: 3000 });
+    return;
+  }
+  if (datoscamposHojaentrada.value.hasOwnProperty('created_at')) {
+     datoscamposHojaentrada.value.created_at = nfecha('timestamp')
+     datoscamposHojaentrada.value.updated_at = nfecha('timestamp')
+    }
+
+
+  datoscamposHojaentrada.value.fallas_electronicas_en_tablero = JSON.stringify(datoscamposHojaentrada.value.fallas_electronicas_en_tablero)
+  datoscamposHojaentrada.value.abolladuras_rayaduras = JSON.stringify(datoscamposHojaentrada.value.abolladuras_rayaduras)
+  datoscamposHojaentrada.value.rotura = JSON.stringify(datoscamposHojaentrada.value.rotura)
+  datoscamposHojaentrada.value.no_funciona = JSON.stringify(datoscamposHojaentrada.value.no_funciona)
+  datoscamposHojaentrada.value.equipos = JSON.stringify(datoscamposHojaentrada.value.equipos)
+
+  const envioDatos = await peticionesFetchOffline('insertData', 'hojaentrada', JSON.stringify(datoscamposHojaentrada.value));
+  if (envioDatos[0] == 'ok') {
+     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Agregados con éxito.', life: 3000 });
+Swal.fire({
+  title: "Datos Agregados",
+  text: "Que hacemos ahora?",
+  icon: "warning",
+  showCancelButton: true,
+  confirmButtonText: "Agregar Otro!",
+  cancelButtonText: "No, Regresar al Inicio!",
+ }).then(async(result) => {
+  if (result.isConfirmed) {
+      fetchAndSetupData()
+} else if (result.dismiss === Swal.DismissReason.cancel) {
+    router.push({ path: `/hojaentrada` });
+  }
+})
+  }else{
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al Agregar los datos.', life: 3000 });
+  }
+}
+/************************************************************************/
+const fnAwesompletecliente = (selected)=>{
+ const datosCliente = arrayClientesObjetos.value.find(cliente=>cliente.nombre === selected.value)
+   if (datosCliente) {
+      datoscamposHojaentrada.value.nombre = datosCliente.nombre
+      datoscamposHojaentrada.value.telefono = datosCliente.telefono
+      datoscamposHojaentrada.value.whatsapp = datosCliente.whatsapp
+      datoscamposHojaentrada.value.email = datosCliente.email
+      datoscamposHojaentrada.value.direccion = datosCliente.direccion
+      if (datoscamposHojaentrada.value.whatsapp == '') {
+          datoscamposHojaentrada.value.whatsapp = datosCliente.telefono
+      }
+
+   }
+}
+/************************************************************************/
+const fnAwesompletecliente0 = ()=>{
+
+}
+/************************************************************************/
+const fnprueba = ()=>{
+  console.log(datoscamposHojaentrada.value.fallas_electronicas_en_tablero)
+}
+/************************************************************************/
+</script>
+<template>
+<main class="content-wrapper card">
+  <div class="w-full px-4 mt-5">
+        <fieldset class="border p-3 rounded mb-2">
+          <legend class="float-none w-auto px-2">Datos de Hojaentrada</legend>
+    <div class="grid grid-cols-12 gap-4">
+      <div class="sm:col-span-12">
+       <router-link to="/hojaentrada" class="btn btn-dark text-white "><i class="icon-home"></i></router-link>
+      </div>
+    </div>
+</fieldset>
+<section>
+    <form id="formularioActualizar" action="" method="">
+         <div class="box-body">
+          <div class="grid grid-cols-12 gap-4" id="campos">
+<div class="form-group col-span-12 sm:col-span-2 md:col-span-2 lg:col-span-2 xl:col-span-2" >
+<label for="fechaAgregarDatos">FECHA</label>
+<input type="input" v-model="datoscamposHojaentrada.fecha" name="fecha"  class="form-control " id="fechaAgregarDatos"  placeholder="fecha" maxlength="250" readonly>
+</div>
+<div class="form-group col-span-12 sm:col-span-2 md:col-span-2 lg:col-span-2 xl:col-span-2" >
+<label for="no_ordenAgregarDatos">NO_ORDEN</label>
+<input type="input" v-model="datoscamposHojaentrada.no_orden" name="no_orden"  class="form-control soloNumero" id="no_ordenAgregarDatos" v-solonumeros placeholder="no_orden" maxlength="250" readonly>
+</div>
+<div class="form-group col-span-12 sm:col-span-8 md:col-span-8 lg:col-span-8 xl:col-span-8" >
+<label for="clienteAgregarDatos">CLIENTE</label>
+            <awesomplete
+                    class="dropdown-input mt-1"
+                    v-model="datoscamposHojaentrada.cliente"
+                    @change="fnAwesompletecliente0"
+                    @selectComplete="fnAwesompletecliente"
+                    :list="listaClientes">
+            </awesomplete>
+
+</div>
+<div class="form-group col-span-12 sm:col-span-4 md:col-span-4 lg:col-span-4 xl:col-span-4" >
+<label for="telefonoAgregarDatos">TELEFONO</label>
+<InputMask id="telefonoAgregarDatos" class="form-control" v-model="datoscamposHojaentrada.telefono" :mask="patronTelefono" :placeholder="patronTelefono" />
+</div>
+<div class="form-group col-span-12 sm:col-span-4 md:col-span-4 lg:col-span-4 xl:col-span-4" >
+<label for="whatsappAgregarDatos">WHATSAPP</label>
+<InputMask id="whatsappAgregarDatos" class="form-control" v-model="datoscamposHojaentrada.whatsapp" :mask="patronTelefono" :placeholder="patronTelefono" />
+</div>
+<div class="form-group col-span-12 sm:col-span-4 md:col-span-4 lg:col-span-4 xl:col-span-4" >
+<label for="emailAgregarDatos">EMAIL</label>
+<input type="input" v-model="datoscamposHojaentrada.email" name="email"  class="form-control " id="emailAgregarDatos"  placeholder="email" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12" >
+<label for="direccionAgregarDatos">DIRECCION</label>
+<textarea class="form-control " v-model="datoscamposHojaentrada.direccion" id="direccionAgregarDatos" name="direccion" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-span-12 sm:col-span-4 md:col-span-4 lg:col-span-4 xl:col-span-4" >
+<label for="cia_seguroAgregarDatos">CIA_SEGURO</label>
+<input type="input" v-model="datoscamposHojaentrada.cia_seguro" name="cia_seguro"  class="form-control mayusc" id="cia_seguroAgregarDatos" v-mayuscula placeholder="cia_seguro" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-4 md:col-span-4 lg:col-span-4 xl:col-span-4" >
+<label for="no_polizaAgregarDatos">NO_POLIZA</label>
+<input type="input" v-model="datoscamposHojaentrada.no_poliza" name="no_poliza"  class="form-control " id="no_polizaAgregarDatos"  placeholder="no_poliza" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-4 md:col-span-4 lg:col-span-4 xl:col-span-4" >
+<label for="no_fichaAgregarDatos">NO_FICHA</label>
+<input type="input" v-model="datoscamposHojaentrada.no_ficha" name="no_ficha"  class="form-control " id="no_fichaAgregarDatos"  placeholder="no_ficha" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-4 md:col-span-4 lg:col-span-4 xl:col-span-4" >
+<label for="marca_vehiculoAgregarDatos">MARCA_VEHICULO</label>
+<input type="input" v-model="datoscamposHojaentrada.marca_vehiculo" name="marca_vehiculo"  class="form-control mayusc" id="marca_vehiculoAgregarDatos" v-mayuscula placeholder="marca_vehiculo" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-4 md:col-span-4 lg:col-span-4 xl:col-span-4" >
+<label for="modeloAgregarDatos">MODELO</label>
+<input type="input" v-model="datoscamposHojaentrada.modelo" name="modelo"  class="form-control mayusc" id="modeloAgregarDatos" v-mayuscula placeholder="modelo" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-2 md:col-span-2 lg:col-span-2 xl:col-span-2" >
+<label for="yearAgregarDatos">YEAR</label>
+<input type="input" v-model="datoscamposHojaentrada.year" name="year"  class="form-control soloNumero" id="yearAgregarDatos" v-solonumeros placeholder="year" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-2 md:col-span-2 lg:col-span-2 xl:col-span-2" >
+<label for="colorAgregarDatos">COLOR</label>
+
+
+
+  <div class="input-group">
+    <input
+      type="text"
+      v-model="datoscamposHojaentrada.color"
+      class="form-control"
+      id="colorAgregarDatos"
+    />
+    <div class="input-group-append">
+      <color-picker  v-model="datoscamposHojaentrada.color" />
+    </div>
+  </div>
+
+
+</div>
+
+
+
+<div class="form-group col-span-12 sm:col-span-4 md:col-span-4 lg:col-span-4 xl:col-span-4" >
+<label for="placaAgregarDatos">PLACA</label>
+<input type="input" v-model="datoscamposHojaentrada.placa" name="placa"  class="form-control " id="placaAgregarDatos"  placeholder="placa" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-2 md:col-span-2 lg:col-span-2 xl:col-span-2" >
+<label for="kmAgregarDatos">KM</label>
+<input type="input" v-model="datoscamposHojaentrada.km" name="km"  class="form-control " id="kmAgregarDatos" v-solonumeros  placeholder="km" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-6 md:col-span-6 lg:col-span-6 xl:col-span-6" >
+<label for="combustibleAgregarDatos">COMBUSTIBLE</label>
+<div class="grid grid-cols-12 gap-4">
+  <div class="col-span-6 md:col-span-8"><select name="combustible" id="combustibleAgregarDatos" class="form-control " v-model="datoscamposHojaentrada.combustible">
+  <option value="0">0</option>
+  <option value="10">10</option>
+  <option value="25">25</option>
+  <option value="40">40</option>
+  <option value="50">50</option>
+  <option value="75">75</option>
+  <option value="90">90</option>
+  <option value="90">90</option>
+  <option value="100">100</option>
+</select></div>
+  <div class="col-span-6 md:col-span-4"><Knob v-model="datoscamposHojaentrada.combustible" valueTemplate="{value}%" /></div>
+</div>
+
+
+
+ 
+  
+
+
+</div>
+<div class="form-group col-span-12 sm:col-span-6 md:col-span-6 lg:col-span-6 xl:col-span-6" >
+<label for="bateriaAgregarDatos">BATERIA</label>
+<input type="input" v-model="datoscamposHojaentrada.bateria" name="bateria"  class="form-control mayusc" id="bateriaAgregarDatos" v-mayuscula placeholder="bateria" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-6 md:col-span-6 lg:col-span-6 xl:col-span-6" >
+<label for="tipo_combustibleAgregarDatos">TIPO_COMBUSTIBLE</label>
+<select class="form-control " v-model="datoscamposHojaentrada.tipo_combustible" id="tipo_combustibleAgregarDatos" name="tipo_combustible" >
+  <option value="GASOLINA">GASOLINA</option>
+<option value="DIESEL">DIESEL</option>
+<option value="GAS">GAS</option>
+<option value="ELECTRICO">ELECTRICO</option>
+</select></div>
+<div class="form-group col-span-12 sm:col-span-6 md:col-span-6 lg:col-span-6 xl:col-span-6" >
+<label for="chasisAgregarDatos">CHASIS</label>
+<input type="input" v-model="datoscamposHojaentrada.chasis" name="chasis"  class="form-control " id="chasisAgregarDatos"  placeholder="chasis" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-3 md:col-span-3 lg:col-span-3 xl:col-span-3" >
+<label for="gruaAgregarDatos">GRUA</label>
+<select class="form-control " v-model="datoscamposHojaentrada.grua" id="gruaAgregarDatos" name="grua" >
+  <option value="NO">NO</option>
+<option value="SI">SI</option>
+</select></div>
+<div class="form-group col-span-12 sm:col-span-3 md:col-span-3 lg:col-span-3 xl:col-span-3" >
+<label for="horaAgregarDatos">HORA</label>
+<input type="input" v-model="datoscamposHojaentrada.hora" name="hora"  class="form-control " id="horaAgregarDatos"  placeholder="hora" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12" >
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">FALLAS ELECTRONICAS EN TABLERO</legend>
+<div class="grid grid-cols-12 gap-4">
+  <div class="col-span-12 md:col-span-6 grid grid-cols-12 gap-4">
+<div class="col-span-3" v-for="(value, key) in datoscamposHojaentrada.fallas_electronicas_en_tablero" :key="key">
+    <div>{{ key }}</div>
+    <InputSwitch v-model="datoscamposHojaentrada.fallas_electronicas_en_tablero[key]"  :id="'switch-' + key"   />
+</div>
+
+<!-- <div class="col-span-12 md:col-span-6 form-group" >
+<label for="otroNAgregarDatos">OTRO</label>
+<input type="input" v-model="datoscamposHojaentrada.fallas_electronicas_en_tablero[9]" name="otroN"  class="form-control " id="otroNAgregarDatos"  placeholder="Otro" maxlength="250">
+</div>
+ -->
+  </div>
+  <div class="col-span-12 md:col-span-6">
+        <div class="card flex justify-content-center">
+        <img src="../../assets/img/carrito.png" alt="carrito">
+
+    </div>
+  </div>
+</div>
+</fieldset>
+</div>
+
+<div class="form-group col-span-12" >
+  <fieldset class="border p-3 rounded mb-2">
+    <legend class="float-none w-auto px-2">OTRO</legend>
+
+<div class="grid grid-cols-12 gap-4">
+      <div class="card col-span-12 md:col-span-3">
+        <Fieldset legend="ABOLLADURAS & RAYADURAS">
+         <div class="grid grid-cols-12 gap-4">
+          <div class="col-span-12 grid grid-cols-12 gap-4">
+        <div class="col-span-6" v-for="(value, key) in datoscamposHojaentrada.abolladuras_rayaduras" :key="key">
+            <div>{{ key }}</div>
+            <InputSwitch v-model="datoscamposHojaentrada.abolladuras_rayaduras[key]"  :id="'switch-' + key"   />
+        </div>
+            
+          </div>
+         </div>
+        </Fieldset>
+    </div>
+      <div class="card col-span-12 md:col-span-3">
+        <Fieldset legend="ROTURA">
+         <div class="grid grid-cols-12 gap-4">
+          <div class="col-span-12 grid grid-cols-12 gap-4">
+        <div class="col-span-6" v-for="(value, key) in datoscamposHojaentrada.rotura" :key="key">
+            <div>{{ key }}</div>
+            <InputSwitch v-model="datoscamposHojaentrada.rotura[key]"  :id="'switch-' + key"   />
+        </div>
+            
+          </div>
+         </div>
+        </Fieldset>
+    </div>
+
+
+      <div class="card col-span-12 md:col-span-3">
+        <Fieldset legend="NO FUNCIONA">
+         <div class="grid grid-cols-12 gap-4">
+          <div class="col-span-12 grid grid-cols-12 gap-4">
+        <div class="col-span-6" v-for="(value, key) in datoscamposHojaentrada.no_funciona" :key="key">
+            <div>{{ key }}</div>
+            <InputSwitch v-model="datoscamposHojaentrada.no_funciona[key]"  :id="'switch-' + key"   />
+        </div>
+            
+          </div>
+         </div>
+        </Fieldset>
+    </div>
+
+      <div class="card col-span-12 md:col-span-3">
+        <Fieldset legend="EQUIPO">
+         <div class="grid grid-cols-12 gap-4">
+          <div class="col-span-12 grid grid-cols-12 gap-4">
+        <div class="col-span-6" v-for="(value, key) in datoscamposHojaentrada.equipos" :key="key">
+            <div>{{ key }}</div>
+            <InputSwitch v-model="datoscamposHojaentrada.equipos[key]"  :id="'switch-' + key"   />
+        </div>
+            
+          </div>
+         </div>
+        </Fieldset>
+    </div>
+
+
+</div>
+</fieldset>
+</div>
+
+
+
+<div class="form-group col-span-12 sm:col-span-6 md:col-span-6 lg:col-span-6 xl:col-span-6" >
+<label for="tecnicoAgregarDatos">TECNICO</label>
+<select name="tecnico" id="tecnico" v-model="datoscamposHojaentrada.tecnico" class="form-control ">
+  <option :value="tecnico" v-for="tecnico in tecnicosArray">{{tecnico}}</option>
+</select>
+
+
+</div>
+<div class="form-group col-span-12 sm:col-span-6 md:col-span-6 lg:col-span-6 xl:col-span-6" >
+<label for="costo_reparacionAgregarDatos">COSTO_REPARACION</label>
+<input type="input" v-model="datoscamposHojaentrada.costo_reparacion" name="costo_reparacion"  class="form-control " id="costo_reparacionAgregarDatos" v-solonumeros v-decimales v-numeroFocusinOut  placeholder="costo_reparacion" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12" >
+<label for="observacionesAgregarDatos">OBSERVACIONES</label>
+<textarea class="form-control " v-model="datoscamposHojaentrada.observaciones" id="observacionesAgregarDatos" name="observaciones" cols="30" rows="3" ></textarea>
+</div>
+<div class="form-group col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12" >
+<label for="trabajos_realizarAgregarDatos">TRABAJOS_REALIZAR</label>
+<textarea class="form-control " v-model="datoscamposHojaentrada.trabajos_realizar" id="trabajos_realizarAgregarDatos" name="trabajos_realizar" cols="30" rows="3" ></textarea>
+</div>
+
+<div class="form-group col-span-12" hidden>
+<label for="usuarioAgregarDatos">USUARIO</label>
+<input type="input" v-model="datoscamposHojaentrada.usuario" name="usuario"  class="form-control " id="usuarioAgregarDatos"  placeholder="usuario" maxlength="250">
+</div>
+<div class="form-group sm:col-span-12 mb-5 mt-5">
+<button type="submit" @click="enviarDatos" class="btn btn-primary elboton w-100">Enviar Datos</button>
+  </div>
+  </div>
+  </div>
+   </form>
+</section>
+  </div>
+   </main>
+<Toast />
+</template>
+<style>
+</style>
