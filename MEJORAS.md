@@ -10,7 +10,7 @@ Sistema de análisis basado en la revisión completa del código fuente v49.6.0.
   - [x] Vitest configurado con alias `@/`
   - [x] `useDelivery.spec.js` — 9 tests de unidad
   - [x] Tests para funcionesVentas.js — 36 tests de unidad (pure functions)
-  - [ ] Tests para funciones.js
+  - [x] Tests para funciones.js — 54 tests de unidad (helpers, formato, strings)
   - [ ] Tests para componentes (Vue Test Utils)
   - [ ] Tests e2e (Playwright/Cypress)
 - [ ] **CI/CD** — No hay pipelines automatizados (GitHub Actions, etc.). Cada build es manual.
