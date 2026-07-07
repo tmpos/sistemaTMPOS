@@ -8,7 +8,7 @@ Sistema de análisis basado en la revisión completa del código fuente v49.6.0.
 
 - [ ] **Pruebas automatizadas** — No hay ni un solo test (unitario, integración, e2e). Cero cobertura.
 - [ ] **CI/CD** — No hay pipelines automatizados (GitHub Actions, etc.). Cada build es manual.
-- [ ] **Descomposición de monolitos** — `Vender.vue` (~28K líneas), `main/index.js` (~3.6K), `funciones.js` (masivo). Urge dividir.
+- [x] **Descomposición de monolitos (Fase 1)** — `Vender.vue` (~28K → ~28.1K). Extraído `TabDelivery.vue` (~200 líneas). Pendiente: Taller, Configuración, Pedidos, POS, Clientes, Documentos, Venta, Sidebar, Dialogs.
 
 ## Arquitectura
 
