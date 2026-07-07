@@ -6,7 +6,13 @@ Sistema de análisis basado en la revisión completa del código fuente v49.6.0.
 
 ## Crítico
 
-- [ ] **Pruebas automatizadas** — No hay ni un solo test (unitario, integración, e2e). Cero cobertura.
+- [x] **Pruebas automatizadas (iniciado)** — Vitest + @vue/test-utils + jsdom instalados. Primer test suite: `useDelivery.spec.js` (9 tests). Falta expandir cobertura.
+  - [x] Vitest configurado con alias `@/`
+  - [x] `useDelivery.spec.js` — 9 tests de unidad
+  - [ ] Tests para funciones.js
+  - [ ] Tests para funcionesVentas.js
+  - [ ] Tests para componentes (Vue Test Utils)
+  - [ ] Tests e2e (Playwright/Cypress)
 - [ ] **CI/CD** — No hay pipelines automatizados (GitHub Actions, etc.). Cada build es manual.
 - [x] **Descomposición de monolitos (Fase 1)** — `Vender.vue` (~28K → ~28.1K). Extraído `TabDelivery.vue` (~200 líneas). Pendiente: Taller, Configuración, Pedidos, POS, Clientes, Documentos, Venta, Sidebar, Dialogs.
   - [x] `TabDelivery.vue` — Componente extraído
