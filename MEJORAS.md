@@ -9,8 +9,8 @@ Sistema de análisis basado en la revisión completa del código fuente v49.6.0.
 - [x] **Pruebas automatizadas (iniciado)** — Vitest + @vue/test-utils + jsdom instalados. Primer test suite: `useDelivery.spec.js` (9 tests). Falta expandir cobertura.
   - [x] Vitest configurado con alias `@/`
   - [x] `useDelivery.spec.js` — 9 tests de unidad
+  - [x] Tests para funcionesVentas.js — 36 tests de unidad (pure functions)
   - [ ] Tests para funciones.js
-  - [ ] Tests para funcionesVentas.js
   - [ ] Tests para componentes (Vue Test Utils)
   - [ ] Tests e2e (Playwright/Cypress)
 - [ ] **CI/CD** — No hay pipelines automatizados (GitHub Actions, etc.). Cada build es manual.
