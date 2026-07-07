@@ -403,6 +403,7 @@ const fnAgregarNomina = async () => {
               <i class="pi pi-tag"></i>
               {{ datoscamposNomina.tipo_nomina }}
             </span>
+          </div>
         </div>
         <div class="nomina-hero__stats">
           <div class="stat-card">
