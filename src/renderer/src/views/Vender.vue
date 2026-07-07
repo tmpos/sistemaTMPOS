@@ -7291,6 +7291,7 @@ const router = useRouter();
 import { peticiones,generadorCodigo,generarCodigoUnico,formatoMonedaRD, arrayToObjetoFromTabla,mensajetoast,actualizarLocalStorage,nfecha,peticionesFetch,encryptarPassword,enviarDatosPorPost,verificaAutentificado,enviarSolicitudGet,extraerNumerosEntreParentesis,stringParentesis, agregarDiasalaFechaActual,formatearFecha,crearGasto,crearTablaSiNoExiste,crearTransferencia,extraerCamposDeObjeto,asientoDiario,enviarDatosLocalStorage,envioElectron,generarTablaFromStringJSON,agregarDiasAFecha,permisosPagina,buscarDatosIMEI,crearNotaCredito,peticionesFetchOffline,generarCodigoUnico4Digitos,arrayToObjetoFromTablaOffline,sincronizarStockProductoPorImeiDisponible,crearTablaSiNoExisteOffline } from '@/funciones/funciones.js';
 import { facturaNueva,cotizacionNueva,facturaActualizar,restarStock } from '@/funciones/funcionesVentas.js';
 import { enviarFacturaElectronica } from '@/funciones/dgiiService.js';
+import { useDelivery } from '@/composables/useDelivery.js';
 //import bcrypt from 'bcryptjs';
 //import config from '../../../../resources/config.json';
 import LoadingOverlay from '../Loading/LoadingOverlay.vue';
@@ -11176,71 +11177,18 @@ const saldarGlobalCredito = async () => {
 /************************************************************/
 
 
-// Colores para los deliveries
-const coloresDelivery = ref({});
-
-const getColorDelivery = (deliveryNombre) => {
-  if (!deliveryNombre || deliveryNombre === 'Ninguno') {
-    return '#94a3b8'; // slate-400
-  }
-
-  // Si ya existe un color asignado, retornarlo
-  if (coloresDelivery.value[deliveryNombre]) {
-    return coloresDelivery.value[deliveryNombre];
-  }
-
-  // Paleta de colores vibrantes para deliveries
-  const coloresPaleta = [
-    '#3b82f6', // blue-500
-    '#10b981', // emerald-500
-    '#f59e0b', // amber-500
-    '#ef4444', // red-500
-    '#8b5cf6', // violet-500
-    '#ec4899', // pink-500
-    '#14b8a6', // teal-500
-    '#f97316', // orange-500
-    '#06b6d4', // cyan-500
-    '#6366f1', // indigo-500
-    '#84cc16', // lime-500
-    '#eab308', // yellow-500
-    '#a855f7', // purple-500
-    '#22c55e', // green-500
-    '#0ea5e9', // sky-500
-    '#f43f5e', // rose-500
-  ];
-
-  // Asignar un color basándose en el índice del delivery
-  const deliveriesExistentes = Object.keys(coloresDelivery.value).length;
-  const colorIndex = deliveriesExistentes % coloresPaleta.length;
-  const color = coloresPaleta[colorIndex];
-
-  coloresDelivery.value[deliveryNombre] = color;
-  return color;
-};
-
-const getRowStyleClienteDelivery = (data) => {
-  if (!data.delivery || data.delivery === 'Ninguno') {
-    return {};
-  }
-
-  const color = getColorDelivery(data.delivery);
-
-  return {
-    backgroundColor: `${color}15`,
-    borderLeft: `4px solid ${color}`
-  };
-};
+const {
+  getColorDelivery,
+  getRowStyleClienteDelivery
+} = useDelivery();
 
 const deliveriesEnUso = computed(() => {
   const deliveriesSet = new Set();
-
-  // Obtener deliveries de los clientes cargados en la tabla
   clientesTabData.value.forEach(cliente => {
     if (cliente.delivery && cliente.delivery !== 'Ninguno') {
       deliveriesSet.add(cliente.delivery);
     }
   });
-
   return Array.from(deliveriesSet).sort();
 });
 

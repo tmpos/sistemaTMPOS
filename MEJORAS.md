@@ -9,6 +9,11 @@ Sistema de análisis basado en la revisión completa del código fuente v49.6.0.
 - [ ] **Pruebas automatizadas** — No hay ni un solo test (unitario, integración, e2e). Cero cobertura.
 - [ ] **CI/CD** — No hay pipelines automatizados (GitHub Actions, etc.). Cada build es manual.
 - [x] **Descomposición de monolitos (Fase 1)** — `Vender.vue` (~28K → ~28.1K). Extraído `TabDelivery.vue` (~200 líneas). Pendiente: Taller, Configuración, Pedidos, POS, Clientes, Documentos, Venta, Sidebar, Dialogs.
+  - [x] `TabDelivery.vue` — Componente extraído
+  - [x] `useDelivery.js` — Composable compartido (colores, estilos)
+  - [ ] `useTaller.js` — Composable para taller
+  - [ ] `usePedidosPendientes.js` — Composable para pedidos pendientes
+  - [ ] TabTaller.vue, TabConfiguracion.vue, TabPedidos.vue, TabPOS.vue, TabClientes.vue, TabDocumentos.vue
 
 ## Arquitectura
 
