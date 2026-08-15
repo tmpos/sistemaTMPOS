@@ -139,8 +139,6 @@
     "productName": "TM-POS",
     "npmRebuild": false,
     "files": [
-      "dist/**/*",
-      "node_modules/**/*",
       "resources/**/*",
       "out/**/*",
       "main.js",
