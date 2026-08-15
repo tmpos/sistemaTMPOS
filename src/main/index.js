@@ -606,7 +606,7 @@ function buildMenuTemplate() {
                 ? [crearItemMenu('Caja', '/caja')]
                 : []),
               ...(hasPermission(['Administrador', 'Gerente', 'Soporte'])
-                ? [crearItemMenu('Caja Chica', '/cajachica')]
+                ? [crearItemMenu('Caja Chica', '/caja-chica')]
                 : []),
               ...(hasPermission(['Administrador', 'Gerente', 'Soporte'])
                 ? [crearItemMenu('Configuración Fiscal', '/confiscal')]
@@ -900,37 +900,45 @@ ipcMain.handle('open-external', async (event, url) => {
   }
 })
 /***********************************************************************/
-ipcMain.handle('copiar-pdf-archivo', async (event, { fileName = 'factura.pdf', base64 = '' } = {}) => {
-  try {
-    if (!base64) {
-      throw new Error('No se recibio el PDF')
-    }
+ipcMain.handle(
+  'copiar-pdf-archivo',
+  async (event, { fileName = 'factura.pdf', base64 = '' } = {}) => {
+    try {
+      if (!base64) {
+        throw new Error('No se recibio el PDF')
+      }
 
-    const safeFileName = String(fileName || 'factura.pdf').replace(/[<>:"/\\|?*]+/g, '_')
-    const tempDir = path.join(app.getPath('temp'), 'tmpos-whatsapp')
-    fsSync.mkdirSync(tempDir, { recursive: true })
+      const safeFileName = String(fileName || 'factura.pdf').replace(/[<>:"/\\|?*]+/g, '_')
+      const tempDir = path.join(app.getPath('temp'), 'tmpos-whatsapp')
+      fsSync.mkdirSync(tempDir, { recursive: true })
 
-    const finalFileName = safeFileName.toLowerCase().endsWith('.pdf') ? safeFileName : `${safeFileName}.pdf`
-    const filePath = path.join(tempDir, finalFileName)
-    fsSync.writeFileSync(filePath, Buffer.from(base64, 'base64'))
+      const finalFileName = safeFileName.toLowerCase().endsWith('.pdf')
+        ? safeFileName
+        : `${safeFileName}.pdf`
+      const filePath = path.join(tempDir, finalFileName)
+      fsSync.writeFileSync(filePath, Buffer.from(base64, 'base64'))
 
-    if (process.platform === 'win32') {
-      const escapedPath = filePath.replace(/'/g, "''")
-      await new Promise((resolve, reject) => {
-        exec(`powershell.exe -NoProfile -Command "Set-Clipboard -LiteralPath '${escapedPath}'"`, (error) => {
-          if (error) reject(error)
-          else resolve()
+      if (process.platform === 'win32') {
+        const escapedPath = filePath.replace(/'/g, "''")
+        await new Promise((resolve, reject) => {
+          exec(
+            `powershell.exe -NoProfile -Command "Set-Clipboard -LiteralPath '${escapedPath}'"`,
+            (error) => {
+              if (error) reject(error)
+              else resolve()
+            }
+          )
         })
-      })
-    } else {
-      clipboard.writeBuffer('application/pdf', fsSync.readFileSync(filePath))
-    }
+      } else {
+        clipboard.writeBuffer('application/pdf', fsSync.readFileSync(filePath))
+      }
 
-    return { success: true, filePath }
-  } catch (error) {
-    return { success: false, error: error.message || String(error) }
+      return { success: true, filePath }
+    } catch (error) {
+      return { success: false, error: error.message || String(error) }
+    }
   }
-})
+)
 /***********************************************************************/
 ipcMain.handle('buscarrnc', async (event, rnc) => {
   const url = 'https://dgii.gov.do/wsMovilDGII/WSMovilDGII.asmx?wsdl'
@@ -2123,40 +2131,40 @@ ipcMain.handle('print-barcode', async (event, args) => {
       cantidad,
       headerText,
       orientacion,
-      qr,          // Nueva propiedad para determinar si se imprime un código QR
-      truncado     // Nueva propiedad opcional para truncar el código
-    } = args;
+      qr, // Nueva propiedad para determinar si se imprime un código QR
+      truncado // Nueva propiedad opcional para truncar el código
+    } = args
 
-    const config = await loadConfig();
-    const labelPrinterName = printerName || config?.impresoraLabel?.printerName || '4BARCODE';
+    const config = await loadConfig()
+    const labelPrinterName = printerName || config?.impresoraLabel?.printerName || '4BARCODE'
     const escapeHtml = (value = '') =>
       String(value)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    const escapeJsString = (value = '') => JSON.stringify(String(value));
-    const safeHeaderText = escapeHtml(headerText || '');
-    const safeText = escapeHtml(text || '');
-    const safePrecio = escapeHtml(precio || '');
-    const safeCode = escapeHtml(code || '');
+        .replace(/'/g, '&#39;')
+    const escapeJsString = (value = '') => JSON.stringify(String(value))
+    const safeHeaderText = escapeHtml(headerText || '')
+    const safeText = escapeHtml(text || '')
+    const safePrecio = escapeHtml(precio || '')
+    const safeCode = escapeHtml(code || '')
 
     // 🔹 Si truncado es true, mostrar solo últimos 6 dígitos
-    const displayCode = truncado ? String(code).slice(-6) : code;
-    const safeDisplayCode = escapeHtml(displayCode || '');
-    const barcodeReferenceLength = Math.max(String(displayCode || code || '').length, 8);
+    const displayCode = truncado ? String(code).slice(-6) : code
+    const safeDisplayCode = escapeHtml(displayCode || '')
+    const barcodeReferenceLength = Math.max(String(displayCode || code || '').length, 8)
     const barcodeVisualWidth = Math.max(
       54,
       Math.min(labelWidth * 0.72, width * barcodeReferenceLength * 6.5)
-    );
+    )
 
     // Definir el tamaño del papel en micras
-    let labelWidthMicrons = labelWidth * 1000 * 25.4 / 96;
-    let labelHeightMicrons = labelHeight * 1000 * 25.4 / 96;
+    let labelWidthMicrons = (labelWidth * 1000 * 25.4) / 96
+    let labelHeightMicrons = (labelHeight * 1000 * 25.4) / 96
 
     if (orientacion === 'horizontal') {
-      [labelWidthMicrons, labelHeightMicrons] = [labelHeightMicrons, labelWidthMicrons];
+      ;[labelWidthMicrons, labelHeightMicrons] = [labelHeightMicrons, labelWidthMicrons]
     }
 
     const marginsMicrons = {
@@ -2164,9 +2172,9 @@ ipcMain.handle('print-barcode', async (event, args) => {
       right: margins.right * 25.4,
       bottom: margins.bottom * 25.4,
       left: margins.left * 25.4
-    };
+    }
 
-    const rotationStyle = orientacion === 'horizontal' ? 'transform: rotate(90deg);' : '';
+    const rotationStyle = orientacion === 'horizontal' ? 'transform: rotate(90deg);' : ''
 
     const htmlContent = `<!DOCTYPE html>
 <html>
@@ -2260,7 +2268,8 @@ ipcMain.handle('print-barcode', async (event, args) => {
         ${incluirCabecera ? `<div class="titulo">${safeHeaderText}</div>` : ''}
 
         <div class="barcode-container">
-            ${incluirOtro
+            ${
+              incluirOtro
                 ? `<img src="${imagen}" class="img-logo" />`
                 : qr
                   ? `<div id="qrcode" class="qr-code"></div>`
@@ -2278,7 +2287,8 @@ ipcMain.handle('print-barcode', async (event, args) => {
                         jsbarcode-textalign="center"
                         jsbarcode-textposition="bottom"
                         jsbarcode-displayvalue="${incluirCodigo}">
-                    </svg>`}
+                    </svg>`
+            }
         </div>
 
         ${incluirTexto ? `<div class="texto">${safeText}</div>` : ''}
@@ -2287,18 +2297,20 @@ ipcMain.handle('print-barcode', async (event, args) => {
 
     <script>
         if (!${incluirOtro}) {
-            ${qr
+            ${
+              qr
                 ? `const QRCode = require('qrcode');
                    QRCode.toDataURL("${code}", { width: ${width}, height: ${height} }, function (err, url) {
                      if (err) throw err;
                      document.getElementById('qrcode').innerHTML = '<img src="' + url + '" />';
                    });`
                 : `const JsBarcode = require('jsbarcode');
-                   JsBarcode(".barcode").init();`}
+                   JsBarcode(".barcode").init();`
+            }
         }
     </script>
 </body>
-</html>`;
+</html>`
 
     return new Promise((resolve) => {
       const printWindow = new BrowserWindow({
@@ -2309,9 +2321,9 @@ ipcMain.handle('print-barcode', async (event, args) => {
           nodeIntegration: true,
           contextIsolation: false
         }
-      });
+      })
 
-      printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+      printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`)
 
       printWindow.webContents.on('did-finish-load', () => {
         printWindow.webContents.print(
@@ -2330,20 +2342,20 @@ ipcMain.handle('print-barcode', async (event, args) => {
             copies: cantidad
           },
           (success, failureReason) => {
-            printWindow.close();
+            printWindow.close()
             if (success) {
-              resolve({ success: true });
+              resolve({ success: true })
             } else {
-              resolve({ success: false, error: failureReason });
+              resolve({ success: false, error: failureReason })
             }
           }
-        );
-      });
-    });
+        )
+      })
+    })
   } catch (error) {
-    return { success: false, error: error.message };
+    return { success: false, error: error.message }
   }
-});
+})
 /**************************************************************/
 ipcMain.handle('print-ticket', async (event, ticketHTML) => {
   try {
@@ -2440,7 +2452,15 @@ ipcMain.handle('print-ticket', async (event, ticketHTML) => {
 /**************************************************************/
 ipcMain.handle('print-html', async (event, args) => {
   try {
-    const { html, printerName = '', width = 800, height = 600, pageSize, silent = true, copies = 1 } = args || {}
+    const {
+      html,
+      printerName = '',
+      width = 800,
+      height = 600,
+      pageSize,
+      silent = true,
+      copies = 1
+    } = args || {}
 
     if (!html) {
       return { success: false, error: 'No HTML content provided' }
@@ -3426,7 +3446,7 @@ ipcMain.handle('creartabla', async (event, tabla, campos) => {
             userDataPath,
             helperPath: path.join(userDataPath, 'IPhoneReaderHelper.exe')
           }
-            console.log("diagnosticOptions", diagnosticOptions);
+          console.log('diagnosticOptions', diagnosticOptions)
           return await iphone[consulta](diagnosticOptions, ...args)
         }
 

@@ -5,7 +5,6 @@ export function useVirtualKeyboard() {
   const visible = ref(false)
   const currentInput = ref(null)
   const type = ref('text')
-  const keys = ref([])
 
   const textKeys = [
     'Q',
@@ -40,6 +39,7 @@ export function useVirtualKeyboard() {
   ]
 
   const numberKeys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']
+  const keys = ref(textKeys)
 
   const pressKey = (key) => {
     if (currentInput.value) {

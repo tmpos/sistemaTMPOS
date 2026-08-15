@@ -376,6 +376,17 @@ const probarConexion = async (registro) => {
 };
 
 const consultarCompaniaAlanube = async () => {
+  const idCompania = String(configGlobal.value.id_compania || '').trim();
+  if (!idCompania) {
+    toast.add({
+      severity: 'warn',
+      summary: 'ID requerido',
+      detail: 'Ingrese el ID de la compañía de Alanube que desea consultar',
+      life: 5000
+    });
+    return;
+  }
+
   guardandoConfigGlobal.value = true;
   resultadoPrueba.value = null;
   try {
@@ -386,24 +397,26 @@ const consultarCompaniaAlanube = async () => {
 
     const token = configGlobal.value.token_api || 'eyJhbGciOiJSUzI1NiIsImtpZCI6ImU1ZTEzYzFiLTJiYTgtNGYzOC1hNWMxLTQ5NWEzMjk3ZjE4ZiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwZTIwYTFlYi1kYjJkLTQ0YTMtOTM3ZC1hMTk1YWQ4M2NjMmQiLCJlbWFpbCI6InRtcG9zc3JsQGFsYW51YmUuY28iLCJzY29wZSI6ImMuci51OmFwaWRvbV9mdWxsX2FjY2VzcyBnZW5lcmljIiwibGFzdFVwZGF0ZWRQYXNzd29yZCI6IjIwMjYtMDMtMjYgMjI6Mzc6MDkiLCJpc3MiOiJzYW5kLWF1dGgtYXBpLmFsZWdyYS5jb20iLCJpYXQiOjE3NzQ1NjQ2MzgsImV4cCI6MTE3MTczNDAyMiwianRpIjoiZTY4N2FhMDMtODc2NS00YWVmLWE5NTgtZTkwMzQzM2FiNjM2In0.UXoIZIoyhbXUlUFC-e7zcPed503KPm04nkq75C71KXJAlIhvpHwUvUszTnMuWfLLmPj_SVjuqnIkI7PRHSJ0awNmNq5H7fajjQnigNviTEfhxVkN-XiAj2UvLY5DZtBKbcDMdVvRO1K8XAExy-oHH43zuj1Tzx6hOhdIqdOmvmOEUda6VZ-gjUnI2RPY0ha2AgfL56lxx2pZSTQ_CB0cTvNU-YgO5Z6PZNW7krGRGkWalVUaZykJOZd1cWYe_g1fB143nsqiWj7PZIN6McjBXzt5iKGDDFmZI7fD1FsK75frBgLmIgPKWLrABhb9V1NbTIrHxNoJSQunFaLC-3VmAQ';
 
-    const response = await axios.get(baseUrl, {
+    // GET /company devuelve la empresa principal asociada al token.
+    // GET /company/{id} devuelve la empresa específica solicitada.
+    const response = await axios.get(`${baseUrl}/${encodeURIComponent(idCompania)}`, {
       headers: {
         'Accept': 'application/json',
         'Authorization': `Bearer ${token}`
       }
     });
 
-    const company = response.data;
+    const company = response.data?.data || response.data;
     resultadoPrueba.value = { exito: true, data: company };
 
-    if (company.id) {
-      configGlobal.value.id_compania = company.id;
-    }
+    configGlobal.value.id_compania = company.id || idCompania;
     if (company.companyName || company.name) {
       configGlobal.value.nombre_empresa = company.companyName || company.name;
     }
-    if (company.companyIdentification || company.rnc) {
-      configGlobal.value.rnc_emisor = String(company.companyIdentification || company.rnc || '').replace(/\D/g, '');
+    if (company.companyIdentification || company.identification || company.rnc) {
+      configGlobal.value.rnc_emisor = String(
+        company.companyIdentification || company.identification || company.rnc || ''
+      ).replace(/\D/g, '');
     }
     persistirConfigGlobal();
 
@@ -517,8 +530,8 @@ onMounted(async () => {
       </div>
       <div class="mt-3 flex items-center gap-2">
         <Button label="Guardar Configuración" icon="pi pi-save" severity="indigo" :loading="guardandoConfigGlobal" @click="guardarConfigGlobal" />
-        <Button label="Cargar desde Alanube" icon="pi pi-cloud-download" severity="info" outlined :loading="guardandoConfigGlobal" @click="consultarCompaniaAlanube" />
-        <small class="text-slate-400">Usa el token para obtener ID, RNC y nombre automáticamente</small>
+        <Button label="Buscar por ID en Alanube" icon="pi pi-cloud-download" severity="info" outlined :loading="guardandoConfigGlobal" @click="consultarCompaniaAlanube" />
+        <small class="text-slate-400">Consulta el ID indicado y completa el RNC y nombre de esa empresa</small>
       </div>
     </div>
 

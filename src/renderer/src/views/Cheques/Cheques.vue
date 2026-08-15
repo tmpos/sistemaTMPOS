@@ -13,7 +13,7 @@ const toast = useToast();
 /************************************************************************/
 const usuarioLocal = ref({})
 /************************************************************************/
-const camposArray = ["numero_cheque", "banco", "cuenta_banco", "beneficiario", "monto", "fecha_emision", "fecha_cobro", "concepto", "estado", "usuario"];
+const camposArray = ["numero_cheque", "banco", "cuenta_banco", "beneficiario", "cuenta_debito_id", "cuenta_debito_nombre", "monto", "fecha_emision", "fecha_cobro", "concepto", "estado", "usuario"];
 /************************************************************************/
 import { useDatosEmpresa } from '../../stores'
 const datosEmpresa = useDatosEmpresa();
@@ -44,6 +44,7 @@ const datoscampos = ref({});
 const data = ref([]);
 const searchQuery = ref('');
 const bancos = ref([]);
+const proveedores = ref([]);
 const bancoSeleccionado = ref(null);
 const estadoSeleccionado = ref(null);
 const cuentasContables = ref([]);
@@ -100,6 +101,7 @@ onMounted(async () => {
     usuarioLocal.value = JSON.parse(window.localStorage.getItem('usuarioLocal'))[0] || {};
     await fetchAndSetupData();
     await fetchBancos();
+    await fetchProveedores();
     await fetchCuentas();
 });
 /************************************************************************/
@@ -145,6 +147,13 @@ async function funcionActualizar() {
         console.error("Datos incompletos, no se puede actualizar.");
         return;
     }
+    const cuentaDebitoEditada = cuentasContables.value.find(
+        cuenta => cuenta.id == cuentaContableSeleccionadaEdit.value
+    );
+    if (cuentaDebitoEditada) {
+        datoscampos.value.cuenta_debito_id = String(cuentaDebitoEditada.id);
+        datoscampos.value.cuenta_debito_nombre = cuentaDebitoEditada.nombre;
+    }
     if (datoscampos.value.hasOwnProperty('created_at')) {
         datoscampos.value.updated_at = nfecha('timestamp');
     }
@@ -157,6 +166,148 @@ async function funcionActualizar() {
         toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar el cheque.', life: 3000 });
     }
 }
+/************************************************************************/
+const crearAsientoContableCheque = async (cheque, cuentaDebito) => {
+    const monto = parseFloat(cheque.monto) || 0;
+    const banco = bancos.value.find(item => item.nombre === cheque.banco);
+    if (!cuentaDebito || !banco || monto <= 0) {
+        throw new Error('Faltan las cuentas contables del débito o del banco.');
+    }
+
+    const ultimoNumero = await peticionesFetchOffline('getMaxValue', 'asientodiario', 'numero');
+    const numeroAnterior = Array.isArray(ultimoNumero) ? ultimoNumero[0] : ultimoNumero;
+    const numeroAsiento = Number.isFinite(parseInt(numeroAnterior, 10))
+        ? String(parseInt(numeroAnterior, 10) + 1).padStart(8, '0')
+        : '00000001';
+    const movimientos = [
+        {
+            debito: cuentaDebito.nombre,
+            cantidadDebito: monto.toFixed(2),
+            credito: banco.nombre || cheque.cuenta_banco || 'EFECTIVO EN BANCO',
+            cantidadCredito: monto.toFixed(2)
+        }
+    ];
+    const asiento = {
+        numero: numeroAsiento,
+        fecha: cheque.fecha_emision || nfecha('fecha'),
+        hora: nfecha('hora'),
+        descripcion: `CHEQUE #${cheque.numero_cheque}: ${cheque.concepto}`,
+        asiento: JSON.stringify(movimientos),
+        usuario: usuarioLocal.value.usuario || '',
+        created_at: nfecha('timestamp'),
+        updated_at: nfecha('timestamp')
+    };
+    const resultado = await peticionesFetchOffline(
+        'insertData',
+        'asientodiario',
+        JSON.stringify(asiento)
+    );
+    if (resultado?.[0] !== 'ok') {
+        throw new Error('No se pudo registrar el asiento diario del cheque.');
+    }
+    return asiento;
+};
+/************************************************************************/
+const respuestaOk = respuesta => {
+    if (Array.isArray(respuesta)) return respuesta[0] === 'ok';
+    if (typeof respuesta === 'string') return respuesta.toLowerCase() === 'ok';
+    return respuesta?.success === true || respuesta?.ok === true || respuesta?.[0] === 'ok';
+};
+
+const buscarCuentaDebitoCheque = (cheque, cuentas, cuentaPreferida = null) => {
+    if (cuentaPreferida) return cuentaPreferida;
+    return cuentas.find(cuenta => cuenta.id == cheque.cuenta_debito_id)
+        || cuentas.find(cuenta => cuenta.nombre === cheque.cuenta_debito_nombre)
+        || cuentas.find(cuenta => cuenta.nombre === cheque.beneficiario);
+};
+
+const aplicarMovimientoSaldosCheque = async (cheque, { reverso = false, cuentaPreferida = null } = {}) => {
+    const monto = parseFloat(cheque.monto) || 0;
+    if (monto <= 0) throw new Error('El monto del cheque no es válido.');
+
+    const [bancosActuales, cuentasActuales] = await Promise.all([
+        peticionesFetchOffline('getDataAsArray', 'banco'),
+        peticionesFetchOffline('getDataAsArray', 'cuentas')
+    ]);
+    const banco = (bancosActuales || []).find(item =>
+        item.nombre === cheque.banco && (!cheque.cuenta_banco || item.cuenta === cheque.cuenta_banco)
+    ) || (bancosActuales || []).find(item => item.nombre === cheque.banco);
+    const cuentaDebito = buscarCuentaDebitoCheque(cheque, cuentasActuales || [], cuentaPreferida);
+
+    if (!banco) throw new Error('No se encontró el banco asociado al cheque.');
+    if (!cuentaDebito) throw new Error('No se encontró la cuenta contable a debitar del cheque.');
+
+    const saldoBancoAnterior = parseFloat(banco.saldo) || 0;
+    const saldoCuentaAnterior = parseFloat(cuentaDebito.saldo) || 0;
+    const factor = reverso ? 1 : -1;
+    const bancoActualizado = {
+        ...banco,
+        saldo: (saldoBancoAnterior + (factor * monto)).toFixed(2)
+    };
+    const cuentaActualizada = {
+        ...cuentaDebito,
+        saldo: (saldoCuentaAnterior - (factor * monto)).toFixed(2)
+    };
+    if (bancoActualizado.hasOwnProperty('created_at')) bancoActualizado.updated_at = nfecha('timestamp');
+    if (cuentaActualizada.hasOwnProperty('created_at')) cuentaActualizada.updated_at = nfecha('timestamp');
+
+    const envioBanco = await peticionesFetchOffline('updateData', 'banco', JSON.stringify(bancoActualizado));
+    if (!respuestaOk(envioBanco)) throw new Error('No se pudo actualizar el saldo del banco.');
+
+    const envioCuenta = await peticionesFetchOffline('updateData', 'cuentas', JSON.stringify(cuentaActualizada));
+    if (!respuestaOk(envioCuenta)) {
+        await peticionesFetchOffline('updateData', 'banco', JSON.stringify(banco));
+        throw new Error('No se pudo actualizar el saldo de la cuenta contable.');
+    }
+
+    const [bancosVerificacion, cuentasVerificacion] = await Promise.all([
+        peticionesFetchOffline('getDataAsArray', 'banco'),
+        peticionesFetchOffline('getDataAsArray', 'cuentas')
+    ]);
+    const bancoVerificado = (bancosVerificacion || []).find(item => item.id == banco.id);
+    const cuentaVerificada = (cuentasVerificacion || []).find(item => item.id == cuentaDebito.id);
+    const bancoCorrecto = Math.abs((parseFloat(bancoVerificado?.saldo) || 0) - parseFloat(bancoActualizado.saldo)) < 0.01;
+    const cuentaCorrecta = Math.abs((parseFloat(cuentaVerificada?.saldo) || 0) - parseFloat(cuentaActualizada.saldo)) < 0.01;
+    if (!bancoCorrecto || !cuentaCorrecta) {
+        await peticionesFetchOffline('updateData', 'banco', JSON.stringify(banco));
+        await peticionesFetchOffline('updateData', 'cuentas', JSON.stringify(cuentaDebito));
+        throw new Error('El servidor no confirmó la actualización de ambos saldos.');
+    }
+
+    try {
+        const transaccion = await arrayToObjetoFromTablaOffline('transaccionesbancarias');
+        transaccion.tipo = reverso ? 'DEPOSITO' : 'RETIRO';
+        transaccion.metodo = 'CHEQUE';
+        transaccion.cuenta_origen = reverso ? '' : banco.cuenta;
+        transaccion.cuenta_destino = reverso ? banco.cuenta : cuentaDebito.nombre;
+        transaccion.monto = monto.toFixed(2);
+        transaccion.balance_anterior = saldoBancoAnterior.toFixed(2);
+        transaccion.balance_actual = bancoActualizado.saldo;
+        transaccion.descripcion = `${reverso ? 'Reverso de cheque' : 'Cheque'} #${cheque.numero_cheque} - ${cheque.beneficiario}`;
+        transaccion.depositante = '';
+        transaccion.beneficiario = cheque.beneficiario;
+        transaccion.fecha = nfecha('fecha');
+        transaccion.hora = nfecha('hora');
+        transaccion.estado = 'COMPLETADA';
+        transaccion.usuario = usuarioLocal.value.usuario || '';
+        if (transaccion.hasOwnProperty('created_at')) {
+            transaccion.created_at = nfecha('timestamp');
+            transaccion.updated_at = nfecha('timestamp');
+        }
+        const envioTransaccion = await peticionesFetchOffline('insertData', 'transaccionesbancarias', JSON.stringify(transaccion));
+        if (!respuestaOk(envioTransaccion)) throw new Error('No se pudo registrar la transacción bancaria.');
+    } catch (error) {
+        console.error('Los saldos se actualizaron, pero falló el registro de la transacción bancaria:', error);
+        toast.add({
+            severity: 'warn',
+            summary: 'Saldos actualizados',
+            detail: `No se pudo guardar la transacción bancaria: ${error.message}`,
+            life: 6000
+        });
+    }
+
+    await Promise.all([fetchBancos(), fetchCuentas()]);
+};
 /************************************************************************/
 async function funcionCrear() {
     // Validaciones
@@ -180,17 +331,77 @@ async function funcionCrear() {
         toast.add({ severity: 'warn', summary: 'Atención', detail: 'Ingrese el concepto', life: 3000 });
         return;
     }
+    const cuentaDebito = cuentasContables.value.find(
+        cuenta => cuenta.id == cuentaContableSeleccionada.value
+    );
+    if (!cuentaDebito) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Atención',
+            detail: 'Seleccione la cuenta contable que recibirá el débito.',
+            life: 4000
+        });
+        return;
+    }
 
     if (datoscamposCheques.value.hasOwnProperty('created_at')) {
         datoscamposCheques.value.created_at = nfecha('timestamp');
         datoscamposCheques.value.updated_at = nfecha('timestamp');
     }
+    datoscamposCheques.value.cuenta_debito_id = String(cuentaDebito.id);
+    datoscamposCheques.value.cuenta_debito_nombre = cuentaDebito.nombre;
     datoscamposCheques.value.usuario = usuarioLocal.value.usuario || '';
+    if (datoscamposCheques.value.estado === 'COBRADO') {
+        datoscamposCheques.value.fecha_cobro = nfecha('fecha');
+    }
 
     const envioDatos = await peticionesFetchOffline('insertData', 'cheques', JSON.stringify(datoscamposCheques.value));
     if (envioDatos[0] == 'ok') {
+        let asientoRegistrado = true;
+        let saldosRegistrados = datoscamposCheques.value.estado !== 'COBRADO';
+        try {
+            await crearAsientoContableCheque(datoscamposCheques.value, cuentaDebito);
+        } catch (errorAsiento) {
+            asientoRegistrado = false;
+            console.error('Cheque registrado sin asiento contable:', errorAsiento);
+            toast.add({
+                severity: 'warn',
+                summary: 'Cheque registrado',
+                detail: `El cheque se guardó, pero falló el asiento contable: ${errorAsiento.message}`,
+                life: 7000
+            });
+        }
+        if (datoscamposCheques.value.estado === 'COBRADO') {
+            try {
+                await aplicarMovimientoSaldosCheque(datoscamposCheques.value, { cuentaPreferida: cuentaDebito });
+                saldosRegistrados = true;
+            } catch (errorSaldos) {
+                console.error('Cheque cobrado sin movimiento de saldos:', errorSaldos);
+                const idCreado = envioDatos?.[1]?.id;
+                if (idCreado) {
+                    const chequePendiente = {
+                        ...datoscamposCheques.value,
+                        id: idCreado,
+                        estado: 'PENDIENTE',
+                        fecha_cobro: ''
+                    };
+                    await peticionesFetchOffline('updateData', 'cheques', JSON.stringify(chequePendiente));
+                }
+                toast.add({
+                    severity: 'error',
+                    summary: 'Cheque pendiente',
+                    detail: `No se aplicaron los saldos: ${errorSaldos.message}`,
+                    life: 7000
+                });
+            }
+        }
         fetchAndSetupData();
-        toast.add({ severity: 'success', summary: 'Éxito', detail: 'Cheque Registrado', life: 3000 });
+        if (asientoRegistrado && saldosRegistrados) {
+            const detalle = datoscamposCheques.value.estado === 'COBRADO'
+                ? 'Cheque, asiento y saldos registrados'
+                : 'Cheque y asiento contable registrados';
+            toast.add({ severity: 'success', summary: 'Éxito', detail: detalle, life: 3000 });
+        }
         limpiarCamposCrear();
         visiblecrear.value = false;
     } else {
@@ -253,136 +464,21 @@ async function borrarSeleccionados() {
 async function cambiarEstadoCheque(cheque, nuevoEstado) {
     const estadoAnterior = cheque.estado;
 
-    // Si se marca como COBRADO, restar saldo del banco y registrar transacción
-    if (nuevoEstado === 'COBRADO') {
-        const bancoEncontrado = bancos.value.find(b => b.nombre === cheque.banco);
-        if (!bancoEncontrado) {
-            toast.add({ severity: 'error', summary: 'Error', detail: 'No se encontró el banco asociado', life: 3000 });
-            return;
+    try {
+        if (nuevoEstado === 'COBRADO' && estadoAnterior !== 'COBRADO') {
+            await aplicarMovimientoSaldosCheque(cheque);
+        } else if (nuevoEstado === 'DEVUELTO' && estadoAnterior === 'COBRADO') {
+            await aplicarMovimientoSaldosCheque(cheque, { reverso: true });
         }
-
-        const montoCheque = parseFloat(cheque.monto) || 0;
-        const saldoAnterior = parseFloat(bancoEncontrado.saldo) || 0;
-        const nuevoSaldo = (saldoAnterior - montoCheque).toFixed(2);
-
-        // Actualizar saldo del banco
-        const bancoActualizado = { ...bancoEncontrado };
-        if (bancoActualizado.hasOwnProperty('created_at')) {
-            bancoActualizado.updated_at = nfecha('timestamp');
-        }
-        bancoActualizado.saldo = nuevoSaldo;
-        const envioBanco = await peticionesFetchOffline('updateData', 'banco', JSON.stringify(bancoActualizado));
-        if (envioBanco[0] != 'ok') {
-            toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar saldo del banco', life: 3000 });
-            return;
-        }
-
-        // Registrar transacción bancaria
-        const camposTransaccion = await arrayToObjetoFromTablaOffline('transaccionesbancarias');
-        camposTransaccion.tipo = 'RETIRO';
-        camposTransaccion.metodo = 'CHEQUE';
-        camposTransaccion.cuenta_origen = bancoEncontrado.cuenta;
-        camposTransaccion.cuenta_destino = '';
-        camposTransaccion.monto = montoCheque.toFixed(2);
-        camposTransaccion.balance_anterior = saldoAnterior.toFixed(2);
-        camposTransaccion.balance_actual = nuevoSaldo;
-        camposTransaccion.descripcion = `Cheque #${cheque.numero_cheque} - ${cheque.beneficiario}`;
-        camposTransaccion.depositante = '';
-        camposTransaccion.beneficiario = cheque.beneficiario;
-        camposTransaccion.fecha = nfecha('fecha');
-        camposTransaccion.hora = nfecha('hora');
-        camposTransaccion.estado = 'COMPLETADA';
-        camposTransaccion.usuario = usuarioLocal.value.usuario || '';
-        if (camposTransaccion.hasOwnProperty('created_at')) {
-            camposTransaccion.created_at = nfecha('timestamp');
-            camposTransaccion.updated_at = nfecha('timestamp');
-        }
-        await peticionesFetchOffline('insertData', 'transaccionesbancarias', JSON.stringify(camposTransaccion));
-
-        // Si el beneficiario coincide con una cuenta contable, acreditar su saldo
-        if (cheque.beneficiario) {
-            const cuentas = await peticionesFetchOffline('getDataAsArray', 'cuentas');
-            const cuentaEncontrada = (cuentas || []).find(c => c.nombre === cheque.beneficiario);
-            if (cuentaEncontrada) {
-                const saldoCuentaAnterior = parseFloat(cuentaEncontrada.saldo) || 0;
-                const nuevoSaldoCuenta = (saldoCuentaAnterior + montoCheque).toFixed(2);
-                const cuentaActualizada = { ...cuentaEncontrada };
-                if (cuentaActualizada.hasOwnProperty('created_at')) {
-                    cuentaActualizada.updated_at = nfecha('timestamp');
-                }
-                cuentaActualizada.saldo = nuevoSaldoCuenta;
-                await peticionesFetchOffline('updateData', 'cuentas', JSON.stringify(cuentaActualizada));
-            }
-        }
-
-        await fetchBancos();
-        await fetchCuentas();
-    }
-
-    // Si se cambia a DEVUELTO y antes estaba COBRADO, revertir saldo
-    if (nuevoEstado === 'DEVUELTO' && estadoAnterior === 'COBRADO') {
-        const bancoEncontrado = bancos.value.find(b => b.nombre === cheque.banco);
-        if (!bancoEncontrado) {
-            toast.add({ severity: 'error', summary: 'Error', detail: 'No se encontró el banco asociado', life: 3000 });
-            return;
-        }
-
-        const montoCheque = parseFloat(cheque.monto) || 0;
-        const saldoAnterior = parseFloat(bancoEncontrado.saldo) || 0;
-        const nuevoSaldo = (saldoAnterior + montoCheque).toFixed(2);
-
-        // Actualizar saldo del banco (sumar de vuelta)
-        const bancoActualizado = { ...bancoEncontrado };
-        if (bancoActualizado.hasOwnProperty('created_at')) {
-            bancoActualizado.updated_at = nfecha('timestamp');
-        }
-        bancoActualizado.saldo = nuevoSaldo;
-        const envioBanco = await peticionesFetchOffline('updateData', 'banco', JSON.stringify(bancoActualizado));
-        if (envioBanco[0] != 'ok') {
-            toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al revertir saldo del banco', life: 3000 });
-            return;
-        }
-
-        // Registrar transacción de reverso
-        const camposTransaccion = await arrayToObjetoFromTablaOffline('transaccionesbancarias');
-        camposTransaccion.tipo = 'DEPOSITO';
-        camposTransaccion.metodo = 'CHEQUE';
-        camposTransaccion.cuenta_origen = '';
-        camposTransaccion.cuenta_destino = bancoEncontrado.cuenta;
-        camposTransaccion.monto = montoCheque.toFixed(2);
-        camposTransaccion.balance_anterior = saldoAnterior.toFixed(2);
-        camposTransaccion.balance_actual = nuevoSaldo;
-        camposTransaccion.descripcion = `Cheque Devuelto #${cheque.numero_cheque} - ${cheque.beneficiario}`;
-        camposTransaccion.depositante = '';
-        camposTransaccion.beneficiario = cheque.beneficiario;
-        camposTransaccion.fecha = nfecha('fecha');
-        camposTransaccion.hora = nfecha('hora');
-        camposTransaccion.estado = 'COMPLETADA';
-        camposTransaccion.usuario = usuarioLocal.value.usuario || '';
-        if (camposTransaccion.hasOwnProperty('created_at')) {
-            camposTransaccion.created_at = nfecha('timestamp');
-            camposTransaccion.updated_at = nfecha('timestamp');
-        }
-        await peticionesFetchOffline('insertData', 'transaccionesbancarias', JSON.stringify(camposTransaccion));
-
-        // Revertir saldo de la cuenta contable si aplica (devuelto → quitar el crédito)
-        if (cheque.beneficiario) {
-            const cuentas = await peticionesFetchOffline('getDataAsArray', 'cuentas');
-            const cuentaEncontrada = (cuentas || []).find(c => c.nombre === cheque.beneficiario);
-            if (cuentaEncontrada) {
-                const saldoCuentaAnterior = parseFloat(cuentaEncontrada.saldo) || 0;
-                const nuevoSaldoCuenta = (saldoCuentaAnterior - montoCheque).toFixed(2);
-                const cuentaActualizada = { ...cuentaEncontrada };
-                if (cuentaActualizada.hasOwnProperty('created_at')) {
-                    cuentaActualizada.updated_at = nfecha('timestamp');
-                }
-                cuentaActualizada.saldo = nuevoSaldoCuenta;
-                await peticionesFetchOffline('updateData', 'cuentas', JSON.stringify(cuentaActualizada));
-            }
-        }
-
-        await fetchBancos();
-        await fetchCuentas();
+    } catch (error) {
+        console.error('No se pudo aplicar el movimiento del cheque:', error);
+        toast.add({
+            severity: 'error',
+            summary: 'No se cambió el estado',
+            detail: error.message,
+            life: 6000
+        });
+        return;
     }
 
     // Actualizar estado del cheque
@@ -752,49 +848,51 @@ watch(visible, (newVal) => {
     if (newVal && datoscampos.value) {
         const nombreBeneficiario = datoscampos.value.beneficiario || '';
         const cuentaMatch = cuentasContables.value.find(c => c.nombre === nombreBeneficiario);
+        const cuentaGuardada = cuentasContables.value.find(c => c.id == datoscampos.value.cuenta_debito_id)
+            || cuentasContables.value.find(c => c.nombre === datoscampos.value.cuenta_debito_nombre);
+        const proveedorMatch = proveedores.value.some(p => p.nombre === nombreBeneficiario);
+        cuentaContableSeleccionadaEdit.value = cuentaGuardada?.id || cuentaMatch?.id || null;
         if (cuentaMatch) {
             beneficiarioModeEdit.value = 'CUENTA';
-            cuentaContableSeleccionadaEdit.value = cuentaMatch.id;
         } else {
-            beneficiarioModeEdit.value = 'MANUAL';
-            cuentaContableSeleccionadaEdit.value = null;
+            beneficiarioModeEdit.value = proveedorMatch ? 'SUPLIDOR' : 'MANUAL';
         }
     }
 });
 /************************************************************************/
 watch(beneficiarioMode, (newVal) => {
-    if (newVal === 'MANUAL') {
-        cuentaContableSeleccionada.value = null;
-    }
-});
-/************************************************************************/
-watch(beneficiarioModeEdit, (newVal) => {
-    if (newVal === 'MANUAL') {
-        cuentaContableSeleccionadaEdit.value = null;
+    if (newVal === 'CUENTA' && cuentaContableSeleccionada.value) {
+        const cuenta = cuentasContables.value.find(c => c.id == cuentaContableSeleccionada.value);
+        if (cuenta) datoscamposCheques.value.beneficiario = cuenta.nombre;
+    } else {
+        datoscamposCheques.value.beneficiario = '';
     }
 });
 /************************************************************************/
 watch(cuentaContableSeleccionada, (newVal) => {
-    if (newVal) {
+    if (newVal && beneficiarioMode.value === 'CUENTA') {
         const cuenta = cuentasContables.value.find(c => c.id == newVal);
-        if (cuenta) {
-            datoscamposCheques.value.beneficiario = cuenta.nombre;
-        }
+        if (cuenta) datoscamposCheques.value.beneficiario = cuenta.nombre;
     }
 });
 /************************************************************************/
 watch(cuentaContableSeleccionadaEdit, (newVal) => {
-    if (newVal) {
+    if (newVal && beneficiarioModeEdit.value === 'CUENTA') {
         const cuenta = cuentasContables.value.find(c => c.id == newVal);
-        if (cuenta) {
-            datoscampos.value.beneficiario = cuenta.nombre;
-        }
+        if (cuenta) datoscampos.value.beneficiario = cuenta.nombre;
     }
 });
 /************************************************************************/
 const fetchCuentas = async () => {
     const response = await peticionesFetchOffline('getDataAsArray', 'cuentas');
     cuentasContables.value = response || [];
+};
+/************************************************************************/
+const fetchProveedores = async () => {
+    const response = await peticionesFetchOffline('getDataAsArray', 'proveedores');
+    proveedores.value = (response || [])
+        .filter(proveedor => proveedor?.nombre)
+        .sort((a, b) => a.nombre.localeCompare(b.nombre));
 };
 /************************************************************************/
 const getRowClass = (data) => {
@@ -1076,17 +1174,29 @@ const getEstadoSeverity = (estado) => {
                 </div>
                 <div class="form-field-modern">
                     <label class="field-label-modern"><i class="pi pi-user mr-2"></i>Beneficiario</label>
-                    <SelectButton v-model="beneficiarioMode" :options="['MANUAL', 'CUENTA']" :allowEmpty="false" class="mb-2" />
+                    <SelectButton v-model="beneficiarioMode" :options="['MANUAL', 'CUENTA', 'SUPLIDOR']" :allowEmpty="false" class="mb-2" />
                     <div v-if="beneficiarioMode === 'MANUAL'">
                         <InputText v-model="datoscamposCheques.beneficiario" v-mayuscula placeholder="Nombre del beneficiario" class="w-full" />
                     </div>
-                    <div v-else>
-                        <Select v-model="cuentaContableSeleccionada" :options="cuentasContables" optionLabel="nombre" optionValue="id" placeholder="Seleccione una cuenta contable" filter class="w-full">
-                            <template #option="slotProps">
-                                <span>{{ slotProps.option.nombre }} - <span class="font-semibold">${{ parseFloat(slotProps.option.saldo || 0).toFixed(2) }}</span></span>
-                            </template>
-                        </Select>
-                    </div>
+                    <Select v-else-if="beneficiarioMode === 'SUPLIDOR'" v-model="datoscamposCheques.beneficiario" :options="proveedores"
+                        optionLabel="nombre" optionValue="nombre" placeholder="Buscar suplidor registrado"
+                        filter showClear class="w-full">
+                        <template #option="slotProps">
+                            <div class="flex flex-col">
+                                <span class="font-semibold">{{ slotProps.option.nombre }}</span>
+                                <small v-if="slotProps.option.rnc" class="text-slate-500">RNC: {{ slotProps.option.rnc }}</small>
+                            </div>
+                        </template>
+                    </Select>
+                    <small v-else class="text-slate-500">Seleccione debajo la cuenta que será el beneficiario.</small>
+                    <label class="block text-xs font-medium text-slate-500 mt-2 mb-1">
+                        {{ beneficiarioMode === 'CUENTA' ? 'Cuenta beneficiaria a debitar *' : 'Cuenta contable a debitar *' }}
+                    </label>
+                    <Select v-model="cuentaContableSeleccionada" :options="cuentasContables" optionLabel="nombre" optionValue="id" placeholder="Seleccione la cuenta a debitar" filter class="w-full">
+                        <template #option="slotProps">
+                            <span>{{ slotProps.option.nombre }} - <span class="font-semibold">${{ parseFloat(slotProps.option.saldo || 0).toFixed(2) }}</span></span>
+                        </template>
+                    </Select>
                 </div>
                 <div class="form-field-modern">
                     <label class="field-label-modern"><i class="pi pi-dollar mr-2"></i>Monto</label>
@@ -1128,17 +1238,29 @@ const getEstadoSeverity = (estado) => {
                 </div>
                 <div class="form-field-modern">
                     <label class="field-label-modern"><i class="pi pi-user mr-2"></i>Beneficiario</label>
-                    <SelectButton v-model="beneficiarioModeEdit" :options="['MANUAL', 'CUENTA']" :allowEmpty="false" class="mb-2" />
+                    <SelectButton v-model="beneficiarioModeEdit" :options="['MANUAL', 'CUENTA', 'SUPLIDOR']" :allowEmpty="false" class="mb-2" />
                     <div v-if="beneficiarioModeEdit === 'MANUAL'">
                         <InputText v-model="datoscampos.beneficiario" v-mayuscula placeholder="Nombre del beneficiario" class="w-full" />
                     </div>
-                    <div v-else>
-                        <Select v-model="cuentaContableSeleccionadaEdit" :options="cuentasContables" optionLabel="nombre" optionValue="id" placeholder="Seleccione una cuenta contable" filter class="w-full">
-                            <template #option="slotProps">
-                                <span>{{ slotProps.option.nombre }} - <span class="font-semibold">${{ parseFloat(slotProps.option.saldo || 0).toFixed(2) }}</span></span>
-                            </template>
-                        </Select>
-                    </div>
+                    <Select v-else-if="beneficiarioModeEdit === 'SUPLIDOR'" v-model="datoscampos.beneficiario" :options="proveedores"
+                        optionLabel="nombre" optionValue="nombre" placeholder="Buscar suplidor registrado"
+                        filter showClear class="w-full">
+                        <template #option="slotProps">
+                            <div class="flex flex-col">
+                                <span class="font-semibold">{{ slotProps.option.nombre }}</span>
+                                <small v-if="slotProps.option.rnc" class="text-slate-500">RNC: {{ slotProps.option.rnc }}</small>
+                            </div>
+                        </template>
+                    </Select>
+                    <small v-else class="text-slate-500">Seleccione debajo la cuenta que será el beneficiario.</small>
+                    <label class="block text-xs font-medium text-slate-500 mt-2 mb-1">
+                        {{ beneficiarioModeEdit === 'CUENTA' ? 'Cuenta beneficiaria a debitar' : 'Cuenta contable a debitar' }}
+                    </label>
+                    <Select v-model="cuentaContableSeleccionadaEdit" :options="cuentasContables" optionLabel="nombre" optionValue="id" placeholder="Seleccione la cuenta a debitar" filter class="w-full">
+                        <template #option="slotProps">
+                            <span>{{ slotProps.option.nombre }} - <span class="font-semibold">${{ parseFloat(slotProps.option.saldo || 0).toFixed(2) }}</span></span>
+                        </template>
+                    </Select>
                 </div>
                 <div class="form-field-modern">
                     <label class="field-label-modern"><i class="pi pi-dollar mr-2"></i>Monto</label>

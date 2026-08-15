@@ -73,13 +73,20 @@ const totalBase = computed(() => {
 // Tipos de NCF según normativa DGII
 const tiposNCF = [
   { label: 'Todos', value: '' },
-  { label: '01 - Gastos Menores', value: 'B01' },
-  { label: '02 - Gastos Personales', value: 'B02' },
-  { label: '03 - Facturas de Crédito Fiscal', value: 'B03' },
-  { label: '04 - Nota de Crédito', value: 'B04' },
-  { label: '14 - Régimen Especial', value: 'B14' },
-  { label: '15 - Gubernamental', value: 'B15' },
-  { label: '16 - Exportaciones', value: 'B16' }
+  { label: 'B01 - Crédito Fiscal', value: 'B01' },
+  { label: 'B11 - Compras', value: 'B11' },
+  { label: 'B13 - Gastos Menores', value: 'B13' },
+  { label: 'B14 - Régimen Especial', value: 'B14' },
+  { label: 'B15 - Gubernamental', value: 'B15' },
+  { label: 'B16 - Exportaciones', value: 'B16' },
+  { label: 'B17 - Pagos al Exterior', value: 'B17' },
+  { label: 'E31 - Crédito Fiscal Electrónico', value: 'E31' },
+  { label: 'E41 - Compras Electrónico', value: 'E41' },
+  { label: 'E43 - Gastos Menores Electrónico', value: 'E43' },
+  { label: 'E44 - Régimen Especial Electrónico', value: 'E44' },
+  { label: 'E45 - Gubernamental Electrónico', value: 'E45' },
+  { label: 'E46 - Exportaciones Electrónico', value: 'E46' },
+  { label: 'E47 - Pagos al Exterior Electrónico', value: 'E47' }
 ];
 
 /************************************************************************/
@@ -158,9 +165,32 @@ const cargarDatos = async () => {
 
   loading.value = true;
   try {
-    // Obtener todas las compras
-    const response = await peticionesFetchOffline('getDataAsArray', 'compras');
-    console.log('Total compras en DB:', response?.length || 0);
+    // El 606 incluye compras y gastos sustentados con NCF/e-NCF.
+    const [responseCompras, responseGastosFijos] = await Promise.all([
+      peticionesFetchOffline('getDataAsArray', 'compras'),
+      peticionesFetchOffline('getDataAsArray', 'gastosfijos')
+    ]);
+    const compras = Array.isArray(responseCompras) ? responseCompras : [];
+    const gastosFijos606 = (Array.isArray(responseGastosFijos) ? responseGastosFijos : [])
+      .filter(gasto => String(gasto.ncf_proveedor || '').trim() !== '')
+      .map(gasto => {
+        const total = parseFloat(gasto.valor || 0);
+        const impuesto = parseFloat(gasto.impuesto || 0);
+        return {
+          ...gasto,
+          origen_606: 'GASTO_FIJO',
+          fecha: gasto.fecha_comprobante || gasto.fecha_pago,
+          no_factura: gasto.no_factura || `GF-${gasto.id || ''}`,
+          subtotal: Math.max(total - impuesto, 0),
+          impuesto,
+          total
+        };
+      });
+    const response = [...compras, ...gastosFijos606];
+    console.log('Registros candidatos para 606:', {
+      compras: compras.length,
+      gastosFijos: gastosFijos606.length
+    });
 
     // Normalizar rango de fechas
     const fechaInicio = new Date(rangoFecha.value[0]);
@@ -215,12 +245,12 @@ const cargarDatos = async () => {
       bienes: parseFloat(compra.subtotal || 0)
     }));
 
-    console.log('Compras con NCF filtradas:', comprasData.value.length);
+    console.log('Compras y gastos con NCF filtrados:', comprasData.value.length);
 
     toast.add({
       severity: 'success',
       summary: 'Éxito',
-      detail: `${comprasData.value.length} compras con NCF cargadas`,
+      detail: `${comprasData.value.length} compras y gastos con NCF cargados`,
       life: 3000
     });
   } catch (error) {
@@ -473,15 +503,28 @@ const exportarPDF = () => {
 const cargarTodasLasCompras = async () => {
   loading.value = true;
   try {
-    const response = await peticionesFetchOffline('getDataAsArray', 'compras');
-    const totalCompras = response?.length || 0;
-
-    // Filtrar solo compras con NCF
-    const comprasConNCF = (response || []).filter(compra =>
-      compra.ncf_proveedor && compra.ncf_proveedor.trim() !== ''
+    const [responseCompras, responseGastos] = await Promise.all([
+      peticionesFetchOffline('getDataAsArray', 'compras'),
+      peticionesFetchOffline('getDataAsArray', 'gastosfijos')
+    ]);
+    const compras = Array.isArray(responseCompras) ? responseCompras : [];
+    const gastos = (Array.isArray(responseGastos) ? responseGastos : []).map(gasto => {
+      const total = parseFloat(gasto.valor || 0);
+      const impuesto = parseFloat(gasto.impuesto || 0);
+      return {
+        ...gasto,
+        fecha: gasto.fecha_comprobante || gasto.fecha_pago,
+        no_factura: gasto.no_factura || `GF-${gasto.id || ''}`,
+        subtotal: Math.max(total - impuesto, 0),
+        impuesto,
+        total
+      };
+    });
+    const registrosConNCF = [...compras, ...gastos].filter(registro =>
+      String(registro.ncf_proveedor || '').trim() !== ''
     );
 
-    comprasData.value = comprasConNCF.map((compra, index) => ({
+    comprasData.value = registrosConNCF.map((compra, index) => ({
       ...compra,
       linea: index + 1,
       montoFacturado: parseFloat(compra.total || 0),
@@ -490,12 +533,10 @@ const cargarTodasLasCompras = async () => {
       bienes: parseFloat(compra.subtotal || 0)
     }));
 
-    console.log(`Total compras: ${totalCompras}, Con NCF: ${comprasConNCF.length}`);
-
     toast.add({
       severity: 'success',
-      summary: 'Compras con NCF',
-      detail: `${comprasData.value.length} compras con NCF cargadas (de ${totalCompras} totales)`,
+      summary: 'Registros con NCF',
+      detail: `${comprasData.value.length} compras y gastos con NCF cargados`,
       life: 4000
     });
   } catch (error) {
@@ -517,13 +558,21 @@ const obtenerTipoNCF = (ncf) => {
   if (!ncf) return 'Sin NCF';
   const codigo = ncf.substring(0, 3);
   const tipos = {
-    'B01': '01 - Gastos Menores',
-    'B02': '02 - Gastos Personales',
-    'B03': '03 - Crédito Fiscal',
+    'B01': 'Crédito Fiscal',
     'B04': '04 - Nota de Crédito',
+    'B11': 'Compras',
+    'B13': 'Gastos Menores',
     'B14': '14 - Régimen Especial',
     'B15': '15 - Gubernamental',
-    'B16': '16 - Exportaciones'
+    'B16': '16 - Exportaciones',
+    'B17': '17 - Pagos al Exterior',
+    'E31': 'Crédito Fiscal Electrónico',
+    'E41': 'Compras Electrónico',
+    'E43': 'Gastos Menores Electrónico',
+    'E44': 'Régimen Especial Electrónico',
+    'E45': 'Gubernamental Electrónico',
+    'E46': 'Exportaciones Electrónico',
+    'E47': 'Pagos al Exterior Electrónico'
   };
   return tipos[codigo] || ncf.substring(0, 3);
 };
@@ -536,7 +585,8 @@ const obtenerCodigoTipoNCF = (ncf) => {
 
 const formatearFechaDGII = (fecha) => {
   if (!fecha) return '';
-  const d = new Date(fecha);
+  const d = parsearFecha(fecha);
+  if (!d || Number.isNaN(d.getTime())) return '';
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');

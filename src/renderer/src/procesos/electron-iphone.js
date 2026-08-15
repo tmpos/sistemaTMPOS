@@ -127,7 +127,9 @@ function resolveHelperExecutablePath(options = {}) {
     explicitHelperPath,
     userDataPath ? path.resolve(userDataPath, 'IPhoneReaderHelper.exe') : '',
     userDataPath ? path.resolve(userDataPath, 'IPhoneReaderHelper') : '',
-    userDataPath ? path.resolve(userDataPath, 'resources/iphone-helper/IPhoneReaderHelper.exe') : '',
+    userDataPath
+      ? path.resolve(userDataPath, 'resources/iphone-helper/IPhoneReaderHelper.exe')
+      : '',
     path.resolve(appDataPath, 'tm-pos/IPhoneReaderHelper.exe'),
     path.resolve(appDataPath, 'tm-pos/resources/iphone-helper/IPhoneReaderHelper.exe'),
     path.resolve(
@@ -331,7 +333,10 @@ function buildChecklist(deviceInfo = {}, hasAutomatedData = false) {
 }
 
 function normalizeComparison(value) {
-  return safeTrim(value).toLowerCase().replace(/\s+/g, '').replace(/[()\-:/]/g, '')
+  return safeTrim(value)
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[()\-:/]/g, '')
 }
 
 function buildReportItems(deviceInfo = {}) {
@@ -370,28 +375,86 @@ function buildReportItems(deviceInfo = {}) {
     ])
 
   const rows = [
-    { label: 'Modelo', factoryKeys: ['ProductName', 'ProductType'], readKeys: ['ProductName', 'ProductType'] },
+    {
+      label: 'Modelo',
+      factoryKeys: ['ProductName', 'ProductType'],
+      readKeys: ['ProductName', 'ProductType']
+    },
     { label: 'Color', factoryKeys: ['DeviceColor'], readKeys: ['DeviceColor'] },
-    { label: 'Capacidad', customFactory: resolveStorage, customRead: resolveStorage, compare: false },
+    {
+      label: 'Capacidad',
+      customFactory: resolveStorage,
+      customRead: resolveStorage,
+      compare: false
+    },
     { label: 'Model Number', factoryKeys: ['ModelNumber'], readKeys: ['ModelNumber'] },
     { label: 'Region', factoryKeys: ['RegionInfo'], readKeys: ['RegionInfo'] },
     { label: 'Serial Number', factoryKeys: ['SerialNumber'], readKeys: ['SerialNumber'] },
-    { label: 'Logic Board SN', factoryKeys: ['LogicBoardSN', 'MLBSerialNumber'], readKeys: ['LogicBoardSN', 'MLBSerialNumber'] },
-    { label: 'Battery SN', factoryKeys: ['BatterySN', 'BatterySerialNumber'], readKeys: ['BatterySN', 'BatterySerialNumber'] },
-    { label: 'Battery Life', customFactory: resolveBatteryLife, customRead: resolveBatteryLife, compare: false },
-    { label: 'Charge Cycles', factoryKeys: ['ChargeCycles', 'CycleCount'], readKeys: ['ChargeCycles', 'CycleCount'], compare: false },
-    { label: 'Front Camera', factoryKeys: ['FrontCameraSerialNumber', 'FrontCamera', 'FCMS'], readKeys: ['FrontCameraSerialNumber', 'FrontCamera', 'FCMS'] },
-    { label: 'Rear Camera', factoryKeys: ['RearCameraSerialNumber', 'RearCamera', 'BCMS'], readKeys: ['RearCameraSerialNumber', 'RearCamera', 'BCMS'] },
-    { label: 'Screen SN', factoryKeys: ['ScreenSN', 'ScreenSerialNumber', 'LCDSerialNumber'], readKeys: ['ScreenSN', 'ScreenSerialNumber', 'LCDSerialNumber'] },
-    { label: 'Infrared Camera', factoryKeys: ['InfraredCamera', 'InfraredCameraSerialNumber'], readKeys: ['InfraredCamera', 'InfraredCameraSerialNumber'] },
-    { label: 'Dot Projector', factoryKeys: ['DotProjector', 'DotProjectorSerialNumber'], readKeys: ['DotProjector', 'DotProjectorSerialNumber'] },
-    { label: 'Distance Sensor', factoryKeys: ['DistanceSensor', 'DistanceSensorSerialNumber'], readKeys: ['DistanceSensor', 'DistanceSensorSerialNumber'] },
+    {
+      label: 'Logic Board SN',
+      factoryKeys: ['LogicBoardSN', 'MLBSerialNumber'],
+      readKeys: ['LogicBoardSN', 'MLBSerialNumber']
+    },
+    {
+      label: 'Battery SN',
+      factoryKeys: ['BatterySN', 'BatterySerialNumber'],
+      readKeys: ['BatterySN', 'BatterySerialNumber']
+    },
+    {
+      label: 'Battery Life',
+      customFactory: resolveBatteryLife,
+      customRead: resolveBatteryLife,
+      compare: false
+    },
+    {
+      label: 'Charge Cycles',
+      factoryKeys: ['ChargeCycles', 'CycleCount'],
+      readKeys: ['ChargeCycles', 'CycleCount'],
+      compare: false
+    },
+    {
+      label: 'Front Camera',
+      factoryKeys: ['FrontCameraSerialNumber', 'FrontCamera', 'FCMS'],
+      readKeys: ['FrontCameraSerialNumber', 'FrontCamera', 'FCMS']
+    },
+    {
+      label: 'Rear Camera',
+      factoryKeys: ['RearCameraSerialNumber', 'RearCamera', 'BCMS'],
+      readKeys: ['RearCameraSerialNumber', 'RearCamera', 'BCMS']
+    },
+    {
+      label: 'Screen SN',
+      factoryKeys: ['ScreenSN', 'ScreenSerialNumber', 'LCDSerialNumber'],
+      readKeys: ['ScreenSN', 'ScreenSerialNumber', 'LCDSerialNumber']
+    },
+    {
+      label: 'Infrared Camera',
+      factoryKeys: ['InfraredCamera', 'InfraredCameraSerialNumber'],
+      readKeys: ['InfraredCamera', 'InfraredCameraSerialNumber']
+    },
+    {
+      label: 'Dot Projector',
+      factoryKeys: ['DotProjector', 'DotProjectorSerialNumber'],
+      readKeys: ['DotProjector', 'DotProjectorSerialNumber']
+    },
+    {
+      label: 'Distance Sensor',
+      factoryKeys: ['DistanceSensor', 'DistanceSensorSerialNumber'],
+      readKeys: ['DistanceSensor', 'DistanceSensorSerialNumber']
+    },
     { label: 'SN Match', factoryKeys: ['SNMatch'], readKeys: ['SNMatch'], compare: false },
-    { label: '5-Code Match', factoryKeys: ['5CodeMatch', 'FiveCodeMatch'], readKeys: ['5CodeMatch', 'FiveCodeMatch'], compare: false }
+    {
+      label: '5-Code Match',
+      factoryKeys: ['5CodeMatch', 'FiveCodeMatch'],
+      readKeys: ['5CodeMatch', 'FiveCodeMatch'],
+      compare: false
+    }
   ]
 
   return rows.map((row) => {
-    const factoryValue = row.customFactory ? row.customFactory() : resolveFactory(row.factoryKeys || [])
+    const factoryValue = row.customFactory
+      ? row.customFactory()
+      : resolveFactory(row.factoryKeys || [])
     const readValue = row.customRead ? row.customRead() : resolveRead(row.readKeys || [])
 
     let status = 'Pendiente'
@@ -519,26 +582,26 @@ function mapDiagnosticData({
         ? 'Se detecto el iPhone y se cargaron datos automaticos disponibles.'
         : 'Se detecto un dispositivo Apple por Windows. Complete las pruebas manuales para el diagnostico final.'
       : /password protected|passcode is set/i.test(String(error || '')) ||
-            /password protected|passcode is set/i.test(
-              String(
-                environment.ideviceInfoStdErr ||
-                  environment.IdeviceInfoStdErr ||
-                  environment.ideviceDiagnosticsStdErr ||
-                  environment.IdeviceDiagnosticsStdErr ||
-                  environment.ideviceDiagnosticsStdOut ||
-                  environment.IdeviceDiagnosticsStdOut ||
-                  ''
-              )
+          /password protected|passcode is set/i.test(
+            String(
+              environment.ideviceInfoStdErr ||
+                environment.IdeviceInfoStdErr ||
+                environment.ideviceDiagnosticsStdErr ||
+                environment.IdeviceDiagnosticsStdErr ||
+                environment.ideviceDiagnosticsStdOut ||
+                environment.IdeviceDiagnosticsStdOut ||
+                ''
             )
+          )
         ? 'El iPhone esta bloqueado con codigo. Desbloquealo y mantenlo confiado para intentar leer bateria y capacidad real.'
         : environment.appleMobileDeviceService?.installed === true &&
-          environment.appleMobileDeviceService?.running === false
-        ? 'Apple Mobile Device Service esta instalado pero detenido. Inicielo para intentar leer el iPhone.'
-      : environment.appleMobileDeviceService?.installed === false
-        ? 'No se detecto el servicio Apple Mobile Device Service. Sin ese driver no es posible leer el iPhone como 3uTools.'
-        : environment.ideviceinfo === false || environment.ideviceId === false
-          ? 'Faltan utilidades de lectura iPhone por cable. Instale Apple Mobile Device Support y libimobiledevice.'
-          : 'No se detecto un iPhone conectado por cable.',
+            environment.appleMobileDeviceService?.running === false
+          ? 'Apple Mobile Device Service esta instalado pero detenido. Inicielo para intentar leer el iPhone.'
+          : environment.appleMobileDeviceService?.installed === false
+            ? 'No se detecto el servicio Apple Mobile Device Service. Sin ese driver no es posible leer el iPhone como 3uTools.'
+            : environment.ideviceinfo === false || environment.ideviceId === false
+              ? 'Faltan utilidades de lectura iPhone por cable. Instale Apple Mobile Device Support y libimobiledevice.'
+              : 'No se detecto un iPhone conectado por cable.',
     error: safeTrim(error)
   }
 }
@@ -554,8 +617,7 @@ export async function getDiagnosticSnapshot(options = {}) {
     const helperError = parsedHelper.error ?? parsedHelper.Error
     const helperDeviceInfo = parsedHelper.deviceInfo ?? parsedHelper.DeviceInfo ?? {}
     const helperPnpDevice = parsedHelper.pnpDevice ?? parsedHelper.PnpDevice ?? null
-    const helperEnvironment =
-      parsedHelper.environment ?? parsedHelper.Environment ?? {}
+    const helperEnvironment = parsedHelper.environment ?? parsedHelper.Environment ?? {}
 
     if (helperSuccess) {
       return {
@@ -566,7 +628,8 @@ export async function getDiagnosticSnapshot(options = {}) {
           deviceInfo: helperDeviceInfo,
           pnpDevice: helperPnpDevice,
           environment: {
-            ideviceinfo: helperEnvironment.ideviceinfo ?? Boolean(helperEnvironment.IdeviceInfoPath),
+            ideviceinfo:
+              helperEnvironment.ideviceinfo ?? Boolean(helperEnvironment.IdeviceInfoPath),
             ideviceId: helperEnvironment.ideviceId ?? Boolean(helperEnvironment.IdeviceIdPath),
             appleMobileDeviceService:
               helperEnvironment.appleMobileDeviceService ||
@@ -592,7 +655,8 @@ export async function getDiagnosticSnapshot(options = {}) {
           deviceInfo: helperDeviceInfo,
           pnpDevice: helperPnpDevice,
           environment: {
-            ideviceinfo: helperEnvironment.ideviceinfo ?? Boolean(helperEnvironment.IdeviceInfoPath),
+            ideviceinfo:
+              helperEnvironment.ideviceinfo ?? Boolean(helperEnvironment.IdeviceInfoPath),
             ideviceId: helperEnvironment.ideviceId ?? Boolean(helperEnvironment.IdeviceIdPath),
             appleMobileDeviceService:
               helperEnvironment.appleMobileDeviceService ||

@@ -28,7 +28,7 @@ const basic = ref({
   dateFormat: 'd/m/Y',
 });
 
-const camposArray = ['descripcion', 'valor', 'fecha_pago', 'alerta', 'dias_alerta', 'tipo', 'cuentaporpagar', 'ultimo_pago','almacen','estado','categoria','proveedor','notas','historial_pagos'];
+const camposArray = ['descripcion', 'valor', 'fecha_pago', 'alerta', 'dias_alerta', 'tipo', 'cuentaporpagar', 'ultimo_pago','almacen','estado','categoria','proveedor','rnc_proveedor','ncf_proveedor','fecha_comprobante','tipo_bienes_servicios','impuesto','notas','historial_pagos'];
 
 /************************************************************************/
 // VARIABLES DE ESTADO
@@ -54,6 +54,20 @@ const visibleConvertirCxP = ref(false);
 const datoscamposGastosfijos = ref({});
 const datoscampos = ref({});
 const gastoSeleccionado = ref(null);
+const proveedores = ref([]);
+const tiposBienesServicios606 = [
+  { label: '01 - Gastos de personal', value: '01' },
+  { label: '02 - Trabajos, suministros y servicios', value: '02' },
+  { label: '03 - Arrendamientos', value: '03' },
+  { label: '04 - Gastos de activos fijos', value: '04' },
+  { label: '05 - Gastos de representación', value: '05' },
+  { label: '06 - Otras deducciones admitidas', value: '06' },
+  { label: '07 - Gastos financieros', value: '07' },
+  { label: '08 - Gastos extraordinarios', value: '08' },
+  { label: '09 - Costo de venta', value: '09' },
+  { label: '10 - Adquisiciones de activos', value: '10' },
+  { label: '11 - Gastos de seguros', value: '11' }
+];
 
 // Filtros
 const filtroTipo = ref(null);
@@ -276,7 +290,33 @@ async function campos() {
 async function limpiarCamposCrear() {
   datoscamposGastosfijos.value = {};
   await campos();
+  datoscamposGastosfijos.value.fecha_comprobante = nfecha('fecha');
+  datoscamposGastosfijos.value.tipo_bienes_servicios = '02';
+  datoscamposGastosfijos.value.impuesto = '0.00';
 }
+
+const fetchProveedores = async () => {
+  const response = await peticionesFetchOffline('getDataAsArray', 'proveedores');
+  proveedores.value = Array.isArray(response)
+    ? [...response].sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || '')))
+    : [];
+};
+
+const asignarProveedor = (formulario, nombreProveedor) => {
+  const proveedor = proveedores.value.find(
+    item => String(item.nombre || '').trim() === String(nombreProveedor || '').trim()
+  );
+  formulario.proveedor = nombreProveedor || '';
+  formulario.rnc_proveedor = proveedor?.rnc || '';
+};
+
+const seleccionarProveedorCrear = (nombreProveedor) => {
+  asignarProveedor(datoscamposGastosfijos.value, nombreProveedor);
+};
+
+const seleccionarProveedorEditar = (nombreProveedor) => {
+  asignarProveedor(datoscampos.value, nombreProveedor);
+};
 
 async function funcionCrear() {
   if (!datoscamposGastosfijos.value.descripcion || !datoscamposGastosfijos.value.valor) {
@@ -292,6 +332,22 @@ async function funcionCrear() {
   datoscamposGastosfijos.value.almacen = datosEmpresa.empresa.nombre;
   datoscamposGastosfijos.value.estado = datoscamposGastosfijos.value.estado || 'PENDIENTE';
   datoscamposGastosfijos.value.historial_pagos = '[]';
+  datoscamposGastosfijos.value.ncf_proveedor = String(
+    datoscamposGastosfijos.value.ncf_proveedor || ''
+  ).trim().toUpperCase();
+
+  if (
+    datoscamposGastosfijos.value.ncf_proveedor &&
+    !/^[A-Z0-9]{11}$|^[A-Z0-9]{13}$/.test(datoscamposGastosfijos.value.ncf_proveedor)
+  ) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Comprobante inválido',
+      detail: 'El NCF debe contener 11 posiciones o 13 posiciones si es electrónico.',
+      life: 4000
+    });
+    return;
+  }
 
   const datosEnviar = JSON.parse(JSON.stringify(datoscamposGastosfijos.value));
   const envioDatos = await peticionesFetchOffline('insertData','gastosfijos', JSON.stringify(datosEnviar));
@@ -309,6 +365,22 @@ async function funcionCrear() {
 async function funcionActualizar() {
   if (!datoscampos.value.descripcion || !datoscampos.value.valor) {
     toast.add({ severity: 'warn', summary: 'Advertencia', detail: 'Descripción y valor son obligatorios', life: 3000 });
+    return;
+  }
+
+  datoscampos.value.ncf_proveedor = String(datoscampos.value.ncf_proveedor || '')
+    .trim()
+    .toUpperCase();
+  if (
+    datoscampos.value.ncf_proveedor &&
+    !/^[A-Z0-9]{11}$|^[A-Z0-9]{13}$/.test(datoscampos.value.ncf_proveedor)
+  ) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Comprobante inválido',
+      detail: 'El NCF debe contener 11 posiciones o 13 posiciones si es electrónico.',
+      life: 4000
+    });
     return;
   }
 
@@ -572,11 +644,10 @@ onMounted(async () => {
   await datosConfig();
   tokenCifrado.value = await encryptarPassword(token.value, 10);
 
-  if(window.electron){
-    await crearTablaSiNoExisteOffline('gastosfijos', camposArray.join(','), toast);
-  }
+  await crearTablaSiNoExisteOffline('gastosfijos', camposArray.join(','), toast);
 
   await campos();
+  await fetchProveedores();
   await fetchAndSetupData();
 });
 
@@ -630,7 +701,7 @@ const historialPagosData = computed(() => {
               icon="pi pi-plus"
               label="Nuevo Gasto"
               severity="success"
-              @click="visiblecrear = true"
+              @click="limpiarCamposCrear(); visiblecrear = true"
             />
           </div>
         </div>
@@ -1218,10 +1289,69 @@ const historialPagosData = computed(() => {
 
       <div class="col-span-6">
         <label class="block text-sm font-medium mb-2">Proveedor</label>
-        <InputText
+        <Dropdown
           v-model="datoscamposGastosfijos.proveedor"
-          placeholder="Nombre del proveedor"
+          :options="proveedores"
+          optionLabel="nombre"
+          optionValue="nombre"
+          placeholder="Seleccione un proveedor"
+          filter
+          showClear
+          fluid
+          @change="seleccionarProveedorCrear($event.value)"
+        />
+      </div>
+
+      <div class="col-span-6">
+        <label class="block text-sm font-medium mb-2">RNC/Cédula del proveedor</label>
+        <InputText
+          v-model="datoscamposGastosfijos.rnc_proveedor"
+          placeholder="Se completa desde el proveedor"
+          readonly
+          fluid
+        />
+      </div>
+
+      <div class="col-span-6">
+        <label class="block text-sm font-medium mb-2">Comprobante fiscal para 606</label>
+        <InputText
+          v-model="datoscamposGastosfijos.ncf_proveedor"
+          placeholder="B0100000001 o E310000000001"
           v-mayuscula
+          fluid
+        />
+      </div>
+
+      <div class="col-span-6">
+        <label class="block text-sm font-medium mb-2">Fecha del comprobante</label>
+        <flat-pickr
+          v-model="datoscamposGastosfijos.fecha_comprobante"
+          class="form-input w-full p-inputtext p-component p-filled p-inputtext-fluid"
+          :config="basic"
+          placeholder="Seleccione fecha"
+        />
+      </div>
+
+      <div class="col-span-6">
+        <label class="block text-sm font-medium mb-2">Tipo de bien o servicio 606</label>
+        <Dropdown
+          v-model="datoscamposGastosfijos.tipo_bienes_servicios"
+          :options="tiposBienesServicios606"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="Seleccione clasificación"
+          fluid
+        />
+      </div>
+
+      <div class="col-span-6">
+        <label class="block text-sm font-medium mb-2">ITBIS facturado</label>
+        <InputText
+          v-model="datoscamposGastosfijos.impuesto"
+          placeholder="0.00"
+          v-decimales
+          v-numeroFocusinOut
+          v-solonumeros
           fluid
         />
       </div>
@@ -1359,10 +1489,62 @@ const historialPagosData = computed(() => {
 
       <div class="col-span-6">
         <label class="block text-sm font-medium mb-2">Proveedor</label>
-        <InputText
+        <Dropdown
           v-model="datoscampos.proveedor"
-          placeholder="Nombre del proveedor"
+          :options="proveedores"
+          optionLabel="nombre"
+          optionValue="nombre"
+          placeholder="Seleccione un proveedor"
+          filter
+          showClear
+          fluid
+          @change="seleccionarProveedorEditar($event.value)"
+        />
+      </div>
+
+      <div class="col-span-6">
+        <label class="block text-sm font-medium mb-2">RNC/Cédula del proveedor</label>
+        <InputText v-model="datoscampos.rnc_proveedor" readonly fluid />
+      </div>
+
+      <div class="col-span-6">
+        <label class="block text-sm font-medium mb-2">Comprobante fiscal para 606</label>
+        <InputText
+          v-model="datoscampos.ncf_proveedor"
+          placeholder="B0100000001 o E310000000001"
           v-mayuscula
+          fluid
+        />
+      </div>
+
+      <div class="col-span-6">
+        <label class="block text-sm font-medium mb-2">Fecha del comprobante</label>
+        <flat-pickr
+          v-model="datoscampos.fecha_comprobante"
+          class="form-input w-full p-inputtext p-component p-filled p-inputtext-fluid"
+          :config="basic"
+        />
+      </div>
+
+      <div class="col-span-6">
+        <label class="block text-sm font-medium mb-2">Tipo de bien o servicio 606</label>
+        <Dropdown
+          v-model="datoscampos.tipo_bienes_servicios"
+          :options="tiposBienesServicios606"
+          optionLabel="label"
+          optionValue="value"
+          fluid
+        />
+      </div>
+
+      <div class="col-span-6">
+        <label class="block text-sm font-medium mb-2">ITBIS facturado</label>
+        <InputText
+          v-model="datoscampos.impuesto"
+          placeholder="0.00"
+          v-decimales
+          v-numeroFocusinOut
+          v-solonumeros
           fluid
         />
       </div>

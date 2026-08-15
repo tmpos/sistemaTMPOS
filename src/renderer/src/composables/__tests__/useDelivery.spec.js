@@ -22,9 +22,21 @@ describe('useDelivery', () => {
     const { getColorDelivery } = useDelivery()
     const color = getColorDelivery('Pedro')
     const palette = [
-      '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-      '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#6366f1',
-      '#84cc16', '#eab308', '#a855f7', '#22c55e', '#0ea5e9',
+      '#3b82f6',
+      '#10b981',
+      '#f59e0b',
+      '#ef4444',
+      '#8b5cf6',
+      '#ec4899',
+      '#14b8a6',
+      '#f97316',
+      '#06b6d4',
+      '#6366f1',
+      '#84cc16',
+      '#eab308',
+      '#a855f7',
+      '#22c55e',
+      '#0ea5e9',
       '#f43f5e'
     ]
     expect(palette).toContain(color)

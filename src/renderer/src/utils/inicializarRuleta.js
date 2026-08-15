@@ -8,17 +8,31 @@ export async function inicializarTablasRuleta() {
     console.log('🎡 Inicializando tablas de la ruleta...')
 
     // Crear tabla de premios
-    await window.electron.ipcRenderer.invoke('consultaservidor', 'crearTabla', 'premios_ruleta', 'id,nombre,descripcion,tipo,imagen,color,probabilidad,activo,created_at,updated_at')
+    await window.electron.ipcRenderer.invoke(
+      'consultaservidor',
+      'crearTabla',
+      'premios_ruleta',
+      'id,nombre,descripcion,tipo,imagen,color,probabilidad,activo,created_at,updated_at'
+    )
     console.log('✅ Tabla premios_ruleta creada')
 
     // Crear tabla de ganadores
-    await window.electron.ipcRenderer.invoke('consultaservidor', 'crearTabla', 'ganadores_ruleta', 'id,no_factura,nombre_cliente,almacen,premio_ganado,premio_id,fecha_participacion,hora_participacion,created_at,updated_at')
+    await window.electron.ipcRenderer.invoke(
+      'consultaservidor',
+      'crearTabla',
+      'ganadores_ruleta',
+      'id,no_factura,nombre_cliente,almacen,premio_ganado,premio_id,fecha_participacion,hora_participacion,created_at,updated_at'
+    )
     console.log('✅ Tabla ganadores_ruleta creada')
 
     console.log('✅ Índices creados (automáticamente por el sistema)')
 
     // Verificar si ya hay premios
-    const premiosExistentes = await window.electron.ipcRenderer.invoke('consultaservidor', 'getDataAsArray', 'premios_ruleta')
+    const premiosExistentes = await window.electron.ipcRenderer.invoke(
+      'consultaservidor',
+      'getDataAsArray',
+      'premios_ruleta'
+    )
 
     if (!premiosExistentes || premiosExistentes.length === 0) {
       // Insertar premios de ejemplo
@@ -116,13 +130,21 @@ export async function verificarTablasRuleta() {
 
     // Verificar tabla premios_ruleta
     try {
-      const premios = await window.electron.ipcRenderer.invoke('consultaservidor', 'tableExists', 'premios_ruleta')
+      const premios = await window.electron.ipcRenderer.invoke(
+        'consultaservidor',
+        'tableExists',
+        'premios_ruleta'
+      )
       premiosExiste = Array.isArray(premios) && premios[0] === 'ok'
 
       // Verificación alternativa: intentar leer datos
       if (!premiosExiste) {
         try {
-          await window.electron.ipcRenderer.invoke('consultaservidor', 'getDataAsArray', 'premios_ruleta')
+          await window.electron.ipcRenderer.invoke(
+            'consultaservidor',
+            'getDataAsArray',
+            'premios_ruleta'
+          )
           premiosExiste = true
         } catch (e) {
           premiosExiste = false
@@ -135,13 +157,21 @@ export async function verificarTablasRuleta() {
 
     // Verificar tabla ganadores_ruleta
     try {
-      const ganadores = await window.electron.ipcRenderer.invoke('consultaservidor', 'tableExists', 'ganadores_ruleta')
+      const ganadores = await window.electron.ipcRenderer.invoke(
+        'consultaservidor',
+        'tableExists',
+        'ganadores_ruleta'
+      )
       ganadoresExiste = Array.isArray(ganadores) && ganadores[0] === 'ok'
 
       // Verificación alternativa: intentar leer datos
       if (!ganadoresExiste) {
         try {
-          await window.electron.ipcRenderer.invoke('consultaservidor', 'getDataAsArray', 'ganadores_ruleta')
+          await window.electron.ipcRenderer.invoke(
+            'consultaservidor',
+            'getDataAsArray',
+            'ganadores_ruleta'
+          )
           ganadoresExiste = true
         } catch (e) {
           ganadoresExiste = false

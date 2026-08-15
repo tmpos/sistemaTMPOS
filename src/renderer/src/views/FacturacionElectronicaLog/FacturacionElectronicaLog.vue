@@ -18,6 +18,7 @@ const camposArray = [
   'no_factura', 'encf', 'tipo_ecf', 'ambiente',
   'id_factura_local', 'alanube_id', 'status', 'legal_status',
   'document_number', 'security_code', 'signature_date',
+  'sequence_consumed',
   'document_stamp_url', 'pdf_url', 'xml_url', 'resume_xml_url',
   'government_response', 'raw_response', 'usuario', 'almacen'
 ];
@@ -41,6 +42,7 @@ const filteredData = computed(() => {
     String(item.encf || '').toLowerCase().includes(q) ||
     String(item.no_factura || '').toLowerCase().includes(q) ||
     String(item.alanube_id || '').toLowerCase().includes(q) ||
+    String(item.document_number || '').toLowerCase().includes(q) ||
     String(item.status || '').toLowerCase().includes(q) ||
     String(item.legal_status || '').toLowerCase().includes(q) ||
     String(item.tipo_ecf || '').toLowerCase().includes(q)
@@ -180,6 +182,7 @@ onMounted(async () => {
           <div><strong>Doc. Number:</strong> {{ selectedLog.document_number }}</div>
           <div><strong>Código Seguridad:</strong> {{ selectedLog.security_code }}</div>
           <div><strong>Fecha Firma:</strong> {{ selectedLog.signature_date }}</div>
+          <div><strong>Secuencia consumida:</strong> {{ selectedLog.sequence_consumed || 'NO' }}</div>
         </div>
 
         <div v-if="selectedLog.document_stamp_url" class="flex gap-2 flex-wrap">

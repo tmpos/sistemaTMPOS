@@ -44,7 +44,8 @@ const generarGanancias = (productos, productosArray = []) => {
   for (let prod of productos) {
     if (/descuento|delivery/i.test(prod.nombre || '')) continue
     const cantidad = parseFloat(prod.cantidad) || 1
-    const precioVenta = parseFloat(prod.precio_venta) || parseFloat(prod.precio_final) || parseFloat(prod.precio) || 0
+    const precioVenta =
+      parseFloat(prod.precio_venta) || parseFloat(prod.precio_final) || parseFloat(prod.precio) || 0
     let precioCompra = 0
     if (prod.costo != null && prod.costo !== '') {
       precioCompra = parseFloat(prod.costo) || 0
@@ -112,7 +113,9 @@ describe('buscarProductoInventario', () => {
     expect(buscarProductoInventario(inventario, { codigo: 'A001' })).toEqual(inventario[0])
   })
   it('finds by codigo_interno', () => {
-    expect(buscarProductoInventario(inventario, { codigo_interno: 'INT-002' })).toEqual(inventario[1])
+    expect(buscarProductoInventario(inventario, { codigo_interno: 'INT-002' })).toEqual(
+      inventario[1]
+    )
   })
   it('finds by id', () => {
     expect(buscarProductoInventario(inventario, { id: 3 })).toEqual(inventario[2])

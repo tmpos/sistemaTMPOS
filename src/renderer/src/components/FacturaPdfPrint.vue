@@ -102,19 +102,27 @@ const generateFacturaHtml = async ({ factura, cliente, datosEmpresa, creditoData
   let qrCodeDGII = ''
   try {
     const otroData = typeof factura.otro === 'string' ? JSON.parse(factura.otro) : factura.otro
-    if (Array.isArray(otroData) && otroData.length > 0) {
-      // Buscar en el primer elemento del array las propiedades de DGII
-      const primerElemento = otroData[0]
-      const qrUrlDGII = primerElemento.documentStampUrl || primerElemento.qr_url
-      const ecfDGII = primerElemento.ecf || primerElemento.encf
+    const primerElemento = Array.isArray(otroData) ? otroData[0] : otroData
+    if (primerElemento && typeof primerElemento === 'object') {
+      const respuestaAlanube =
+        primerElemento.alanubeResponse &&
+        typeof primerElemento.alanubeResponse === 'object'
+          ? primerElemento.alanubeResponse
+          : {}
+      const datosElectronicos = { ...respuestaAlanube, ...primerElemento }
+      const qrUrlDGII = datosElectronicos.documentStampUrl
+      const ecfDGII =
+        datosElectronicos.documentNumber ||
+        datosElectronicos.ecf ||
+        datosElectronicos.encf
       if (qrUrlDGII && ecfDGII) {
         datosDGII = {
-          rnc: primerElemento.rnc || primerElemento.companyIdentification,
+          rnc: datosElectronicos.rnc || datosElectronicos.companyIdentification,
           ecf: ecfDGII,
-          internalTrackId: primerElemento.internalTrackId || primerElemento.id,
-          securityCode: primerElemento.securityCode,
+          internalTrackId: datosElectronicos.internalTrackId || datosElectronicos.id,
+          securityCode: datosElectronicos.securityCode,
           qr_url: qrUrlDGII,
-          signedDate: primerElemento.signedDate || primerElemento.signatureDate
+          signedDate: datosElectronicos.signedDate || datosElectronicos.signatureDate
         }
 
         // Generar QR de DGII
@@ -333,28 +341,6 @@ const generateFacturaHtml = async ({ factura, cliente, datosEmpresa, creditoData
           ${factura.metodo_pago === 'CREDITO' ? 'FACTURA A CREDITO' : 'FACTURA'}
         </h2>
 
-        <!-- Comprobante Fiscal Electrónico (DGII) - Compacto -->
-        ${datosDGII ? `
-        <div class="border-2 border-blue-600 rounded-lg p-2 mt-2 bg-blue-50">
-          <div class="flex justify-between items-center gap-3">
-            <!-- QR Code -->
-            <div class="flex-shrink-0">
-              <div class="border-2 border-blue-600 rounded  bg-white">
-                <img src="${qrCodeDGII}" style="width: 80px; height: 80px;"/>
-              </div>
-            </div>
-
-            <!-- Código y Fecha -->
-            <div class="flex-1 text-center">
-              <p class="text-xs font-bold text-blue-800 mb-1">CÓDIGO DE SEGURIDAD</p>
-              <p class="text-3xl font-bold font-mono text-blue-900 tracking-wide">${datosDGII.securityCode}</p>
-              <div class="mt-1 pt-1 border-t border-blue-300">
-                <p class="text-xs text-blue-700">Firma: ${datosDGII.signedDate}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-        ` : ''}
       </div>
     </div>
 
@@ -368,8 +354,14 @@ const generateFacturaHtml = async ({ factura, cliente, datosEmpresa, creditoData
         <p><strong>METODO DE PAGO:</strong> ${factura.metodo_pago || 'N/A'}</p>
         ${tieneInstitucionCredito ? `<p><strong>INSTITUCION:</strong> ${institucionFactura}</p>` : ''}
       </div>
-      <div class="text-right p-1 rounded-md" style="max-width: 120px; max-height: 120px;">
-        ${qrCodeData ? `<img src="${qrCodeData}" style="max-width: 100px; max-height: 100px;"/>` : ''}
+      <div class="text-center p-1 rounded-md" style="min-width: 140px;">
+        ${datosDGII
+          ? `<img src="${qrCodeDGII}" alt="QR DGII" style="width: 105px; height: 105px; margin: 0 auto;"/>
+             <p style="font-size:10px;font-weight:bold;margin:2px 0 0;">CÓDIGO DE SEGURIDAD</p>
+             <p style="font-size:14px;font-family:monospace;font-weight:bold;margin:0;">${datosDGII.securityCode || ''}</p>`
+          : qrCodeData
+            ? `<img src="${qrCodeData}" alt="QR interno" style="max-width: 100px; max-height: 100px;"/>`
+            : ''}
       </div>
     </div>
 

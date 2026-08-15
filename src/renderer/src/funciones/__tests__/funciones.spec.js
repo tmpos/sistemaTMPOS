@@ -111,7 +111,10 @@ const convertirStringAArrayDeObjetos = (str) => {
   return resultado
 }
 
-const normalizarNombreTabla = (tabla = '') => String(tabla || '').toLowerCase().trim()
+const normalizarNombreTabla = (tabla = '') =>
+  String(tabla || '')
+    .toLowerCase()
+    .trim()
 
 const coincideValorCache = (valorA, valorB) => String(valorA ?? '') === String(valorB ?? '')
 
@@ -209,7 +212,10 @@ describe('extraerString', () => {
 })
 
 describe('buscadorObjeto', () => {
-  const arr = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }]
+  const arr = [
+    { id: 1, name: 'A' },
+    { id: 2, name: 'B' }
+  ]
   it('finds object by field value', () => {
     expect(buscadorObjeto(arr, 'id', 2)).toEqual({ id: 2, name: 'B' })
   })
@@ -230,7 +236,10 @@ describe('devuelveIndiceObjetoFromArray', () => {
 
 describe('objectToArray', () => {
   it('converts object to entries', () => {
-    expect(objectToArray({ a: 1, b: 2 })).toEqual([['a', 1], ['b', 2]])
+    expect(objectToArray({ a: 1, b: 2 })).toEqual([
+      ['a', 1],
+      ['b', 2]
+    ])
   })
   it('returns empty array for empty object', () => {
     expect(objectToArray({})).toEqual([])
@@ -301,7 +310,9 @@ describe('esObjeto', () => {
 describe('convertirStringAArrayDeObjetos', () => {
   it('converts comma-separated string to array of objects', () => {
     expect(convertirStringAArrayDeObjetos('A, B, C')).toEqual([
-      { id: 'A' }, { id: 'B' }, { id: 'C' }
+      { id: 'A' },
+      { id: 'B' },
+      { id: 'C' }
     ])
   })
   it('returns empty array for empty input', () => {

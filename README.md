@@ -1,5 +1,7 @@
 # nuevo-tmpos
 
+[![Descargar TM-POS 49.7.6](https://img.shields.io/badge/Descargar-TM--POS%2049.7.6-2563eb?style=for-the-badge&logo=windows)](https://github.com/tmpos/sistemaTMPOS/releases/download/v49.7.6/TM-POS-49.7.6.exe)
+
 An Electron application with Vue
 
 ## Recommended IDE Setup

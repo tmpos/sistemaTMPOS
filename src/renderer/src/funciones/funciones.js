@@ -39,7 +39,10 @@ export const TABLAS_LOCALSTORAGE = [
 const PREFIJO_CACHE_TABLA = 'cache_tabla_estatica_'
 const TABLAS_LOCALSTORAGE_SET = new Set(TABLAS_LOCALSTORAGE)
 
-const normalizarNombreTabla = (tabla = '') => String(tabla || '').toLowerCase().trim()
+const normalizarNombreTabla = (tabla = '') =>
+  String(tabla || '')
+    .toLowerCase()
+    .trim()
 
 export function esTablaLocalStorage(tabla) {
   return TABLAS_LOCALSTORAGE_SET.has(normalizarNombreTabla(tabla))
@@ -239,7 +242,7 @@ export async function enviarDatosPorPost(url, data, token = null) {
       headers['Authorization'] = token
     }
 
-    console.log('📤 enviarDatosPorPost URL:', requestUrl, 'DATA:', JSON.stringify(data));
+    console.log('📤 enviarDatosPorPost URL:', requestUrl, 'DATA:', JSON.stringify(data))
 
     if (window.electron?.ipcRenderer && /^https?:\/\//.test(requestUrl)) {
       const response = await window.electron.ipcRenderer.invoke('http-request', requestUrl, {
@@ -250,11 +253,11 @@ export async function enviarDatosPorPost(url, data, token = null) {
 
       if (!response.ok) {
         console.error('❌ Error en la solicitud: Código de estado', response.status)
-        console.error('⚠️ Respuesta completa:', response);
+        console.error('⚠️ Respuesta completa:', response)
         return null
       }
 
-      console.log('📥 Respuesta Electron IPC:', response.data);
+      console.log('📥 Respuesta Electron IPC:', response.data)
       return response.data
     }
 
@@ -267,15 +270,18 @@ export async function enviarDatosPorPost(url, data, token = null) {
     if (!response.ok) {
       console.error('❌ Error en la solicitud: Código de estado', response.status)
       try {
-        const errorText = await response.text();
-        console.error('⚠️ Cuerpo del error:', errorText);
-      } catch(e) {}
+        const errorText = await response.text()
+        console.error('⚠️ Cuerpo del error:', errorText)
+      } catch (e) {}
       return null
     }
 
-    const responseData = await response.clone().json().catch(() => response.text());
-    console.log('📥 Respuesta fetch:', responseData);
-    return responseData;
+    const responseData = await response
+      .clone()
+      .json()
+      .catch(() => response.text())
+    console.log('📥 Respuesta fetch:', responseData)
+    return responseData
   } catch (error) {
     console.error('❌ Error en enviarDatosPorPost:', error)
     return null
@@ -699,13 +705,7 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
     try {
       const raw = JSON.parse(window.localStorage.getItem('usuarioLocal') || 'null')
       const usuario = Array.isArray(raw) ? raw[0] : raw
-      return (
-        usuario?.nombre ||
-        usuario?.usuario ||
-        usuario?.email ||
-        usuario?.token ||
-        'Sistema'
-      )
+      return usuario?.nombre || usuario?.usuario || usuario?.email || usuario?.token || 'Sistema'
     } catch (error) {
       return 'Sistema'
     }
@@ -751,7 +751,11 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
   const asegurarTablaBitacoraDirecta = async () => {
     try {
       if (window.electron) {
-        const existe = await window.electron.ipcRenderer.invoke('consultaservidor', 'tableExists', BITACORA_TABLE)
+        const existe = await window.electron.ipcRenderer.invoke(
+          'consultaservidor',
+          'tableExists',
+          BITACORA_TABLE
+        )
         if (!Array.isArray(existe) || existe[0] !== 'ok') {
           await window.electron.ipcRenderer.invoke(
             'consultaservidor',
@@ -761,11 +765,20 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
           )
         }
 
-        const columnas = await window.electron.ipcRenderer.invoke('consultaservidor', 'getTableColumns', BITACORA_TABLE)
+        const columnas = await window.electron.ipcRenderer.invoke(
+          'consultaservidor',
+          'getTableColumns',
+          BITACORA_TABLE
+        )
         const columnasActuales = Array.isArray(columnas) ? columnas : []
         for (const campo of BITACORA_FIELDS) {
           if (!columnasActuales.includes(campo)) {
-            await window.electron.ipcRenderer.invoke('consultaservidor', 'addColumnToTable', BITACORA_TABLE, campo)
+            await window.electron.ipcRenderer.invoke(
+              'consultaservidor',
+              'addColumnToTable',
+              BITACORA_TABLE,
+              campo
+            )
           }
         }
       }
@@ -779,7 +792,9 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
       if (!tablaNombre || !registro || Object.keys(registro).length === 0) return null
 
       const clavesPreferidas = ['id', 'no_factura', 'no_cotizacion', 'codigo', 'imei', 'numero']
-      const clave = clavesPreferidas.find((campo) => registro[campo] != null && registro[campo] !== '')
+      const clave = clavesPreferidas.find(
+        (campo) => registro[campo] != null && registro[campo] !== ''
+      )
       if (!clave) return null
 
       if (window.electron) {
@@ -814,7 +829,11 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
     try {
       if (!tablaNombre) return []
       if (window.electron) {
-        return await window.electron.ipcRenderer.invoke('consultaservidor', 'getDataAsArray', tablaNombre)
+        return await window.electron.ipcRenderer.invoke(
+          'consultaservidor',
+          'getDataAsArray',
+          tablaNombre
+        )
       }
       if (offline) {
         initOfflineDB()
@@ -849,7 +868,11 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
         await insertOffline(BITACORA_TABLE, payload)
         return ['ok']
       }
-      return await enviarDatosPorPost(`${link}${api}/insertar/${BITACORA_TABLE}`, payload, tokenCifrado)
+      return await enviarDatosPorPost(
+        `${link}${api}/insertar/${BITACORA_TABLE}`,
+        payload,
+        tokenCifrado
+      )
     } catch (error) {
       console.error('Error insertando bitacora:', error)
       return ['error']
@@ -863,7 +886,8 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
   }
 
   const asegurarCacheLocalTabla = async (tablaNombre) => {
-    if (!esTablaLocalStorage(tablaNombre) || Array.isArray(obtenerTablaLocalStorage(tablaNombre))) return
+    if (!esTablaLocalStorage(tablaNombre) || Array.isArray(obtenerTablaLocalStorage(tablaNombre)))
+      return
     const registros = await peticionesFetch(
       `${link}${api}`,
       `datosarray/${tablaNombre}`,
@@ -891,7 +915,8 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
         accion,
         registro_id: despues?.id || antes?.id || '',
         referencia: referencia || obtenerReferenciaRegistro(despues || antes || {}),
-        descripcion: descripcion || obtenerDescripcionBitacora(tablaNombre, accion, despues || antes || {}),
+        descripcion:
+          descripcion || obtenerDescripcionBitacora(tablaNombre, accion, despues || antes || {}),
         datos_anteriores: serializarBitacora(antes),
         datos_nuevos: serializarBitacora(despues),
         usuario: parseUsuarioBitacora(),
@@ -909,9 +934,10 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
   }
 
   const forzarApi = datos?.[0]?.forceApi === true
-  const respuestaLocal = !offline && !forzarApi
-    ? leerRespuestaLocalStorage(peticion, tabla, datos)
-    : { disponible: false }
+  const respuestaLocal =
+    !offline && !forzarApi
+      ? leerRespuestaLocalStorage(peticion, tabla, datos)
+      : { disponible: false }
 
   if (respuestaLocal.disponible) {
     return respuestaLocal.valor
@@ -958,11 +984,25 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
           let respuesta
 
           if (item.accion === 'insertData') {
-            respuesta = await enviarDatosPorPost(`${link}${api}/insertar/${item.tabla}`, payload, tokenCifrado)
+            respuesta = await enviarDatosPorPost(
+              `${link}${api}/insertar/${item.tabla}`,
+              payload,
+              tokenCifrado
+            )
           } else if (item.accion === 'updateData') {
-            respuesta = await enviarDatosPorPost(`${link}${api}/actualizarcampos/${item.tabla}`, payload, tokenCifrado)
+            respuesta = await enviarDatosPorPost(
+              `${link}${api}/actualizarcampos/${item.tabla}`,
+              payload,
+              tokenCifrado
+            )
           } else if (item.accion === 'deleteEntry') {
-            respuesta = await peticionesFetch(`${link}${api}`, `borrar/${item.tabla}`, { id: payload.id }, tokenCifrado, 'POST')
+            respuesta = await peticionesFetch(
+              `${link}${api}`,
+              `borrar/${item.tabla}`,
+              { id: payload.id },
+              tokenCifrado,
+              'POST'
+            )
           } else if (item.accion === 'deleteByField') {
             respuesta = await peticionesFetch(
               `${link}${api}`,
@@ -972,16 +1012,36 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
               'POST'
             )
           } else if (item.accion === 'deleteAll') {
-            respuesta = await peticionesFetch(`${link}${api}`, 'borrartodo', { tabla: item.tabla }, tokenCifrado, 'POST')
+            respuesta = await peticionesFetch(
+              `${link}${api}`,
+              'borrartodo',
+              { tabla: item.tabla },
+              tokenCifrado,
+              'POST'
+            )
           } else {
             throw new Error(`Accion de sincronizacion no soportada: ${item.accion}`)
           }
 
-          if (respuesta && (respuesta[0] === 'ok' || respuesta.success === true || respuesta.ok === true || !respuesta.error)) {
-            await window.electron.ipcRenderer.invoke('consultaservidor', 'markSyncPendingChange', item.id, 'sincronizado', '')
+          if (
+            respuesta &&
+            (respuesta[0] === 'ok' ||
+              respuesta.success === true ||
+              respuesta.ok === true ||
+              !respuesta.error)
+          ) {
+            await window.electron.ipcRenderer.invoke(
+              'consultaservidor',
+              'markSyncPendingChange',
+              item.id,
+              'sincronizado',
+              ''
+            )
             resumen.sincronizados++
           } else {
-            throw new Error(respuesta?.error || respuesta?.message || 'El servidor no confirmo la operacion')
+            throw new Error(
+              respuesta?.error || respuesta?.message || 'El servidor no confirmo la operacion'
+            )
           }
         } catch (error) {
           await window.electron.ipcRenderer.invoke(
@@ -1020,62 +1080,56 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
       }
       break
 
+    case 'getDataAsArrayLazy': {
+      const data = datos?.[0] ?? {}
+      const opciones = {
+        limit: data?.limit ?? 20,
+        offset: data?.offset ?? 0,
+        search: data?.search ?? '',
+        searchFields: data?.searchFields ?? [],
+        orderBy: data?.orderBy ?? 'id',
+        orderDir: data?.orderDir ?? 'DESC',
+        filtroCampo: data?.filtroCampo ?? '',
+        filtroValor: data?.filtroValor ?? '',
+        filtros: data?.filtros ?? [],
+        stockMode: data?.stockMode ?? 'all'
+      }
 
-case 'getDataAsArrayLazy': {
-  const data = datos?.[0] ?? {}
-  const opciones = {
-    limit: data?.limit ?? 20,
-    offset: data?.offset ?? 0,
-    search: data?.search ?? '',
-    searchFields: data?.searchFields ?? [],
-    orderBy: data?.orderBy ?? 'id',
-    orderDir: data?.orderDir ?? 'DESC',
-    filtroCampo: data?.filtroCampo ?? '',
-    filtroValor: data?.filtroValor ?? '',
-    filtros: data?.filtros ?? [],
-    stockMode: data?.stockMode ?? 'all'
-  }
+      if (offline) {
+        if (window.electron) {
+          console.log('[peticionesFetchOffline] Usando Electron IPC')
+          envio = await ipcCall()
+        } else {
+          console.log('[peticionesFetchOffline] Usando IndexedDB')
+          initOfflineDB()
+          envio = await getDataAsArrayLazy(tabla, opciones)
+          console.log('[peticionesFetchOffline] Respuesta de IndexedDB:', envio)
+        }
+      } else {
+        console.log('[peticionesFetchOffline] Usando servidor online')
+        const params = new URLSearchParams({
+          limit: String(opciones.limit),
+          offset: String(opciones.offset),
+          search: opciones.search,
+          searchFields: Array.isArray(opciones.searchFields) ? opciones.searchFields.join(',') : '',
+          orderBy: opciones.orderBy,
+          orderDir: opciones.orderDir,
+          filtroCampo: opciones.filtroCampo,
+          filtroValor: opciones.filtroValor,
+          filtros: Array.isArray(opciones.filtros) ? JSON.stringify(opciones.filtros) : '[]',
+          stockMode: opciones.stockMode
+        })
 
-
-  if (offline) {
-    if (window.electron) {
-      console.log('[peticionesFetchOffline] Usando Electron IPC')
-      envio = await ipcCall()
-    } else {
-      console.log('[peticionesFetchOffline] Usando IndexedDB')
-      initOfflineDB()
-      envio = await getDataAsArrayLazy(tabla, opciones)
-      console.log('[peticionesFetchOffline] Respuesta de IndexedDB:', envio)
+        envio = await peticionesFetch(
+          `${link}${api}`,
+          `datoslazy/${tabla}?${params.toString()}`,
+          {},
+          tokenCifrado,
+          'GET'
+        )
+      }
+      break
     }
-  } else {
-    console.log('[peticionesFetchOffline] Usando servidor online')
-    const params = new URLSearchParams({
-      limit: String(opciones.limit),
-      offset: String(opciones.offset),
-      search: opciones.search,
-      searchFields: Array.isArray(opciones.searchFields)
-        ? opciones.searchFields.join(',')
-        : '',
-      orderBy: opciones.orderBy,
-      orderDir: opciones.orderDir,
-      filtroCampo: opciones.filtroCampo,
-      filtroValor: opciones.filtroValor,
-      filtros: Array.isArray(opciones.filtros)
-        ? JSON.stringify(opciones.filtros)
-        : '[]',
-      stockMode: opciones.stockMode
-    })
-
-    envio = await peticionesFetch(
-      `${link}${api}`,
-      `datoslazy/${tabla}?${params.toString()}`,
-      {},
-      tokenCifrado,
-      'GET'
-    )
-  }
-  break
-}
 
     case 'getAllData':
       if (offline) {
@@ -1187,21 +1241,20 @@ case 'getDataAsArrayLazy': {
       }
       break
 
-
     case 'getDataProductosArray':
-      if(offline){
-         envio = await datosServidorLocal('getDataAsArrayWithIMG',{tablas:tabla})
-      }else{
-       // const link = datos[0]
-      envio = await peticionesFetch(
-        `${link}${api}`,
-        `productos_stock`,
-        {tabla:tabla,link:link},
-        tokenCifrado,
-        'POST'
-      );}
-      break;
-
+      if (offline) {
+        envio = await datosServidorLocal('getDataAsArrayWithIMG', { tablas: tabla })
+      } else {
+        // const link = datos[0]
+        envio = await peticionesFetch(
+          `${link}${api}`,
+          `productos_stock`,
+          { tabla: tabla, link: link },
+          tokenCifrado,
+          'POST'
+        )
+      }
+      break
 
     case 'datosArrayMultiples':
       if (offline) {
@@ -1303,8 +1356,10 @@ case 'getDataAsArrayLazy': {
       break
 
     case 'addColumnToTable': {
-      const campo = typeof parametros === 'object' && parametros !== null ? parametros.campo : datos[0]
-      const tipo = typeof parametros === 'object' && parametros !== null ? parametros.tipo : datos[1]
+      const campo =
+        typeof parametros === 'object' && parametros !== null ? parametros.campo : datos[0]
+      const tipo =
+        typeof parametros === 'object' && parametros !== null ? parametros.tipo : datos[1]
       if (!tabla || !campo) throw new Error('Falta tabla o campo para agregar columna')
       if (offline) {
         envio = await ipcCall()
@@ -1321,7 +1376,8 @@ case 'getDataAsArrayLazy': {
     }
 
     case 'deleteColumnFromTable': {
-      const campo = typeof parametros === 'object' && parametros !== null ? parametros.campo : datos[0]
+      const campo =
+        typeof parametros === 'object' && parametros !== null ? parametros.campo : datos[0]
       if (!tabla || !campo) throw new Error('Falta tabla o campo para borrar columna')
       if (offline) {
         envio = await ipcCall()
@@ -1338,7 +1394,8 @@ case 'getDataAsArrayLazy': {
     }
 
     case 'deleteColumnFromTable': {
-      const campo = typeof parametros === 'object' && parametros !== null ? parametros.campo : datos[0]
+      const campo =
+        typeof parametros === 'object' && parametros !== null ? parametros.campo : datos[0]
       if (!tabla || !campo) throw new Error('Falta tabla o campo para borrar columna')
 
       try {
@@ -1354,7 +1411,7 @@ case 'getDataAsArrayLazy': {
             }
           }
         )
-        envio = respuesta.data 
+        envio = respuesta.data
       } catch (err) {
         envio = { success: false, message: 'Error borrando la columna', error: err.message }
       }
@@ -1711,8 +1768,9 @@ case 'getDataAsArrayLazy': {
       break
     }
 
-    case 'deleteAll':{ 
-      const registrosAntes = tabla && tabla !== BITACORA_TABLE ? await obtenerTodosRegistros(tabla) : []
+    case 'deleteAll': {
+      const registrosAntes =
+        tabla && tabla !== BITACORA_TABLE ? await obtenerTodosRegistros(tabla) : []
       if (offline) {
         envio = await ipcCall()
       } else {
@@ -1737,14 +1795,14 @@ case 'getDataAsArrayLazy': {
       break
     }
 
-    case 'ejecutarSQL':{ 
+    case 'ejecutarSQL': {
       if (offline) {
         envio = await ipcCall()
       } else {
         envio = await peticionesFetch(
           `${link}${api}`,
           `execsql`,
-          { sql: tabla},
+          { sql: tabla },
           tokenCifrado,
           'POST'
         )
@@ -1755,9 +1813,8 @@ case 'getDataAsArrayLazy': {
     case 'deleteEntry': {
       const id = datos[0]
       if (!tabla || id == null) throw new Error('Faltan el nombre de la tabla o el ID para borrar')
-      const registroAnterior = tabla !== BITACORA_TABLE
-        ? await obtenerRegistroPrevio(tabla, { id })
-        : null
+      const registroAnterior =
+        tabla !== BITACORA_TABLE ? await obtenerRegistroPrevio(tabla, { id }) : null
       if (offline) {
         envio = await ipcCall()
       } else {
@@ -1787,13 +1844,14 @@ case 'getDataAsArrayLazy': {
       const valor = datos[1]
       if (!tabla || campo == null)
         throw new Error('Faltan el nombre de la tabla o el ID para borrar')
-      const registrosAntes = tabla !== BITACORA_TABLE
-        ? await obtenerTodosRegistros(tabla).then((items) =>
-            Array.isArray(items)
-              ? items.filter((item) => String(item?.[campo]) === String(valor))
-              : []
-          )
-        : []
+      const registrosAntes =
+        tabla !== BITACORA_TABLE
+          ? await obtenerTodosRegistros(tabla).then((items) =>
+              Array.isArray(items)
+                ? items.filter((item) => String(item?.[campo]) === String(valor))
+                : []
+            )
+          : []
       if (offline) {
         envio = await ipcCall()
       } else {
@@ -2027,8 +2085,10 @@ export async function peticionesFetchOfflineRED(peticion, parametros, ...datos) 
       break
 
     case 'addColumnToTable': {
-      const campo = typeof parametros === 'object' && parametros !== null ? parametros.campo : datos[0]
-      const tipo = typeof parametros === 'object' && parametros !== null ? parametros.tipo : datos[1]
+      const campo =
+        typeof parametros === 'object' && parametros !== null ? parametros.campo : datos[0]
+      const tipo =
+        typeof parametros === 'object' && parametros !== null ? parametros.tipo : datos[1]
       if (!tabla || !campo) throw new Error('Falta tabla o campo para agregar columna')
 
       try {
@@ -4867,7 +4927,11 @@ export async function sincronizarStockProductoPorImeiDisponible(idProducto) {
       producto.updated_at = nfecha('timestamp')
     }
 
-    const actualizado = await peticionesFetchOffline('updateData', 'productos', JSON.stringify(producto))
+    const actualizado = await peticionesFetchOffline(
+      'updateData',
+      'productos',
+      JSON.stringify(producto)
+    )
     const ok = Array.isArray(actualizado) ? actualizado[0] === 'ok' : !!actualizado
 
     return {

@@ -369,75 +369,81 @@ export async function reciboTaller(datosLoL, datosEmpresa, silent, visible, show
     `
 
   return new Promise((resolve) => {
-  const win = new BrowserWindow({ width: 300, height: 600, show: show, autoHideMenuBar: true })
-  let respuestaEnviada = false
-  const finalizarImpresion = (resultado) => {
-    if (respuestaEnviada) return
-    respuestaEnviada = true
-    if (!win.isDestroyed()) {
-      win.close()
+    const win = new BrowserWindow({ width: 300, height: 600, show: show, autoHideMenuBar: true })
+    let respuestaEnviada = false
+    const finalizarImpresion = (resultado) => {
+      if (respuestaEnviada) return
+      respuestaEnviada = true
+      if (!win.isDestroyed()) {
+        win.close()
+      }
+      resolve(resultado)
     }
-    resolve(resultado)
-  }
-  win.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(htmlContent)}`)
-  win.webContents.on('did-finish-load', async () => {
-    let copiesPrinted = 0
+    win.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(htmlContent)}`)
+    win.webContents.on('did-finish-load', async () => {
+      let copiesPrinted = 0
 
-    try {
-      const printers = await getInstalledPrinters()
+      try {
+        const printers = await getInstalledPrinters()
 
-      // Buscar si existe la impresora configurada
-      const encontrada = printers.find((p) => p.toLowerCase() === printerName.toLowerCase())
+        // Buscar si existe la impresora configurada
+        const encontrada = printers.find((p) => p.toLowerCase() === printerName.toLowerCase())
 
-      // Si no existe, usar la primera impresora de la lista como fallback
-      const nombreImpresoraFinal = encontrada || printers[0]
+        // Si no existe, usar la primera impresora de la lista como fallback
+        const nombreImpresoraFinal = encontrada || printers[0]
 
-      if (!nombreImpresoraFinal) {
-        finalizarImpresion({ success: false, error: 'No hay impresoras instaladas disponibles' })
-        return
-      }
+        if (!nombreImpresoraFinal) {
+          finalizarImpresion({ success: false, error: 'No hay impresoras instaladas disponibles' })
+          return
+        }
 
-      if (!encontrada) {
-        console.warn(
-          `⚠️ La impresora "${printerName}" no fue encontrada. Usando predeterminada: "${nombreImpresoraFinal}"`
-        )
-      }
+        if (!encontrada) {
+          console.warn(
+            `⚠️ La impresora "${printerName}" no fue encontrada. Usando predeterminada: "${nombreImpresoraFinal}"`
+          )
+        }
 
-      const printNextCopy = () => {
-        win.webContents.print(
-          {
-            silent: true,
-            printBackground: true,
-            deviceName: nombreImpresoraFinal,
-            margins: { marginType: 'none' },
-            pageSize: {
-              width: Number(printerConfig.pageSizeWidth) || 80000,
-              height: Number(printerConfig.pageSizeHeight) || 295000
+        const printNextCopy = () => {
+          win.webContents.print(
+            {
+              silent: true,
+              printBackground: true,
+              deviceName: nombreImpresoraFinal,
+              margins: { marginType: 'none' },
+              pageSize: {
+                width: Number(printerConfig.pageSizeWidth) || 80000,
+                height: Number(printerConfig.pageSizeHeight) || 295000
+              },
+              preview: false
             },
-            preview: false
-          },
-          (success, errorType) => {
-            if (!success) {
-              console.error('❌ Error en la impresión:', errorType)
-              finalizarImpresion({ success: false, error: errorType || 'No se pudo imprimir el ticket' })
-            } else {
-              copiesPrinted++
-              if (copiesPrinted < cantidadCopias) {
-                printNextCopy() // seguir imprimiendo
+            (success, errorType) => {
+              if (!success) {
+                console.error('❌ Error en la impresión:', errorType)
+                finalizarImpresion({
+                  success: false,
+                  error: errorType || 'No se pudo imprimir el ticket'
+                })
               } else {
-                console.log('✅ Impresión finalizada, cerrando ventana.')
-                finalizarImpresion({ success: true, printerName: nombreImpresoraFinal })
+                copiesPrinted++
+                if (copiesPrinted < cantidadCopias) {
+                  printNextCopy() // seguir imprimiendo
+                } else {
+                  console.log('✅ Impresión finalizada, cerrando ventana.')
+                  finalizarImpresion({ success: true, printerName: nombreImpresoraFinal })
+                }
               }
             }
-          }
-        )
-      }
+          )
+        }
 
-      printNextCopy()
-    } catch (err) {
-      console.error('Error al obtener las impresoras instaladas:', err)
-      finalizarImpresion({ success: false, error: err.message || 'Error al obtener las impresoras instaladas' })
-    }
-  })
+        printNextCopy()
+      } catch (err) {
+        console.error('Error al obtener las impresoras instaladas:', err)
+        finalizarImpresion({
+          success: false,
+          error: err.message || 'Error al obtener las impresoras instaladas'
+        })
+      }
+    })
   })
 }

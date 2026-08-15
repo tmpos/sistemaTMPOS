@@ -19,7 +19,8 @@ buscadorArrayObjeto,
 envioElectron,
 calcularDiferenciaEnDias,
 agregarDiasalaFechaActual,
-generarCodigoUnico } from '../../funciones/funciones.js';
+generarCodigoUnico,
+crearTablaSiNoExisteOffline } from '../../funciones/funciones.js';
 import Swal from 'sweetalert2'
 const toast = useToast();
 /************************************************************************/
@@ -33,6 +34,8 @@ import TablaJSON from '../../components/TablaJSON.vue'
 import { useLoading } from 'vue-loading-overlay';
 const $loading = useLoading();
 let loader = null;
+/************************************************************************/
+const camposArray = ['cedula_cliente', 'nombre_cliente', 'telefono_cliente', 'whatsapp_cliente', 'email_cliente', 'direccion_cliente', 'referencia_direccion_cliente', 'fecha_nacimiento', 'edad_cliente', 'estado_civil', 'nombre_conyugue', 'telefono_conyugue', 'ocupcion', 'salario','sexo', 'tiempo_laborando', 'tipo_empresa', 'empresa_labora', 'contacto_empresa', 'ingresos_adicionales', 'tipo_vivienda', 'vehiculo', 'cantidad_hijos', 'cantidad_dependientes', 'referencia_familiar1', 'contacto_familiar1', 'referencia_familiar2', 'contacto_familiar2', 'referencia_personal1', 'contacto_personal1', 'referencia_personal2', 'contacto_personal2', 'redes_solciales', 'no_financiamiento', 'fecha_solicitud', 'hora_emision', 'etapa_solicitud', 'score_aa', 'agente', 'resultados_prospecto', 'resultado_analisis', 'motivo', 'cedula_garante', 'nombre_garante', 'telefono_garante', 'whatsapp_garante', 'email_garante', 'vinculo_deudor', 'direccion_garante', 'referencia_direccion_garante', 'articulos', 'inicial', 'capital','total_capital', 'tasa_interes', 'interes_total', 'no_cuotas', 'valor_cuotas', 'gastos_legales','porcentaje_seguro', 'total_seguro', 'monto_total', 'total_abonado', 'total_pendiente', 'frecuencia_pago', 'fechas_pago', 'proximo_pago', 'prorrateo', 'proxima_cuota','fecha_vencimiento', 'fecha_entrega', 'responsable_entrega', 'cobrador_asignado', 'geolocalizacion', 'estado_financiamiento', 'historial_pagos', 'comentario', 'imagen','vinculo_referencia_familiar1', 'vinculo_referencia_familiar2', 'vinculo_contacto_personal1', 'vinculo_contacto_personal2','almacen'];
 /************************************************************************/
 import flatPickr from 'vue-flatpickr-component';
 import 'flatpickr/dist/flatpickr.css';
@@ -177,6 +180,7 @@ const articulosNormalizados = computed(() => {
 onMounted(async() => {
 await datosConfig()
 tokenCifrado.value = await encryptarPassword(token.value, 10);
+await crearTablaSiNoExisteOffline('financiamientos', camposArray.join(','), toast)
 await campos()
 await fnProductos()
 
@@ -188,25 +192,12 @@ uploadUrl.value = link.value+api.value+"/subirunaimagen2";
 /************************************************************************/
 /************************************************/
 const sumaTotal = () => {
-  // Inicializar valores de total de impuestos, subtotal y total de la factura
   totalImpuestos.value = 0;
   subtotalFactura.value = 0;
   totalFactura.value = 0;
   totalGanancias.value = 0;
-  let articulos = ''
-  //datoscamposFinanciamientos.value.articulos = JSON.parse(datoscamposFinanciamientos.value.articulos)
+  const articulos = [];
 
-  if (typeof articulos === 'string') {
-    try {
-      articulos = JSON.parse(articulos);
-    } catch (e) {
-      console.warn('Error al parsear articulos:', e);
-      articulos = [];
-    }
-  }
-
-
-  // Recorrer cada producto en productosVentaArray y sumar los valores correspondientes
   productosVentaArray.value.forEach(producto => {
     const impuestoPorProducto = parseFloat(producto.impuesto_venta) || 0; // Total de impuestos por producto
     const subtotalPorProducto = parseFloat(producto.precio_venta) * producto.cantidad; // Subtotal por producto (sin impuesto)
@@ -266,7 +257,7 @@ datoscamposFinanciamientos.value.fechas_pago = JSON.stringify(fechasP);
 if (archivosParaSubir.value.length > 0) {
       for (const archivo of archivosParaSubir.value) {
         const nombreFinal = archivo.name;
-        const carpeta = datoscamposPrueba.value.imagen; 
+        const carpeta = datoscamposFinanciamientos.value.imagen;
         await subirImagenDespuesDeInsertar(archivo, carpeta, nombreFinal);
       }
       }
@@ -281,7 +272,8 @@ Swal.fire({
   cancelButtonText: "No, Regresar al Inicio!",
  }).then(async(result) => {
   if (result.isConfirmed) {
-      fetchAndSetupData()
+      await campos()
+      router.push({ path: `/crearfinanciamientos` });
 } else if (result.dismiss === Swal.DismissReason.cancel) {
     router.push({ path: `/financiamientos` });
   }
@@ -1147,6 +1139,126 @@ datoscamposFinanciamientos.value.edad_cliente = calcularEdad(fechaFormateada);
 
 };
 
+const crearRegistroFinanciamiento = async () => {
+  const data = {
+    nombre_cliente: faker.person.fullName(),
+    cedula_cliente: faker.string.numeric({ length: 11, allowLeadingZeros: false }),
+    telefono_cliente: faker.phone.number('809-###-####'),
+    whatsapp_cliente: faker.phone.number('809-###-####'),
+    email_cliente: faker.internet.email(),
+    direccion_cliente: faker.location.streetAddress(),
+    referencia_direccion_cliente: faker.location.streetAddress(),
+    estado_civil: faker.helpers.arrayElement(['SOLTERO', 'CASADO', 'DIVORCIADO', 'UNION LIBRE']),
+    nombre_conyugue: faker.person.fullName(),
+    telefono_conyugue: faker.phone.number('809-###-####'),
+    ocupcion: faker.person.jobTitle(),
+    empresa_labora: faker.company.name(),
+    contacto_empresa: faker.phone.number('809-###-####'),
+    salario: faker.number.int({ min: 15000, max: 70000 }).toString(),
+    ingresos_adicionales: faker.number.int({ min: 0, max: 10000 }).toString(),
+    tiempo_laborando: faker.number.int({ min: 1, max: 24 }).toString(),
+    tipo_empresa: faker.helpers.arrayElement(['PUBLICA', 'PRIVADA']),
+    tipo_vivienda: faker.helpers.arrayElement(['PROPIA', 'ALQUILADA']),
+    vehiculo: faker.helpers.arrayElement(['PROPIO', 'NO', 'OPOSICION']),
+    cantidad_hijos: faker.number.int({ min: 0, max: 5 }).toString(),
+    cantidad_dependientes: faker.number.int({ min: 0, max: 5 }).toString(),
+    referencia_familiar1: faker.person.fullName(),
+    contacto_familiar1: faker.phone.number('809-###-####'),
+    referencia_familiar2: faker.person.fullName(),
+    contacto_familiar2: faker.phone.number('809-###-####'),
+    referencia_personal1: faker.person.fullName(),
+    contacto_personal1: faker.phone.number('809-###-####'),
+    referencia_personal2: faker.person.fullName(),
+    contacto_personal2: faker.phone.number('809-###-####'),
+    redes_solciales: JSON.stringify({ instagram: faker.internet.username(), facebook: faker.internet.username() }),
+    vinculo_deudor: faker.helpers.arrayElement(['ESPOSO(A)', 'FAMILIAR', 'AMIGO', 'NINGUNO']),
+    vinculo_referencia_familiar1: faker.helpers.arrayElement(['HERMANO(A)', 'PADRE', 'MADRE', 'TIO(A)']),
+    vinculo_referencia_familiar2: faker.helpers.arrayElement(['HERMANO(A)', 'PADRE', 'MADRE', 'TIO(A)']),
+    vinculo_contacto_personal1: 'AMIGO',
+    vinculo_contacto_personal2: 'AMIGO',
+    nombre_garante: faker.person.fullName(),
+    cedula_garante: faker.string.numeric({ length: 11, allowLeadingZeros: false }),
+    telefono_garante: faker.phone.number('809-###-####'),
+    whatsapp_garante: faker.phone.number('809-###-####'),
+    email_garante: faker.internet.email(),
+    direccion_garante: faker.location.streetAddress(),
+    referencia_direccion_garante: faker.location.streetAddress(),
+    no_financiamiento: faker.string.alphanumeric(8).toUpperCase(),
+    fecha_solicitud: new Date().toLocaleDateString('es-DO', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+    hora_emision: `${String(faker.number.int({ min: 8, max: 17 })).padStart(2, '0')}:${String(faker.number.int({ min: 0, max: 59 })).padStart(2, '0')}`,
+    etapa_solicitud: faker.helpers.arrayElement(['PROSPECTO', 'VALIDACION', 'ANALISIS', 'FIRMA CLIENTE', 'ENTREGA']),
+    score_aa: faker.number.int({ min: 10, max: 100 }).toString(),
+    agente: faker.person.fullName(),
+    resultados_prospecto: faker.helpers.arrayElement(['PENDIENTE', 'APROBADO', 'APLAZADO', 'DECLINADO']),
+    resultado_analisis: faker.helpers.arrayElement(['PENDIENTE', 'APROBADO', 'APLAZADO', 'DECLINADO']),
+    motivo: faker.lorem.sentence(),
+    articulos: JSON.stringify([{ nombre: faker.commerce.productName(), cantidad: faker.number.int({ min: 1, max: 5 }), precio_venta: faker.number.int({ min: 1000, max: 50000 }) }]),
+    inicial: faker.number.int({ min: 1000, max: 5000 }).toString(),
+    capital: faker.number.int({ min: 5000, max: 100000 }).toString(),
+    total_capital: '0.00',
+    tasa_interes: faker.number.float({ min: 1.5, max: 5.5, precision: 0.1 }).toString(),
+    interes_total: faker.number.int({ min: 1000, max: 10000 }).toString(),
+    porcentaje_seguro: '5.00',
+    total_seguro: '0.00',
+    no_cuotas: faker.number.int({ min: 3, max: 24 }).toString(),
+    valor_cuotas: faker.number.int({ min: 1000, max: 10000 }).toString(),
+    gastos_legales: faker.number.int({ min: 500, max: 3000 }).toString(),
+    monto_total: faker.number.int({ min: 10000, max: 200000 }).toString(),
+    total_abonado: '0.00',
+    total_pendiente: faker.number.int({ min: 5000, max: 150000 }).toString(),
+    frecuencia_pago: faker.helpers.arrayElement(['SEMANAL', 'QUINCENAL', 'MENSUAL']),
+    fechas_pago: JSON.stringify([]),
+    proximo_pago: faker.date.future().toISOString().split('T')[0],
+    prorrateo: '0.00',
+    proxima_cuota: '1',
+    fecha_vencimiento: faker.date.future().toISOString().split('T')[0],
+    fecha_entrega: faker.date.future().toISOString().split('T')[0],
+    responsable_entrega: faker.person.fullName(),
+    cobrador_asignado: faker.person.fullName(),
+    geolocalizacion: JSON.stringify({ lat: faker.location.latitude(), lng: faker.location.longitude() }),
+    estado_financiamiento: faker.helpers.arrayElement(['AL DIA', 'ATRASADO', 'PENDIENTE', 'PAGADO']),
+    historial_pagos: JSON.stringify([]),
+    comentario: faker.lorem.paragraph(),
+    imagen: faker.string.alphanumeric(16).toLowerCase(),
+    sexo: faker.helpers.arrayElement(['HOMBRE', 'MUJER']),
+    fecha_nacimiento: faker.date.birthdate({ min: 18, max: 65, mode: 'age' }).toLocaleDateString('es-DO', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+    edad_cliente: faker.number.int({ min: 18, max: 65 }).toString(),
+    almacen: datosEmpresa.empresa.nombre || '',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+  const envioDatos = await peticionesFetchOffline('insertData', 'financiamientos', JSON.stringify(data));
+  return envioDatos && envioDatos[0] === 'ok'
+}
+
+const generarMultiplesEntradas = async () => {
+  const { value: cantidad } = await Swal.fire({
+    title: 'Cuantos registros deseas crear?',
+    input: 'number',
+    inputValue: 10,
+    showCancelButton: true,
+    confirmButtonText: 'Crear',
+    cancelButtonText: 'Cancelar'
+  })
+  if (!cantidad || cantidad <= 0) return
+
+  const loader = $loading.show({ loader: 'bars' })
+  let creados = 0
+  for (let i = 0; i < cantidad; i++) {
+    const ok = await crearRegistroFinanciamiento()
+    if (ok) creados++
+  }
+  loader.hide()
+  Swal.fire({
+    icon: 'success',
+    title: 'Registros creados',
+    text: `${creados} de ${cantidad} financiamientos generados correctamente.`,
+    confirmButtonText: 'OK'
+  })
+}
+
+
+
 
 /************************************************************************/
 const fnAbonar = async () => {
@@ -1868,78 +1980,68 @@ async function subirImagenDespuesDeInsertar(archivo, subcarpeta, nombreFinal) {
 </script>
 <template>
 <main class="content-wrapper">
-  <div class="w-full px-4 mt-5 card">
-        <fieldset class="border p-3 rounded mb-2">
-          <legend class="float-none w-auto px-2">Datos de Financiamientos</legend>
-    <div class="grid grid-cols-12 gap-4">
-      <div class="sm:col-span-12">
-        <Button as="router-link" label="Home" icon="pi pi-home" to="/financiamientos" />
-        <Button class="mx-1" label="Generar Pruebas" icon="pi pi-bolt" @click="generarDatosPrueba" />
-        <Button class="mx-1 " label="Abono" icon="pi pi-dollar" @click="fnAbonar" />
-      </div>
+  <div class="p-4 md:p-6">
+    <div class="flex flex-col gap-6">
 
-<div class="mt-2 col-span-12">
-  <div class="score-card">
-    <div class="score-card__header">
-      <div>
-        <span class="score-card__eyebrow">Evaluacion automatica</span>
-        <h3 class="score-card__title">Score AA</h3>
-      </div>
-      <div class="score-card__badge" :class="scoreAAVisual.textClass">
-        {{ scoreAAVisual.label }}
-      </div>
-    </div>
-
-    <div class="score-card__body">
-      <div class="score-card__value-wrap">
-        <div class="score-card__value">{{ scoreAAVisual.score }}</div>
-        <div class="score-card__meta">de 100 puntos</div>
-      </div>
-
-      <div class="score-card__progress-block">
-        <div class="score-card__scale">
-          <span>0</span>
-          <span>50</span>
-          <span>100</span>
+      <!-- HEADER -->
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div>
+          <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Nuevo Financiamiento</h1>
+          <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Complete los datos del solicitante y las condiciones del financiamiento</p>
         </div>
-        <div class="score-card__track">
-          <div
-            class="score-card__fill"
-            :style="{
-              width: `${scoreAAVisual.percentage}%`,
-              background: scoreAAVisual.gradient,
-              boxShadow: `0 10px 22px ${scoreAAVisual.glow}`
-            }"
-          ></div>
-        </div>
-        <div class="score-card__footer">
-          <span class="score-card__percent">{{ scoreAAVisual.percentage }}%</span>
-          <span class="score-card__hint">{{ scoreAAVisual.recommendation }}</span>
+        <div class="flex flex-wrap items-center gap-2">
+          <Button as="router-link" label="Listado" icon="pi pi-home" severity="secondary" to="/financiamientos" />
+          <Button label="Generar Pruebas" icon="pi pi-bolt" severity="info" @click="generarDatosPrueba" />
+          <Button label="Multiples" icon="pi pi-database" severity="success" @click="generarMultiplesEntradas" />
         </div>
       </div>
-    </div>
-  </div>
-</div>
 
-
-    </div>
-</fieldset>
-<section>
-<fieldset class="border p-3 rounded mb-2">
-  <legend class="float-none w-auto px-2">Campos</legend>
-    <form id="formularioGenerar" action="" method="">
-         <div class="box-body">
-
-            <div class="flex mb-2 gap-2 justify-end">
-            <Button @click="value = '0'" rounded label="1" class="w-8 h-8 p-0" :outlined="value !== '0'" />
-            <Button @click="value = '1'" rounded label="2" class="w-8 h-8 p-0" :outlined="value !== '1'" />
-            <Button @click="value = '2'" rounded label="3" class="w-8 h-8 p-0" :outlined="value !== '2'" />
-            <Button @click="value = '3'" rounded label="4" class="w-8 h-8 p-0" :outlined="value !== '3'" />
-            <Button @click="value = '5'" rounded label="5" class="w-8 h-8 p-0" :outlined="value !== '5'" />
-            <Button @click="value = '8'" rounded label="6" class="w-8 h-8 p-0" :outlined="value !== '8'" />
-            <Button @click="value = '4'" rounded label="7" class="w-8 h-8 p-0" :outlined="value !== '4'" />
-            <Button @click="value = '9'" rounded label="8" class="w-8 h-8 p-0" :outlined="value !== '9'" />
+      <!-- SCORE CARD -->
+      <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-5">
+        <div class="flex flex-col lg:flex-row lg:items-center gap-6">
+          <div class="flex-1">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Evaluacion automatica</span>
+            <h3 class="text-lg font-bold text-slate-900 dark:text-slate-100 mt-1">Score AA</h3>
+          </div>
+          <div class="flex items-center gap-4">
+            <div class="text-center">
+              <div class="text-4xl font-extrabold text-slate-900 dark:text-slate-100">{{ scoreAAVisual.score }}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">de 100 pts</div>
+            </div>
+            <div class="flex-1 min-w-[200px]">
+              <div class="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
+                <span>0</span><span>50</span><span>100</span>
+              </div>
+              <div class="h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden shadow-inner">
+                <div class="h-full rounded-full transition-all duration-300" :style="{ width: `${scoreAAVisual.percentage}%`, background: scoreAAVisual.gradient }"></div>
+              </div>
+              <div class="flex items-center gap-2 mt-2">
+                <span :class="['text-sm font-bold', scoreAAVisual.textClass]">{{ scoreAAVisual.label }}</span>
+                <span class="text-xs text-slate-400 dark:text-slate-500">{{ scoreAAVisual.percentage }}%</span>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
+
+      <!-- FORM -->
+      <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <form id="formularioGenerar" action="" method="">
+          <div class="border-b border-slate-200 dark:border-slate-700 px-5 py-3 bg-slate-50 dark:bg-slate-800/50">
+            <Tabs v-model:value="value" class="custom-tabs">
+              <TabList>
+                <Tab value="0"><i class="pi pi-user mr-2"></i>Cliente</Tab>
+                <Tab value="1"><i class="pi pi-file-edit mr-2"></i>Solicitud</Tab>
+                <Tab value="2"><i class="pi pi-users mr-2"></i>Garante</Tab>
+                <Tab value="3"><i class="pi pi-box mr-2"></i>Articulos</Tab>
+                <Tab value="4"><i class="pi pi-file mr-2"></i>Documentos</Tab>
+                <Tab value="5"><i class="pi pi-chart-line mr-2"></i>Condiciones</Tab>
+                <Tab value="6"><i class="pi pi-truck mr-2"></i>Entrega</Tab>
+                <Tab value="7"><i class="pi pi-dollar mr-2"></i>Pagos</Tab>
+                <Tab value="8"><i class="pi pi-print mr-2"></i>Generar</Tab>
+              </TabList>
+            </Tabs>
+          </div>
         <Tabs v-model:value="value" scrollable>
             <TabList>
                 <Tab value="0">Datos del Cliente</Tab>
@@ -3570,7 +3672,12 @@ async function subirImagenDespuesDeInsertar(archivo, subcarpeta, nombreFinal) {
                 </TabPanel>
             </TabPanels>
         </Tabs>
-<!-- ///////////////////////////////////////////////////////////////////////// -->
+        </form>
+      </div>
+    </div>
+    <Toast />
+  </div>
+</main>
 
 <Dialog v-model:visible="visibleProductos" position="top" modal :style="{ width: '75rem' }" header="Productos">
   <template #header>
@@ -3578,7 +3685,6 @@ async function subirImagenDespuesDeInsertar(archivo, subcarpeta, nombreFinal) {
       <span class="font-bold white-space-nowrap">Productos</span>
     </div>
   </template>
-
   <fieldset class="border p-3 rounded mb-2">
     <legend class="float-none w-auto px-2">Productos</legend>
     <div class="grid grid-cols-1 gap-4">
@@ -3622,26 +3728,12 @@ async function subirImagenDespuesDeInsertar(archivo, subcarpeta, nombreFinal) {
     />
   </DataTable>
 </div>
-
     </div>
   </fieldset>
-
   <template #footer>
       <Button label="Cerrar" outlined severity="secondary" @click="visibleProductos = false" autofocus />
   </template>
 </Dialog>
-
-
-<!-- ///////////////////////////////////////////////////////////////////////// -->
-
-
-  </div>
-   </form>
-   </fieldset>
-</section>
-  </div>
-   </main>
-<Toast />
 </template>
 <style scoped>
 .score-card {

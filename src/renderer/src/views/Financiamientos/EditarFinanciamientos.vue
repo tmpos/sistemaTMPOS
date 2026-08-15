@@ -133,7 +133,7 @@ const fetchAllData = async () => {
     const jsonData = response;
     todosLosfinanciamientos.value = response;
     datoscampos.value = jsonData.find(datos=>datos.id == route.params.id)
-    datoscampos.value.fechas_pago = JSON.parse(datoscampos.value.fechas_pago)
+    datoscampos.value.fechas_pago = datoscampos.value.fechas_pago ? JSON.parse(datoscampos.value.fechas_pago) : []
     arrayIMG.value = await peticionesFetchOffline('listarArchivosDeCarpetaUrl', `financiamientos/${datoscampos.value.imagen}`);
 };
 /************************************************************************/
@@ -360,10 +360,18 @@ const editarFila = async (index, fila, tableId) => {
   })
 
   if (formValues) {
-    // Modificamos la fila
-    if (typeof fila === 'string') {
-      // Si es solo fecha en string, lo reemplazamos con un objeto completo
-      this.productos[index] = {
+    const targetArray =
+      tableId === 'fechas_pago' ? datoscampos.value.fechas_pago
+      : tableId === 'historial_pagos' ? (() => {
+          const arr = typeof datoscampos.value.historial_pagos === 'string'
+            ? JSON.parse(datoscampos.value.historial_pagos)
+            : datoscampos.value.historial_pagos || [];
+          return arr;
+        })()
+      : null;
+
+    if (typeof fila === 'string' && targetArray) {
+      targetArray[index] = {
         fecha: formValues.fecha,
         estado: formValues.estado
       }
@@ -394,14 +402,59 @@ function formateaFechaInput(fechaStr) {
   return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
 }
 
-// Función para eliminar
+const borrarEntrada = async () => {
+  const autorizado = await pedirContrasena()
+  if (!autorizado) return
+  const envioDatos = await peticionesFetchOffline('deleteEntry', 'financiamientos', datoscampos.value.id);
+  if (envioDatos[0] == 'ok') {
+    toast.add({ severity: 'success', summary: 'Exito', detail: 'Financiamiento eliminado', life: 3000 });
+    router.push('/financiamientos')
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al eliminar', life: 3000 });
+  }
+};
+
 const eliminarFila = async (index, tableId) => {
   const autorizado = await pedirContrasena()
   if (!autorizado) return
-
-  console.log(`🗑️ Eliminar fila en tabla ${tableId}`, index)
-  // Aquí puedes eliminar del array original
-}
+  const targetArray = tableId === 'fechas_pago' ? datoscampos.value.fechas_pago : null;
+  if (targetArray) {
+    targetArray.splice(index, 1)
+    await funcionActualizar()
+    Swal.fire('Eliminado', 'La fila fue eliminada correctamente', 'success')
+  }
+};
+const eliminarPago = async (index) => {
+  const confirm = await Swal.fire({ title: 'Eliminar pago?', text: 'Esta accion no se puede deshacer', icon: 'warning', showCancelButton: true, confirmButtonText: 'Si, eliminar', cancelButtonText: 'Cancelar' });
+  if (!confirm.isConfirmed) return;
+  const arr = typeof datoscampos.value.historial_pagos === 'string' ? JSON.parse(datoscampos.value.historial_pagos) : datoscampos.value.historial_pagos || [];
+  arr.splice(index, 1);
+  datoscampos.value.historial_pagos = JSON.stringify(arr);
+  const totalAbonado = arr.reduce((sum, pago) => sum + parseFloat(pago.monto || 0), 0);
+  datoscampos.value.total_abonado = totalAbonado.toFixed(2);
+  datoscampos.value.total_pendiente = (parseFloat(datoscampos.value.monto_total || 0) - totalAbonado).toFixed(2);
+  await funcionActualizar();
+  Swal.fire('Eliminado', 'El pago fue eliminado correctamente', 'success');
+};
+const editarPago = async (index) => {
+  const arr = typeof datoscampos.value.historial_pagos === 'string' ? JSON.parse(datoscampos.value.historial_pagos) : datoscampos.value.historial_pagos || [];
+  const pago = arr[index];
+  const { value: formValues } = await Swal.fire({
+    title: 'Editar Pago',
+    html: '<div class=\"grid grid-cols-1 gap-4 text-left\"><div><label class=\"text-sm font-medium\">Monto</label><input id=\"swal-monto\" type=\"number\" step=\"0.01\" class=\"w-full rounded-md border p-2\" value=\"' + pago.monto + '\"></div><div><label class=\"text-sm font-medium\">Metodo</label><select id=\"swal-metodo\" class=\"w-full rounded-md border p-2\"><option value=\"EFECTIVO\"' + (pago.metodo === 'EFECTIVO' ? ' selected' : '') + '>EFECTIVO</option><option value=\"TARJETA\"' + (pago.metodo === 'TARJETA' ? ' selected' : '') + '>TARJETA</option><option value=\"TRANSFERENCIA\"' + (pago.metodo === 'TRANSFERENCIA' ? ' selected' : '') + '>TRANSFERENCIA</option></select></div><div><label class=\"text-sm font-medium\">Fecha</label><input id=\"swal-fecha\" type=\"text\" class=\"w-full rounded-md border p-2\" value=\"' + (pago.fecha || '') + '\"></div></div>',
+    showCancelButton: true, confirmButtonText: 'Guardar', cancelButtonText: 'Cancelar',
+    preConfirm: () => ({ monto: document.getElementById('swal-monto').value, metodo: document.getElementById('swal-metodo').value, fecha: document.getElementById('swal-fecha').value })
+  });
+  if (formValues) {
+    arr[index] = { ...arr[index], ...formValues };
+    datoscampos.value.historial_pagos = JSON.stringify(arr);
+    const totalAbonado = arr.reduce((sum, p) => sum + parseFloat(p.monto || 0), 0);
+    datoscampos.value.total_abonado = totalAbonado.toFixed(2);
+    datoscampos.value.total_pendiente = (parseFloat(datoscampos.value.monto_total || 0) - totalAbonado).toFixed(2);
+    await funcionActualizar();
+    Swal.fire('Actualizado', 'El pago fue actualizado correctamente', 'success');
+  }
+};
 /************************************************************************/
 const handleUpload = async (event) => {
   const archivos = event.files;
@@ -667,177 +720,344 @@ const generarRecibo = async () => {
 };
 
 /************************************************************************/
+function generarPlanPagoPDF() {
+  try {
+    const doc = new jsPDF();
+    if (!datoscampos.value.fechas_pago || datoscampos.value.fechas_pago.length === 0) {
+      toast.add({ severity: 'warn', summary: 'Advertencia', detail: 'No hay fechas de pago programadas.', life: 3000 });
+      return;
+    }
+    const totalCuotas = datoscampos.value.no_cuotas;
+    const montoPrincipal = parseFloat(datoscampos.value.monto_total || 0);
+    const interesTotal = parseFloat(datoscampos.value.interes_total || 0);
+    const tasaInteres = parseFloat(datoscampos.value.tasa_interes || 0);
+    const montoSeguro = parseFloat(datoscampos.value.total_seguro || 0) / totalCuotas;
+    const montoCuota = parseFloat((montoPrincipal + interesTotal) / totalCuotas);
+    const interesPorCuota = interesTotal / totalCuotas;
+    const montoPorCuota = montoPrincipal / totalCuotas;
+    const totalInteresMensual = montoPorCuota + interesPorCuota;
+    let balance = montoPrincipal;
+    const fechaPago = datoscampos.value.fechas_pago;
+    const planPagos = [];
+    for (let fecha of fechaPago) {
+      const laFecha = fecha.split('/');
+      planPagos.push({ fecha, dia: laFecha[0], monto: montoPorCuota.toFixed(2), seguro: montoSeguro.toFixed(2), balance: balance.toFixed(2), tasaInteres: tasaInteres.toFixed(2), totalInteres: totalInteresMensual.toFixed(2), cuota: (totalInteresMensual + montoSeguro).toFixed(2) });
+      balance -= montoPorCuota;
+    }
+    doc.setFontSize(12);
+    doc.text(datosEmpresa.empresa.nombre, 105, 10, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text(datosEmpresa.empresa.legal, 105, 15, { align: 'center' });
+    doc.text('Tabla de Amortización', 105, 22, { align: 'center' });
+    const info = [
+      [`Número de Financiamiento:`, datoscampos.value.no_financiamiento, `Código del Cliente:`, datoscampos.value.cedula_cliente],
+      [`Monto Principal:`, `$${montoPrincipal.toLocaleString()}`, `Nombre:`, datoscampos.value.nombre_cliente],
+      [`Monto de intereses:`, `$${interesTotal.toLocaleString()}`, `Periodicidad:`, datoscampos.value.frecuencia_pago],
+      [`Fecha de apertura:`, datoscampos.value.fecha_solicitud, `Fecha de vencimiento:`, datoscampos.value.fecha_vencimiento]
+    ];
+    let y = 30;
+    info.forEach(row => { doc.text(`${row[0]} ${row[1]}`, 10, y); doc.text(`${row[2]} ${row[3]}`, 110, y); y += 6; });
+    autoTable(doc, {
+      head: [['Linea', 'Fecha', 'Estado', 'DIA', 'Monto', 'Seguro', 'Balance', 'Tasa de interes', 'Principal mas Interes', 'Cuota']],
+      body: planPagos.map((p, index) => [index + 1, p.fecha, 'Pendiente', p.dia, `$${p.monto.toLocaleString()}`, `$${p.seguro.toLocaleString()}`, `$${p.balance.toLocaleString()}`, `${p.tasaInteres}%`, `$${p.totalInteres.toLocaleString()}`, `$${p.cuota.toLocaleString()}`]),
+      startY: y + 5, theme: 'grid', styles: { fontSize: 8 }
+    });
+    const finalY = doc.lastAutoTable.finalY + 20;
+    doc.text('_________________________', 30, finalY);
+    doc.text('_________________________', 130, finalY);
+    doc.text('FIRMA DEL CLIENTE', 40, finalY + 6);
+    doc.text('FIRMA DEL GARANTE', 140, finalY + 6);
+    const blob = doc.output('blob');
+    const pdfObjectUrl = URL.createObjectURL(blob);
+    Swal.fire({
+      title: 'Vista previa de la Tabla de Amortizacion',
+      html: '<iframe src="' + pdfObjectUrl + '" width="100%" height="500px" style="border: none;"></iframe>',
+      width: '80%', showCloseButton: true, showCancelButton: true,
+      confirmButtonText: 'Descargar PDF', cancelButtonText: 'Cerrar'
+    }).then(result => {
+      if (result.isConfirmed) {
+        const a = document.createElement('a'); a.href = pdfObjectUrl; a.download = 'TablaAmortizacion-' + datoscampos.value.no_financiamiento + '.pdf'; a.click();
+      }
+      URL.revokeObjectURL(pdfObjectUrl);
+    });
+  } catch (error) {
+    console.error('Error generando tabla de amortizacion:', error);
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Error al generar la tabla de amortizacion.', life: 5000 });
+  }
+}
+/************************************************************************/
+const getBase64ImageFromURLAutoSize = async (url, maxWidth, maxHeight) => {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  const img = await createImageBitmap(blob);
+  let width = img.width, height = img.height;
+  const scale = Math.min(maxWidth / width, maxHeight / height);
+  width *= scale; height *= scale;
+  const canvas = document.createElement('canvas');
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, width, height);
+  return { base64: canvas.toDataURL(), width, height };
+};
+/************************************************************************/
+async function generarAutorizacionPDF() {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+  let startY = 10;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const { base64, width, height } = await getBase64ImageFromURLAutoSize(datosEmpresa.empresa.imagen, 150, 60);
+  const logoWidth = 30;
+  const logoX = (pageWidth - logoWidth) / 2;
+  doc.addImage(base64, 'PNG', logoX, startY, width, height);
+  doc.setFont('times', 'bold');
+  doc.setFontSize(12);
+  doc.text('AUTORIZACION PARA CONSULTA INFORMACION CREDITICIA,', 306, 100, { align: 'center' });
+  doc.text('CAPTURA Y ALMACENAMIENTO DE DATOS BIOMETRICOS', 306, 115, { align: 'center' });
+  doc.setFont('times', 'normal');
+  doc.setFontSize(11);
+  const text = 'Conforme a las leyes 172-13 sobre Proteccion Integral de Datos Personales y la Ley 4-23 sobre sobre registro civil, respecto de la captura y almacenamiento de datos biometricos, EL FIRMANTE otorga su consentimiento formal y expreso, para que, AA Solutions Comercial pueda: 1. Consultar su informacion personal reportada en las bases de datos de las Sociedades de Informacion Crediticia, y 2. Capturar y almacenar sus datos biometricos.';
+  doc.text(text, 55, 140, { maxWidth: 500, lineHeightFactor: 1.5 });
+  doc.text('El firmante da su autorizacion expresa para los fines de:', 55, 225);
+  doc.setFont('times', 'bold');
+  doc.text('Recoleccion y almacenamiento', 55, 245);
+  doc.text('Validacion y consulta', 330, 245);
+  doc.setFont('times', 'normal');
+  doc.rect(55, 255, 10, 10); doc.text('X', 57, 263); doc.text('Fotografia de su rostro', 70, 263);
+  doc.rect(55, 275, 10, 10); doc.text('X', 57, 283); doc.text('Huella dactilar', 70, 283);
+  doc.rect(330, 255, 10, 10); doc.text('X', 332, 263); doc.text('Buro de credito', 345, 263);
+  doc.rect(330, 275, 10, 10); doc.text('', 332, 283); doc.text('Otro (Especificar cual en observaciones)', 345, 283);
+  doc.line(55, 330, 250, 330); doc.text('(Firmar igual que en su cedula)', 55, 340);
+  doc.line(330, 330, 555, 330); doc.text('(Cedula escrita por el cliente)', 330, 340);
+  doc.line(190, 370, 420, 370); doc.text('(Fecha escrita por el cliente)', 230, 380);
+  doc.rect(55, 400, 120, 90); doc.text('Huella dactilar dedo INDICE DERECHO', 55, 500);
+  doc.text('Observaciones:', 55, 530);
+  doc.line(55, 540, 555, 540); doc.line(55, 560, 555, 560);
+  doc.setFontSize(9);
+  doc.text('Autorizacion para consulta informacion crediticia, captura y almacenamiento de datos biometricos', 555, 760, { align: 'right' });
+  doc.text('Codigo: GA-DCC-03     Version 01, Abril 2025', 555, 770, { align: 'right' });
+  const pdfData = doc.output('datauristring');
+  Swal.fire({
+    title: 'Autorizacion Generada',
+    html: '<embed src="' + pdfData + '" type="application/pdf" width="100%" height="500px"/>',
+    width: '80%', showCloseButton: true, confirmButtonText: 'Cerrar'
+  });
+}
+/************************************************************************/
+function formatearFechaTexto(fechaISO) {
+  const date = new Date(fechaISO);
+  return date.toLocaleDateString('es-DO', { day: '2-digit', month: 'long', year: 'numeric' });
+}
+/************************************************************************/
+function formatearRD(valor) {
+  return 'RD$' + parseFloat(valor).toLocaleString('es-DO', { minimumFractionDigits: 2 });
+}
+/************************************************************************/
+async function generarPagarePDF() {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: [612, 1008] });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const data = datoscampos.value;
+  const nombre = data.nombre_cliente;
+  const cedula = data.cedula_cliente;
+  const direccion = data.direccion_cliente;
+  const estadoCivil = data.estado_civil || 'soltero(a)';
+  const monto = formatearRD(data.monto_total);
+  const cuotas = data.no_cuotas;
+  const valorCuota = formatearRD(data.valor_cuotas);
+  const interes = data.tasa_interes;
+  const tiempoCobro = data.frecuencia_pago;
+  const fechaInicio = formatearFechaTexto(data.fecha_solicitud);
+  const ultimaFecha = data.fechas_pago[data.fechas_pago.length - 1];
+  const fechaFin = formatearFechaTexto(ultimaFecha);
+  const senorSenora = data.sexo === 'HOMBRE' ? 'el senor' : 'la senora';
+  const deudor_a = data.sexo === 'HOMBRE' ? 'EL DEUDOR' : 'LA DEUDORA';
+  const equipo = data.articulos.map(e => e.nombre).join(', ');
+  const fechaHoy = new Date().toLocaleDateString('es-DO', { day: '2-digit', month: 'long', year: 'numeric' });
+  doc.text('PAGARE NOTARIAL', pageWidth / 2, 40, { align: 'center' });
+  const texto = 'ACTO NUMERO ________________. En la ciudad de Santiago, Santiago de los Caballeros, Republica Dominicana, a los ' + fechaHoy + ', Por ante mi, LIC. EDUARDO RAFAEL POLANCO RAMIREZ, Notario Publico Numero 5477, para el municipio de Santiago, con estudio Profesional abierto en la calle Buena Vista No. 147, La Gallera, Santiago, encontrandome en mi despacho y en el regular ejercicio de mis funciones, COMPARECIO libre y voluntariamente ' + senorSenora + ' ' + nombre.toUpperCase() + ' de nacionalidad dominicana, mayor de edad, estado civil ' + estadoCivil + ', provisto/a de la cedula de identidad y electoral No. ' + cedula + ', domiciliado/a y residente en ' + direccion + ', lugar donde hace formal eleccion de domicilio para todos los actos y consecuencias legales que se deriven del presente compromiso y ME HA DECLARADO bajo la fe del juramento lo siguiente: PRIMERO: Que reconoce, por medio del presente acto, ser ' + deudor_a + ', de la Razon Social AETM AA SOLUTIONS COMERCIAL, SRL, por la suma de ' + monto + ', por concepto de financiamiento de los siguientes articulos: ' + equipo + ', suma que se compromete a pagar en ' + cuotas + ' cuotas ' + tiempoCobro + ' y consecutivas, a razon de ' + valorCuota + ' cada una, iniciando en la fecha ' + fechaInicio + ' y finalizando el ' + fechaFin + '; SEGUNDO: ' + deudor_a + ' reconoce que la suma adeudada generara un interes de ' + interes + '% por ciento mensual en caso de no saldar este compromiso al termino de cinco (5) meses como se ha pactado.';
+  const fontSize = 10, lineHeight = fontSize * 1.5, margin = 55, maxWidth = 502;
+  let yM = 60;
+  doc.setFontSize(fontSize);
+  doc.setFont('times', 'normal');
+  const bloques = texto.split('[[SALTO]]');
+  bloques.forEach(p => {
+    const limpio = p.trim();
+    doc.text(limpio, margin, yM, { maxWidth, align: 'justify', lineHeightFactor: 1.5 });
+    yM += doc.getTextDimensions(limpio, { maxWidth }).h + lineHeight + 10;
+  });
+  const lineY = doc.lastAutoTable ? doc.lastAutoTable.finalY : 620;
+  doc.line(margin, lineY, pageWidth - margin, lineY);
+  doc.line(margin, lineY + 15, pageWidth - margin, lineY + 15);
+  doc.line(margin, lineY + 30, pageWidth - margin, lineY + 30);
+  const yPos = doc.lastAutoTable ? doc.lastAutoTable.finalY + 60 : 730;
+  doc.text('_______________________________________', pageWidth / 2, yPos + 40, { align: 'center' });
+  doc.text(nombre.toUpperCase(), pageWidth / 2, yPos + 55, { align: 'center' });
+  doc.text('DEUDOR(A)', pageWidth / 2, yPos + 70, { align: 'center' });
+  doc.text('_______________________________________', pageWidth / 2, yPos + 100, { align: 'center' });
+  doc.text('JENNIFFER MARLENY GOMEZ TORRES', pageWidth / 2, yPos + 115, { align: 'center' });
+  doc.text('POR AETM AA SOLUTIONS COMERCIAL SRL', pageWidth / 2, yPos + 130, { align: 'center' });
+  doc.text('ACREEDOR', pageWidth / 2, yPos + 145, { align: 'center' });
+  doc.text('_______________________________________', pageWidth / 2, yPos + 175, { align: 'center' });
+  doc.text('EDUARDO RAFAEL POLANCO RAMIREZ', pageWidth / 2, yPos + 190, { align: 'center' });
+  doc.text('NOTARIO', pageWidth / 2, yPos + 205, { align: 'center' });
+  const pdfData = doc.output('datauristring');
+  Swal.fire({
+    title: 'Pagaré Notarial Generado',
+    html: '<embed src="' + pdfData + '" type="application/pdf" width="100%" height="500px"/>',
+    width: '80%', showCloseButton: true, confirmButtonText: 'Cerrar'
+  });
+}
+/************************************************************************/
+const fnGenerarSolicitud = async () => {
+  const doc = new jsPDF();
+  const datosSolicitud = {
+    articulos: datoscampos.value.articulos.map(art => art.nombre).join(', '),
+    monto: datoscampos.value.monto_total,
+    inicial: datoscampos.value.inicial,
+    tasa: datoscampos.value.tasa_interes,
+    no_cuotas: datoscampos.value.no_cuotas,
+    seguro: datoscampos.value.porcentaje_seguro,
+    cuotaTotal: datoscampos.value.valor_cuotas,
+    frecuencia: datoscampos.value.frecuencia_pago,
+  };
+  const datosSolicitante = {
+    nombres: datoscampos.value.nombre_cliente, apellidos: '', cedula: datoscampos.value.cedula_cliente,
+    fechaNacimiento: datoscampos.value.fecha_nacimiento, sexo: datoscampos.value.sexo, estadoCivil: datoscampos.value.estado_civil,
+    telefonoResidencial: datoscampos.value.telefono_cliente, telefonoMovil: datoscampos.value.whatsapp_cliente,
+    email: datoscampos.value.email_cliente, nacionalidad: 'Dominicana', provincia: '', direccion: datoscampos.value.direccion_cliente,
+    referencia: datoscampos.value.referencia_direccion_cliente, nombreEmpresa: datoscampos.value.empresa_labora,
+    tiempoLaborando: datoscampos.value.tiempo_laborando, cargo: datoscampos.value.ocupcion,
+    direccionTrabajo: datoscampos.value.direccion_cliente, telefonoTrabajo: datoscampos.value.contacto_empresa,
+    salario: datoscampos.value.salario, nombreConyugue: datoscampos.value.nombre_conyugue, telefonoConyugue: datoscampos.value.telefono_conyugue,
+  };
+  const referenciasFamiliares = [
+    { referencia: datoscampos.value.referencia_familiar1, contacto: datoscampos.value.contacto_familiar1, vinculo: datoscampos.value.vinculo_referencia_familiar1 },
+    { referencia: datoscampos.value.referencia_familiar2, contacto: datoscampos.value.contacto_familiar2, vinculo: datoscampos.value.vinculo_referencia_familiar2 },
+  ];
+  const referenciasPersonales = [
+    { referencia: datoscampos.value.referencia_personal1, contacto: datoscampos.value.contacto_personal1, vinculo: datoscampos.value.vinculo_contacto_personal1 },
+    { referencia: datoscampos.value.referencia_personal2, contacto: datoscampos.value.contacto_personal2, vinculo: datoscampos.value.vinculo_contacto_personal2 },
+  ];
+  const datosGarante = {
+    nombres: datoscampos.value.nombre_garante, apellidos: '', cedula: datoscampos.value.cedula_garante,
+    fechaNacimiento: '', sexo: '', estadoCivil: '', telefonoResidencial: datoscampos.value.telefono_garante,
+    telefonoMovil: datoscampos.value.whatsapp_garante, email: datoscampos.value.email_garante, nacionalidad: 'Dominicana',
+    provincia: '', direccion: datoscampos.value.direccion_garante, referencia: datoscampos.value.referencia_direccion_garante,
+    nombreEmpresa: '', tiempoLaborando: '', cargo: '', direccionTrabajo: '', telefonoTrabajo: '', salario: '', nombreConyugue: '', telefonoConyugue: '',
+  };
+  doc.setFontSize(16);
+  doc.text('SOLICITUD DE FINANCIAMIENTO', 105, 15, { align: 'center' });
+  doc.setFontSize(12);
+  doc.text('DATOS DE LA SOLICITUD', 10, 25);
+  autoTable(doc, { startY: 30, body: [['Articulos:', datosSolicitud.articulos, 'Monto:', datosSolicitud.monto], ['Frecuencia:', datosSolicitud.frecuencia, 'No. cuotas:', datosSolicitud.no_cuotas], ['Inicial:', datosSolicitud.inicial, 'Seguro:', datosSolicitud.seguro], ['Tasa:', datosSolicitud.tasa, 'Cuota total:', datosSolicitud.cuotaTotal]], theme: 'grid', styles: { fontSize: 10 } });
+  doc.text('DATOS DEL SOLICITANTE', 10, doc.lastAutoTable.finalY + 10);
+  autoTable(doc, { startY: doc.lastAutoTable.finalY + 15, body: [['Nombres:', datosSolicitante.nombres, 'Apellidos:', datosSolicitante.apellidos], ['Cedula:', datosSolicitante.cedula, 'Fecha Nacimiento:', datosSolicitante.fechaNacimiento], ['Sexo:', datosSolicitante.sexo, 'Estado Civil:', datosSolicitante.estadoCivil], ['Telefono Residencial:', datosSolicitante.telefonoResidencial, 'Telefono Movil:', datosSolicitante.telefonoMovil], ['E-mail:', datosSolicitante.email, 'Nacionalidad:', datosSolicitante.nacionalidad], ['Provincia:', datosSolicitante.provincia, 'Direccion:', datosSolicitante.direccion], ['Referencia:', datosSolicitante.referencia, 'Nombre Empresa:', datosSolicitante.nombreEmpresa], ['Tiempo Laborando:', datosSolicitante.tiempoLaborando, 'Cargo:', datosSolicitante.cargo], ['Direccion Trabajo:', datosSolicitante.direccionTrabajo, 'Telefono Trabajo:', datosSolicitante.telefonoTrabajo], ['Salario:', datosSolicitante.salario, 'Nombre Conyugue:', datosSolicitante.nombreConyugue], ['Telefono Conyugue:', datosSolicitante.telefonoConyugue, '']], theme: 'grid', styles: { fontSize: 10 } });
+  doc.text('REFERENCIAS FAMILIARES', 10, doc.lastAutoTable.finalY + 10);
+  autoTable(doc, { startY: doc.lastAutoTable.finalY + 15, body: referenciasFamiliares.map(r => [r.referencia, r.vinculo, r.contacto]), head: [['Referencia', 'Vinculo', 'Contacto']], theme: 'grid', styles: { fontSize: 10 } });
+  doc.text('REFERENCIAS PERSONALES', 10, doc.lastAutoTable.finalY + 10);
+  autoTable(doc, { startY: doc.lastAutoTable.finalY + 15, body: referenciasPersonales.map(r => [r.referencia, r.vinculo, r.contacto]), head: [['Referencia', 'Vinculo', 'Contacto']], theme: 'grid', styles: { fontSize: 10 } });
+  doc.text('DATOS DEL GARANTE', 10, doc.lastAutoTable.finalY + 10);
+  autoTable(doc, { startY: doc.lastAutoTable.finalY + 15, body: [['Nombres:', datosGarante.nombres, 'Apellidos:', datosGarante.apellidos], ['Cedula:', datosGarante.cedula, 'Fecha Nacimiento:', datosGarante.fechaNacimiento], ['Sexo:', datosGarante.sexo, 'Estado Civil:', datosGarante.estadoCivil], ['Telefono Residencial:', datosGarante.telefonoResidencial, 'Telefono Movil:', datosGarante.telefonoMovil], ['E-mail:', datosGarante.email, 'Nacionalidad:', datosGarante.nacionalidad], ['Provincia:', datosGarante.provincia, 'Direccion:', datosGarante.direccion], ['Referencia:', datosGarante.referencia, 'Nombre Empresa:', datosGarante.nombreEmpresa], ['Tiempo Laborando:', datosGarante.tiempoLaborando, 'Cargo:', datosGarante.cargo], ['Direccion Trabajo:', datosGarante.direccionTrabajo, 'Telefono Trabajo:', datosGarante.telefonoTrabajo], ['Salario:', datosGarante.salario, 'Nombre Conyugue:', datosGarante.nombreConyugue], ['Telefono Conyugue:', datosGarante.telefonoConyugue, '']], theme: 'grid', styles: { fontSize: 10 } });
+  const finalY = doc.lastAutoTable.finalY + 20;
+  doc.text('Firma del Solicitante', 30, finalY);
+  doc.text('Firma del Garante', 140, finalY);
+  const pdfData = doc.output('datauristring');
+  Swal.fire({
+    title: 'Solicitud de Financiamiento',
+    html: '<embed src="' + pdfData + '" type="application/pdf" width="100%" height="500px"/>',
+    width: '80%', showCloseButton: true, confirmButtonText: 'Cerrar'
+  });
+};
+/************************************************************************/
 </script>
 <template>
 <main class="content-wrapper">
-  <div class="w-full px-4 mt-5 card">
-        <fieldset class="border p-3 rounded mb-2">
-          <legend class="float-none w-auto px-2">Datos de Financiamientos</legend>
+  <div class="p-4 md:p-6">
+    <div class="flex flex-col gap-6">
 
-    <div class="finance-header">
-      <div class="finance-header__actions">
-        <Button as="router-link" icon="pi pi-home" label="Listado" to="/financiamientos" />
-        <Button as="router-link" class="finance-header__action" icon="pi pi-plus-circle" label="Nuevo" to="/crearfinanciamientos" />
-        <Button
-          icon="pi pi-trash"
-          label="Eliminar"
-          class="p-button-danger finance-header__action"
-          title="Borrar Entrada"
-          @click="borrarEntrada"
-        />
-        <Button
-          icon="pi pi-step-backward"
-          class="finance-header__icon"
-          title="Primero"
-          @click="navigate('primero')"
-        />
-        <Button
-          icon="pi pi-chevron-left"
-          class="finance-header__icon"
-          title="Anterior"
-          @click="navigate('anterior')"
-        />
-        <Button
-          icon="pi pi-chevron-right"
-          class="finance-header__icon"
-          title="Siguiente"
-          @click="navigate('siguiente')"
-        />
-        <Button
-          icon="pi pi-step-forward"
-          class="finance-header__icon"
-          title="Ultimo"
-          @click="navigate('ultimo')"
-        />
-        <Button
-          icon="pi pi-save"
-          label="Guardar"
-          class="finance-header__action"
-          severity="contrast"
-          @click="funcionActualizar"
-        />
-        <Button
-          icon="pi pi-dollar"
-          label="Abonar"
-          class="finance-header__action"
-          severity="contrast"
-          @click="fnAbonar"
-        />
-        <Button
-          label="Generar Recibo"
-          icon="pi pi-file-pdf"
-          class="finance-header__action"
-          @click="generarRecibo"
-        />
+      <!-- HEADER -->
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <Button as="router-link" icon="pi pi-home" severity="secondary" v-tooltip.top="'Listado'" to="/financiamientos" />
+          <Button as="router-link" icon="pi pi-plus" severity="success" v-tooltip.top="'Nuevo'" to="/crearfinanciamientos" />
+          <Button icon="pi pi-trash" severity="danger" v-tooltip.top="'Eliminar'" @click="borrarEntrada" />
+          <span class="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1"></span>
+          <Button icon="pi pi-step-backward" severity="secondary" v-tooltip.top="'Primero'" @click="navigate('primero')" />
+          <Button icon="pi pi-chevron-left" severity="secondary" v-tooltip.top="'Anterior'" @click="navigate('anterior')" />
+          <Button icon="pi pi-chevron-right" severity="secondary" v-tooltip.top="'Siguiente'" @click="navigate('siguiente')" />
+          <Button icon="pi pi-step-forward" severity="secondary" v-tooltip.top="'Ultimo'" @click="navigate('ultimo')" />
+          <span class="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1"></span>
+          <Button icon="pi pi-save" label="Guardar" severity="contrast" @click="funcionActualizar" />
+          <Button icon="pi pi-dollar" label="Abonar" severity="success" @click="fnAbonar" />
+          <Button icon="pi pi-file-pdf" label="Recibo" severity="info" @click="generarRecibo" />
+        </div>
       </div>
 
-      <div class="finance-overview">
-        <div class="finance-overview__content">
-          <div class="finance-overview__intro">
-            <span class="finance-overview__eyebrow">Panel de seguimiento</span>
-            <h2 class="finance-overview__title">{{ datoscampos.nombre_cliente || 'Financiamiento' }}</h2>
-            <p class="finance-overview__subtitle">
-              {{ datoscampos.no_financiamiento || 'Sin codigo' }} · {{ datoscampos.estado_financiamiento || 'Sin estado' }}
-            </p>
-          </div>
-
-          <div class="finance-overview__stats">
-            <div
-              v-for="item in resumenFinanciamiento"
-              :key="item.label"
-              class="finance-stat"
-            >
-              <span class="finance-stat__label">{{ item.label }}</span>
-              <strong class="finance-stat__value">{{ item.value }}</strong>
-            </div>
+      <!-- TITLE + SUMMARY ROW -->
+      <div class="flex flex-col lg:flex-row gap-6">
+        <div class="flex-1">
+          <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">{{ datoscampos.nombre_cliente || 'Financiamiento' }}</h1>
+          <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">{{ datoscampos.no_financiamiento || 'Sin codigo' }} · {{ datoscampos.estado_financiamiento || 'Sin estado' }}</p>
+        </div>
+        <div class="flex flex-wrap gap-4">
+          <div v-for="item in resumenFinanciamiento" :key="item.label" class="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 px-4 py-3 min-w-[120px] text-center">
+            <span class="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">{{ item.label }}</span>
+            <strong class="block text-lg mt-1 text-slate-900 dark:text-slate-100">{{ item.value }}</strong>
           </div>
         </div>
+      </div>
 
-        <div class="score-card score-card--compact">
-          <div class="score-card__header">
-            <div>
-              <span class="score-card__eyebrow">Analisis actual</span>
-              <h3 class="score-card__title">Score AA</h3>
-            </div>
-            <div class="score-card__badge" :class="scoreAAVisual.textClass">
-              {{ scoreAAVisual.label }}
-            </div>
+      <!-- SCORE CARD -->
+      <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-5">
+        <div class="flex flex-col lg:flex-row lg:items-center gap-6">
+          <div class="flex-1">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Analisis actual</span>
+            <h3 class="text-lg font-bold text-slate-900 dark:text-slate-100 mt-1">Score AA</h3>
           </div>
-
-          <div class="score-card__body">
-            <div class="score-card__value-wrap">
-              <div class="score-card__value">{{ scoreAAVisual.score }}</div>
-              <div class="score-card__meta">de 100 puntos</div>
+          <div class="flex items-center gap-4">
+            <div class="text-center">
+              <div class="text-4xl font-extrabold" :class="scoreAAVisual.textClass">{{ scoreAAVisual.score }}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">de 100 pts</div>
             </div>
-
-            <div class="score-card__progress-block">
-              <div class="score-card__scale">
-                <span>0</span>
-                <span>50</span>
-                <span>100</span>
+            <div class="flex-1 min-w-[200px]">
+              <div class="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
+                <span>0</span><span>50</span><span>100</span>
               </div>
-              <div class="score-card__track">
-                <div
-                  class="score-card__fill"
-                  :style="{
-                    width: `${scoreAAVisual.percentage}%`,
-                    background: scoreAAVisual.gradient,
-                    boxShadow: `0 10px 22px ${scoreAAVisual.glow}`
-                  }"
-                ></div>
+              <div class="h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden shadow-inner">
+                <div class="h-full rounded-full transition-all duration-300" :style="{ width: `${scoreAAVisual.percentage}%`, background: scoreAAVisual.gradient, boxShadow: `0 0 12px ${scoreAAVisual.glow}` }"></div>
               </div>
-              <div class="score-card__footer">
-                <span class="score-card__percent">{{ scoreAAVisual.percentage }}%</span>
-                <span class="score-card__hint">{{ scoreAAVisual.recommendation }}</span>
+              <div class="flex items-center gap-2 mt-2">
+                <span :class="['text-sm font-bold', scoreAAVisual.textClass]">{{ scoreAAVisual.label }}</span>
+                <span class="text-xs text-slate-400 dark:text-slate-500">{{ scoreAAVisual.percentage }}%</span>
+                <span class="text-xs text-slate-500 dark:text-slate-400">{{ scoreAAVisual.recommendation }}</span>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-
-</fieldset>
-<section>
-<fieldset class="border p-3 rounded mb-2">
-  <legend class="float-none w-auto px-2">Campos</legend>
-    <form id="formularioGenerar" action="" method="">
-         <div class="box-body">
-
-        <div class="tabs-shell">
-          <div class="tabs-shell__top">
-            <div class="tabs-shell__copy">
-              <span class="tabs-shell__eyebrow">Secciones del expediente</span>
-              <h3 class="tabs-shell__title">Edicion del financiamiento</h3>
-            </div>
-            <div class="tabs-shell__steps">
-              <Button @click="value = '0'" rounded label="1" class="w-8 h-8 p-0" :outlined="value !== '0'" />
-              <Button @click="value = '1'" rounded label="2" class="w-8 h-8 p-0" :outlined="value !== '1'" />
-              <Button @click="value = '2'" rounded label="3" class="w-8 h-8 p-0" :outlined="value !== '2'" />
-              <Button @click="value = '3'" rounded label="4" class="w-8 h-8 p-0" :outlined="value !== '3'" />
-              <Button @click="value = '4'" rounded label="5" class="w-8 h-8 p-0" :outlined="value !== '4'" />
-              <Button @click="value = '5'" rounded label="6" class="w-8 h-8 p-0" :outlined="value !== '5'" />
-              <Button @click="value = '6'" rounded label="7" class="w-8 h-8 p-0" :outlined="value !== '6'" />
-              <Button @click="value = '7'" rounded label="8" class="w-8 h-8 p-0" :outlined="value !== '7'" />
-              <Button @click="value = '8'" rounded label="9" class="w-8 h-8 p-0" :outlined="value !== '8'" />
-            </div>
-          </div>
-
-        <Tabs v-model:value="value" scrollable>
+      <!-- FORM TABS -->
+      <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div class="border-b border-slate-200 dark:border-slate-700 px-5 py-3 bg-slate-50 dark:bg-slate-800/50">
+          <Tabs v-model:value="value" class="custom-tabs">
             <TabList>
-                <Tab value="0">Datos del Cliente</Tab>
-                <Tab value="1">Datos Solicitud</Tab>
-                <Tab value="2">Datos Garante</Tab>
-                <Tab value="3">Artículos</Tab>
-                <Tab value="4">Documentos</Tab>
-                <Tab value="5">Condiciones</Tab>
-                <Tab value="6">Entrega</Tab>
-                <Tab value="7">Pagos</Tab>
-                <Tab value="8">Documentos a Generar</Tab>
+              <Tab value="0"><i class="pi pi-user mr-2"></i>Cliente</Tab>
+              <Tab value="1"><i class="pi pi-file-edit mr-2"></i>Solicitud</Tab>
+              <Tab value="2"><i class="pi pi-users mr-2"></i>Garante</Tab>
+              <Tab value="3"><i class="pi pi-box mr-2"></i>Articulos</Tab>
+              <Tab value="4"><i class="pi pi-file mr-2"></i>Docs</Tab>
+              <Tab value="5"><i class="pi pi-chart-line mr-2"></i>Condiciones</Tab>
+              <Tab value="6"><i class="pi pi-truck mr-2"></i>Entrega</Tab>
+              <Tab value="7"><i class="pi pi-dollar mr-2"></i>Pagos</Tab>
+              <Tab value="8"><i class="pi pi-print mr-2"></i>Docs Generar</Tab>
+              <Tab value="9"><i class="pi pi-check-circle mr-2"></i>Finalizar</Tab>
             </TabList>
+          </Tabs>
+        </div>
+        <form id="formularioGenerar" action="" method="">
+          <Tabs v-model:value="value" scrollable>
             <TabPanels>
-                <TabPanel value="0">
-                  <div class="p-4 space-y-6" id="campos">
+              <TabPanel value="0">
+                <div class="p-6 space-y-6" id="campos">
                     <div class="section-card">
                       <div class="section-card__header section-card__header--blue"><i class="pi pi-user text-2xl"></i><h3 class="text-lg font-bold">Información del Cliente</h3></div>
                       <div class="section-card__body"><div class="grid grid-cols-12 gap-4">
@@ -1138,32 +1358,150 @@ const generarRecibo = async () => {
 
                 </TabPanel>
                 <TabPanel value="7">
-                  
-<div class="grid grid-cols-12 gap-4 mt-4 text-blue-600" >
-<div class="col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12 2xl:col-span-12">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-400" for="estado_financiamiento">ESTADO_FINANCIAMIENTO</label>
-                    <Dropdown fluid editable v-model="datoscampos.estado_financiamiento" :options="['AL DIA','EN ATRASO','EN LEGAL','FINALIZADO']" placeholder="Seleccione estado_financiamiento" class="w-full" />
-            </div>
-<div class="col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12 2xl:col-span-12">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-400" for="historial_pagos">HISTORIAL_PAGOS</label>
-                      <TablaJSON 
-                      :productos="datoscampos.historial_pagos" 
-                      tableId="tablaHistorialPago"
-                       />
-<!--                      <div class="table-responsive border p-3 rounded mb-2 overflow-x-auto">
-                      <div v-html="generarTablaFromStringJSON(datoscampos.historial_pagos)" class="border p-3 rounded mb-2">
+                  <div class="p-4 space-y-6">
+                    <!-- Resumen de Pagos -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div class="bg-white dark:bg-gray-800 rounded-lg border border-slate-200 dark:border-slate-700 p-4 text-center">
+                        <span class="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Monto Total</span>
+                        <strong class="block text-2xl mt-1 text-slate-900 dark:text-slate-100">RD$ {{ parseFloat(datoscampos.monto_total || 0).toLocaleString('es-DO', { minimumFractionDigits: 2 }) }}</strong>
                       </div>
-                     </div> -->
-                   </div>
-<div class="col-span-12 sm:col-span-12 md:col-span-12 lg:col-span-12 xl:col-span-12 2xl:col-span-12">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-400" for="comentario">COMENTARIO</label>
-                   <Textarea fluid id="actualizarcomentario"  v-model="datoscampos.comentario" name="comentario" rows="3" class="form-textarea w-full " placeholder="Enter Comentario"></textarea>
-                </div>
-                </div>
+                      <div class="bg-white dark:bg-gray-800 rounded-lg border border-slate-200 dark:border-slate-700 p-4 text-center">
+                        <span class="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Abonado</span>
+                        <strong class="block text-2xl mt-1 text-green-600 dark:text-green-400">RD$ {{ parseFloat(datoscampos.total_abonado || 0).toLocaleString('es-DO', { minimumFractionDigits: 2 }) }}</strong>
+                      </div>
+                      <div class="bg-white dark:bg-gray-800 rounded-lg border border-slate-200 dark:border-slate-700 p-4 text-center">
+                        <span class="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Pendiente</span>
+                        <strong class="block text-2xl mt-1 text-red-600 dark:text-red-400">RD$ {{ parseFloat(datoscampos.total_pendiente || 0).toLocaleString('es-DO', { minimumFractionDigits: 2 }) }}</strong>
+                      </div>
+                      <div class="bg-white dark:bg-gray-800 rounded-lg border border-slate-200 dark:border-slate-700 p-4 text-center">
+                        <span class="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Progreso</span>
+                        <div class="mt-2">
+                          <span class="block text-2xl font-bold text-blue-600 dark:text-blue-400">{{ datoscampos.monto_total > 0 ? Math.round((parseFloat(datoscampos.total_abonado || 0) / parseFloat(datoscampos.monto_total)) * 100) : 0 }}%</span>
+                          <div class="h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden mt-1">
+                            <div class="h-full rounded-full bg-blue-500 transition-all" :style="{ width: (datoscampos.monto_total > 0 ? Math.min(Math.round((parseFloat(datoscampos.total_abonado || 0) / parseFloat(datoscampos.monto_total)) * 100), 100) : 0) + '%' }"></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
 
+                    <!-- Estado y proximo pago -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1" for="estado_financiamiento">Estado del Financiamiento</label>
+                        <Dropdown fluid editable v-model="datoscampos.estado_financiamiento" :options="['AL DIA','EN ATRASO','EN LEGAL','FINALIZADO']" placeholder="Seleccione estado" class="w-full" />
+                      </div>
+                      <div class="grid grid-cols-2 gap-4">
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">Proxima Cuota</label>
+                          <InputText fluid v-model="datoscampos.proxima_cuota" placeholder="Monto proxima cuota" />
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">Proximo Pago</label>
+                          <InputText fluid v-model="datoscampos.proximo_pago" placeholder="Fecha proximo pago" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Historial de Pagos -->
+                    <div>
+                      <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-3 flex items-center gap-2">
+                        <i class="pi pi-history text-blue-500"></i> Historial de Pagos
+                      </h3>
+                      <div class="bg-white dark:bg-gray-800 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                        <TablaJSON
+                          :productos="datoscampos.historial_pagos"
+                          :onEditar="editarPago"
+                          :onEliminar="eliminarPago"
+                          :onClickProducto="() => {}"
+                          :indice="true"
+                          :botones="true"
+                          tableId="tablaHistorialPago"
+                        />
+                      </div>
+                    </div>
+
+                    <!-- Comentario -->
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1" for="comentario">Comentario</label>
+                      <Textarea fluid id="actualizarcomentario" v-model="datoscampos.comentario" name="comentario" rows="3" class="w-full" placeholder="Agregar comentario..." />
+                    </div>
+                  </div>
                 </TabPanel>
 
                 <TabPanel value="8">
+                  <div class="p-6">
+                    <div class="text-center mb-6">
+                      <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-2">
+                        <i class="pi pi-file-pdf text-red-500 mr-2"></i>
+                        Documentos del Financiamiento
+                      </h2>
+                      <p class="text-gray-600 dark:text-gray-400">Genere los documentos legales y administrativos necesarios</p>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden border-t-4 border-blue-500">
+                        <div class="p-6">
+                          <div class="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-blue-100 dark:bg-blue-900 rounded-full">
+                            <i class="pi pi-file-edit text-3xl text-blue-600 dark:text-blue-300"></i>
+                          </div>
+                          <h3 class="text-lg font-bold text-center text-gray-800 dark:text-gray-200 mb-2">Pagare</h3>
+                          <p class="text-sm text-center text-gray-600 dark:text-gray-400 mb-4">Documento de compromiso de pago</p>
+                          <Button label="Generar PDF" @click="generarPagarePDF" severity="info" fluid icon="pi pi-download" class="mt-2" />
+                        </div>
+                      </div>
+                      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden border-t-4 border-purple-500">
+                        <div class="p-6">
+                          <div class="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-purple-100 dark:bg-purple-900 rounded-full">
+                            <i class="pi pi-book text-3xl text-purple-600 dark:text-purple-300"></i>
+                          </div>
+                          <h3 class="text-lg font-bold text-center text-gray-800 dark:text-gray-200 mb-2">Contrato</h3>
+                          <p class="text-sm text-center text-gray-600 dark:text-gray-400 mb-4">Contrato de financiamiento</p>
+                          <Button label="Generar PDF" severity="help" fluid icon="pi pi-download" class="mt-2" />
+                        </div>
+                      </div>
+                      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden border-t-4 border-green-500">
+                        <div class="p-6">
+                          <div class="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-green-100 dark:bg-green-900 rounded-full">
+                            <i class="pi pi-file-check text-3xl text-green-600 dark:text-green-300"></i>
+                          </div>
+                          <h3 class="text-lg font-bold text-center text-gray-800 dark:text-gray-200 mb-2">Solicitud</h3>
+                          <p class="text-sm text-center text-gray-600 dark:text-gray-400 mb-4">Formulario de solicitud</p>
+                          <Button label="Generar PDF" @click="fnGenerarSolicitud" severity="success" fluid icon="pi pi-download" class="mt-2" />
+                        </div>
+                      </div>
+                      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden border-t-4 border-orange-500">
+                        <div class="p-6">
+                          <div class="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-orange-100 dark:bg-orange-900 rounded-full">
+                            <i class="pi pi-verified text-3xl text-orange-600 dark:text-orange-300"></i>
+                          </div>
+                          <h3 class="text-lg font-bold text-center text-gray-800 dark:text-gray-200 mb-2">Autorizacion</h3>
+                          <p class="text-sm text-center text-gray-600 dark:text-gray-400 mb-4">Documento de autorizacion</p>
+                          <Button label="Generar PDF" @click="generarAutorizacionPDF" severity="warning" fluid icon="pi pi-download" class="mt-2" />
+                        </div>
+                      </div>
+                      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden border-t-4 border-cyan-500">
+                        <div class="p-6">
+                          <div class="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-cyan-100 dark:bg-cyan-900 rounded-full">
+                            <i class="pi pi-shield text-3xl text-cyan-600 dark:text-cyan-300"></i>
+                          </div>
+                          <h3 class="text-lg font-bold text-center text-gray-800 dark:text-gray-200 mb-2">Seguro</h3>
+                          <p class="text-sm text-center text-gray-600 dark:text-gray-400 mb-4">Poliza de seguro</p>
+                          <Button label="Generar PDF" severity="secondary" fluid icon="pi pi-download" class="mt-2" />
+                        </div>
+                      </div>
+                      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden border-t-4 border-indigo-500">
+                        <div class="p-6">
+                          <div class="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-indigo-100 dark:bg-indigo-900 rounded-full">
+                            <i class="pi pi-table text-3xl text-indigo-600 dark:text-indigo-300"></i>
+                          </div>
+                          <h3 class="text-lg font-bold text-center text-gray-800 dark:text-gray-200 mb-2">Tabla de Amortizacion</h3>
+                          <p class="text-sm text-center text-gray-600 dark:text-gray-400 mb-4">Detalle de cuotas y pagos</p>
+                          <Button label="Generar PDF" @click="generarPlanPagoPDF" severity="contrast" fluid icon="pi pi-download" class="mt-2" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </TabPanel>
+                <TabPanel value="9">
 <div class="grid grid-cols-12 gap-4 mt-4 text-blue-600" >
 
         <div class="hidden col-span-12">
@@ -1187,16 +1525,13 @@ const generarRecibo = async () => {
   </div>
                 </TabPanel>
             </TabPanels>
-</Tabs >
-        </div>
-
+        </Tabs>
+        </form>
+      </div>
+    </div>
   </div>
-   </form>
-   </fieldset>
-</section>
-  </div>
-   </main>
-<Toast />
+  <Toast />
+</main>
 </template>
 <style scoped>
 .finance-header {

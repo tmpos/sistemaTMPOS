@@ -480,13 +480,15 @@ const buildTicketHtml = ({
             </div>
             ` : ''}
 
-            <div id="qrcode" class="qr-code ">
+            ${!datosDGII && qrCodeData ? `
+            <div id="qrcode" class="qr-code">
                 <center>
                   <div class="bordeado2">
                    <img src="${qrCodeData}" alt="Codigo QR" width="150" height="150"/>
-                   <div>
+                   </div>
                  </center>
             </div>
+            ` : ''}
 
         </div>
     </body>
@@ -578,18 +580,27 @@ const printTicket = async ({ factura, cliente, datosEmpresa }) => {
   let datosDGII = null
   let qrCodeDGII = ''
   try {
-    if (datosOtro && Array.isArray(datosOtro) && datosOtro.length > 0) {
-      const primerElemento = datosOtro[0]
-      const qrUrlDGII = primerElemento.documentStampUrl || primerElemento.qr_url
-      const ecfDGII = primerElemento.ecf || primerElemento.encf
+    const primerElemento = Array.isArray(datosOtro) ? datosOtro[0] : datosOtro
+    if (primerElemento && typeof primerElemento === 'object') {
+      const respuestaAlanube =
+        primerElemento.alanubeResponse && typeof primerElemento.alanubeResponse === 'object'
+          ? primerElemento.alanubeResponse
+          : {}
+      const datosElectronicos = {
+        ...respuestaAlanube,
+        ...primerElemento
+      }
+      const qrUrlDGII = datosElectronicos.documentStampUrl
+      const ecfDGII =
+        datosElectronicos.documentNumber || datosElectronicos.ecf || datosElectronicos.encf
       if (qrUrlDGII && ecfDGII) {
         datosDGII = {
-          rnc: primerElemento.rnc || primerElemento.companyIdentification,
+          rnc: datosElectronicos.rnc || datosElectronicos.companyIdentification,
           ecf: ecfDGII,
-          internalTrackId: primerElemento.internalTrackId || primerElemento.id,
-          securityCode: primerElemento.securityCode,
+          internalTrackId: datosElectronicos.internalTrackId || datosElectronicos.id,
+          securityCode: datosElectronicos.securityCode,
           qr_url: qrUrlDGII,
-          signedDate: primerElemento.signedDate || primerElemento.signatureDate
+          signedDate: datosElectronicos.signedDate || datosElectronicos.signatureDate
         }
         // Generar QR de DGII
         qrCodeDGII = await QRCode.toDataURL(datosDGII.qr_url)

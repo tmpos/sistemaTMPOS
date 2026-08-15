@@ -251,6 +251,16 @@ const fnAwesomplete = ()=>{
 }
 const handleSelectComplete = async(selected)=>{
 }
+const getStatusSeverity = (estado) => {
+  const map = {
+    'AL DIA': 'success',
+    'ATRASADO': 'danger',
+    'PENDIENTE': 'warn',
+    'PAGADO': 'success',
+    'CANCELADO': 'contrast'
+  }
+  return map[estado] || 'info'
+}
 /************************************************************************/
 const onRowSelect = (event) => {
  router.push({ path: `/editarfinanciamientos/${event.data.id}` });
@@ -260,52 +270,52 @@ const onRowSelect = (event) => {
 </script>
 <template>
 <main class="content-wrapper">
-  <div class="mt-5">
-<Card>
-      <template #content>
-<div class="flex flex-col space-y-4">
-<div class="w-full">
-<fieldset class="border p-3 rounded-md mb-2">
-  <legend class="px-2">Datos de Financiamientos</legend>
-  <div class="flex items-center">
-    <div class="flex space-x-2">
-      <Button icon="pi pi-refresh" severity="primary" @click="fetchAndSetupData" data-toggle="tooltip" title="Recargar" id="reload" />
-      <Button as="router-link" icon="pi pi-plus-circle" to="/crearfinanciamientos" class="ms-1" />
-      <Button icon="pi pi-trash" severity="danger" @click="borrarSeleccionados" data-toggle="tooltip" title="Borrar Selección" id="borrador" />
-    </div>
-    <div class="ml-auto">
-      <Button
-        v-if="datosEmpresa.usuario.nivel_seguridad == 'Soporte'"
-        label="Borrar Todo"
-        icon="pi pi-trash"
-        severity="danger"
-        @click="borrarTodo"
-        id="borrartodo"
-      />
-    </div>
-  </div>
-</fieldset>
-</div>
+  <div class="p-4 md:p-6">
+    <div class="flex flex-col gap-6">
 
-      <div class="w-full">
-        <div class="flex justify-end mb-4">
-          <InputText v-model="searchQuery" placeholder="Buscar financiamientos..." class="p-inputtext p-component" />
+      <!-- HEADER -->
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Financiamientos</h1>
+          <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Gestion de solicitudes, aprobaciones y seguimiento</p>
         </div>
+        <div class="flex items-center gap-2">
+          <span class="p-input-icon-left">
+            <i class="pi pi-search" />
+            <InputText v-model="searchQuery" placeholder="Buscar por nombre, cedula o No...." class="p-inputtext-sm" />
+          </span>
+          <Button icon="pi pi-refresh" severity="secondary" v-tooltip.top="'Recargar'" @click="fetchAndSetupData" />
+          <Button as="router-link" icon="pi pi-plus" label="Nuevo" to="/crearfinanciamientos" />
+          <Button icon="pi pi-trash" severity="danger" v-tooltip.top="'Borrar seleccion'" @click="borrarSeleccionados" />
+          <Button
+            v-if="datosEmpresa.usuario.nivel_seguridad == 'Soporte'"
+            label="Borrar Todo"
+            icon="pi pi-trash"
+            severity="danger"
+            @click="borrarTodo"
+          />
+        </div>
+      </div>
+
+      <!-- TABLE -->
+      <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
         <DataTable
           :value="filteredFinanciamientos"
           scrollable
-          scrollHeight="600px"
+          scrollHeight="calc(100vh - 280px)"
           dataKey="id"
           paginator
-          :rows="10"
+          :rows="15"
           size="small"
-          resizableColumns 
+          resizableColumns
           columnResizeMode="fit"
           v-model:selection="selectedItems"
           @rowSelect="onRowSelect"
           selectionMode="multiple"
-          :rowsPerPageOptions="[5, 10, 20, 50]"
-          tableStyle="min-width: 50rem">
+          :rowsPerPageOptions="[10, 15, 25, 50]"
+          tableStyle="min-width: 60rem"
+          class="p-datatable-sm"
+          stripedRows>
         <Column selectionMode="multiple" headerStyle="width: 3rem">
         <template #body="{ data }">
              <div @click.stop>
@@ -330,87 +340,36 @@ const onRowSelect = (event) => {
               />
             </template>
           </Column>
-          <Column field="cedula_cliente" header="Cedula_cliente"></Column>
-<Column field="nombre_cliente" header="Nombre_cliente"></Column>
-<Column field="telefono_cliente" header="Telefono_cliente"></Column>
-<Column field="whatsapp_cliente" header="Whatsapp_cliente"></Column>
-<Column field="email_cliente" header="Email_cliente"></Column>
-<Column field="direccion_cliente" header="Direccion_cliente"></Column>
-<Column field="referencia_direccion_cliente" header="Referencia_direccion_cliente"></Column>
-<Column field="fecha_nacimiento" header="Fecha_nacimiento"></Column>
-<Column field="edad_cliente" header="Edad_cliente"></Column>
-<Column field="estado_civil" header="Estado_civil"></Column>
-<Column field="nombre_conyugue" header="Nombre_conyugue"></Column>
-<Column field="telefono_conyugue" header="Telefono_conyugue"></Column>
-<Column field="ocupcion" header="Ocupcion"></Column>
-<Column field="salario" header="Salario"></Column>
-<Column field="tiempo_laborando" header="Tiempo_laborando"></Column>
-<Column field="tipo_empresa" header="Tipo_empresa"></Column>
-<Column field="empresa_labora" header="Empresa_labora"></Column>
-<Column field="contacto_empresa" header="Contacto_empresa"></Column>
-<Column field="ingresos_adicionales" header="Ingresos_adicionales"></Column>
-<Column field="tipo_vivienda" header="Tipo_vivienda"></Column>
-<Column field="vehiculo" header="Vehiculo"></Column>
-<Column field="cantidad_hijos" header="Cantidad_hijos"></Column>
-<Column field="cantidad_dependientes" header="Cantidad_dependientes"></Column>
-<Column field="referencia_familiar1" header="Referencia_familiar1"></Column>
-<Column field="contacto_familiar1" header="Contacto_familiar1"></Column>
-<Column field="referencia_familiar2" header="Referencia_familiar2"></Column>
-<Column field="contacto_familiar2" header="Contacto_familiar2"></Column>
-<Column field="referencia_personal1" header="Referencia_personal1"></Column>
-<Column field="contacto_personal1" header="Contacto_personal1"></Column>
-<Column field="referencia_personal2" header="Referencia_personal2"></Column>
-<Column field="contacto_personal2" header="Contacto_personal2"></Column>
-<Column field="redes_solciales" header="Redes_solciales"></Column>
-<Column field="no_financiamiento" header="No_financiamiento"></Column>
-<Column field="fecha_solicitud" header="Fecha_solicitud"></Column>
-<Column field="hora_emision" header="Hora_emision"></Column>
-<Column field="etapa_solicitud" header="Etapa_solicitud"></Column>
-<Column field="score_aa" header="Score_aa"></Column>
-<Column field="agente" header="Agente"></Column>
-<Column field="resultados_prospecto" header="Resultados_prospecto"></Column>
-<Column field="resultado_analisis" header="Resultado_analisis"></Column>
-<Column field="motivo" header="Motivo"></Column>
-<Column field="cedula_garante" header="Cedula_garante"></Column>
-<Column field="nombre_garante" header="Nombre_garante"></Column>
-<Column field="telefono_garante" header="Telefono_garante"></Column>
-<Column field="whatsapp_garante" header="Whatsapp_garante"></Column>
-<Column field="email_garante" header="Email_garante"></Column>
-<Column field="vinculo_deudor" header="Vinculo_deudor"></Column>
-<Column field="direccion_garante" header="Direccion_garante"></Column>
-<Column field="referencia_direccion_garante" header="Referencia_direccion_garante"></Column>
-<Column field="articulos" header="Articulos"></Column>
-<Column field="inicial" header="Inicial"></Column>
-<Column field="capital" header="Capital"></Column>
-<Column field="tasa_interes" header="Tasa_interes"></Column>
-<Column field="interes_total" header="Interes_total"></Column>
-<Column field="no_cuotas" header="No_cuotas"></Column>
-<Column field="valor_cuotas" header="Valor_cuotas"></Column>
-<Column field="gastos_legales" header="Gastos_legales"></Column>
-<Column field="monto_total" header="Monto_total"></Column>
-<Column field="total_abonado" header="Total_abonado"></Column>
-<Column field="total_pendiente" header="Total_pendiente"></Column>
-<Column field="frecuencia_pago" header="Frecuencia_pago"></Column>
-<Column field="fechas_pago" header="Fechas_pago"></Column>
-<Column field="proximo_pago" header="Proximo_pago"></Column>
-<Column field="prorrateo" header="Prorrateo"></Column>
-<Column field="proxima_cuota" header="Proxima_cuota"></Column>
-<Column field="fecha_entrega" header="Fecha_entrega"></Column>
-<Column field="responsable_entrega" header="Responsable_entrega"></Column>
-<Column field="cobrador_asignado" header="Cobrador_asignado"></Column>
-<Column field="geolocalizacion" header="Geolocalizacion"></Column>
-<Column field="estado_financiamiento" header="Estado_financiamiento"></Column>
-<Column field="historial_pagos" header="Historial_pagos"></Column>
-<Column field="comentario" header="Comentario"></Column>
-<Column field="imagen" header="Imagen"></Column>
+          <Column field="no_financiamiento" header="No."></Column>
+          <Column field="nombre_cliente" header="Cliente"></Column>
+          <Column field="cedula_cliente" header="Cedula"></Column>
+          <Column field="telefono_cliente" header="Telefono"></Column>
+          <Column field="capital" header="Capital">
+            <template #body="{ data }">
+              <span class="font-semibold">RD$ {{ parseFloat(data.capital || 0).toLocaleString('es-DO', { minimumFractionDigits: 2 }) }}</span>
+            </template>
+          </Column>
+          <Column field="total_pendiente" header="Pendiente">
+            <template #body="{ data }">
+              <span :class="parseFloat(data.total_pendiente) > 0 ? 'text-red-600 font-bold' : 'text-green-600 font-bold'">
+                RD$ {{ parseFloat(data.total_pendiente || 0).toLocaleString('es-DO', { minimumFractionDigits: 2 }) }}
+              </span>
+            </template>
+          </Column>
+          <Column field="no_cuotas" header="Cuotas"></Column>
+          <Column field="frecuencia_pago" header="Frecuencia"></Column>
+          <Column field="fecha_solicitud" header="Solicitud"></Column>
+          <Column field="agente" header="Agente"></Column>
+          <Column field="estado_financiamiento" header="Estado">
+            <template #body="{ data }">
+              <Tag :severity="getStatusSeverity(data.estado_financiamiento)" :value="data.estado_financiamiento" />
+            </template>
+          </Column>
         </DataTable>
       </div>
-    </div>
-      </template>
-</Card>
 
-<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
-<Toast />
+    </div>
+    <Toast />
   </div>
 </main>
 </template>

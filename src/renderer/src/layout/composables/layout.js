@@ -129,8 +129,7 @@ export function useLayout() {
   }
 
   const verificaLocalStorage = () => {
-    const savedTheme =
-      localStorage.getItem(LAYOUT_STORAGE_KEY) || localStorage.getItem('theme')
+    const savedTheme = localStorage.getItem(LAYOUT_STORAGE_KEY) || localStorage.getItem('theme')
     const customTheme = localStorage.getItem('custom_theme_config')
     if (customTheme) {
       try {
@@ -152,8 +151,7 @@ export function useLayout() {
             ? datosConfig.darktheme
             : layoutConfig.darkTheme
 
-      const tipoGuardado =
-        datosConfig.tipo || (darkThemeGuardado ? 'dark' : 'light')
+      const tipoGuardado = datosConfig.tipo || (darkThemeGuardado ? 'dark' : 'light')
 
       // Aplicar cada propiedad de la configuración guardada
       layoutConfig.preset = datosConfig.preset || layoutConfig.preset

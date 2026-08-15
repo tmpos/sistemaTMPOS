@@ -742,8 +742,8 @@ export function getDataAsArrayLazy(tabla, opciones = {}) {
     // Búsqueda global
     if (search && Array.isArray(searchFields) && searchFields.length > 0) {
       const camposValidos = searchFields
-        .filter(c => /^[a-zA-Z0-9_]+$/.test(c))
-        .map(c => `IFNULL(${c}, '')`)
+        .filter((c) => /^[a-zA-Z0-9_]+$/.test(c))
+        .map((c) => `IFNULL(${c}, '')`)
 
       if (camposValidos.length > 0) {
         where += ` AND (LOWER(${camposValidos.join(` || ' ' || `)}) LIKE LOWER(?))`
@@ -752,11 +752,7 @@ export function getDataAsArrayLazy(tabla, opciones = {}) {
     }
 
     // Filtro dinámico
-    if (
-      filtroCampo &&
-      filtroValor !== '' &&
-      /^[a-zA-Z0-9_]+$/.test(filtroCampo)
-    ) {
+    if (filtroCampo && filtroValor !== '' && /^[a-zA-Z0-9_]+$/.test(filtroCampo)) {
       where += ` AND LOWER(IFNULL(${filtroCampo}, '')) LIKE LOWER(?)`
       params.push(`%${filtroValor}%`)
     }
@@ -1424,7 +1420,10 @@ export async function bulkUpsertData(tabla, dataString) {
                ON CONFLICT(id) DO UPDATE SET ${updates}`
             : `INSERT OR IGNORE INTO ${tabla} (${campos.join(', ')}) VALUES (${placeholders})`
 
-          await runSQL(sql, campos.map((campo) => data[campo]))
+          await runSQL(
+            sql,
+            campos.map((campo) => data[campo])
+          )
           if (existente.length > 0) updated++
           else inserted++
         } else {
@@ -1522,7 +1521,10 @@ export function insertData(tabla, dataString) {
           console.error('Error al ejecutar la consulta:', err)
           reject(['error', err.message]) // Devuelve también el mensaje de error
         } else {
-          await registrarCambioPendiente(tabla, 'insertData', { ...data, id: data.id ?? this.lastID })
+          await registrarCambioPendiente(tabla, 'insertData', {
+            ...data,
+            id: data.id ?? this.lastID
+          })
           resolve(['ok', { id: this.lastID }]) // Devuelve el ID del registro insertado
         }
       })

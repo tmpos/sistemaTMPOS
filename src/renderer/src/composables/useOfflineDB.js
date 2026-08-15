@@ -256,10 +256,7 @@ export async function limpiarFacturasSincronizadas() {
     const database = getDB()
     if (!database.facturas_offline) return 0
 
-    const count = await database.facturas_offline
-      .where('estado')
-      .equals('sincronizada')
-      .delete()
+    const count = await database.facturas_offline.where('estado').equals('sincronizada').delete()
 
     console.log(`[OfflineDB] ${count} facturas sincronizadas eliminadas`)
     return count
@@ -282,12 +279,16 @@ export function hayInternet() {
 export async function getEstadoSincronizacion() {
   try {
     const database = getDB()
-    const [pendientesSync, facturasPendientes, usuariosCached, productosCached] = await Promise.all([
-      database.sync_queue.count(),
-      database.facturas_offline ? database.facturas_offline.where('estado').equals('pendiente_sincronizacion').count() : 0,
-      database.usuarios.count(),
-      database.productos.count()
-    ])
+    const [pendientesSync, facturasPendientes, usuariosCached, productosCached] = await Promise.all(
+      [
+        database.sync_queue.count(),
+        database.facturas_offline
+          ? database.facturas_offline.where('estado').equals('pendiente_sincronizacion').count()
+          : 0,
+        database.usuarios.count(),
+        database.productos.count()
+      ]
+    )
 
     return {
       online: hayInternet(),
@@ -330,7 +331,9 @@ export async function buscarProductosOffline(criterio, valor) {
     } catch {
       // Si el campo no está indexado, buscar en memoria
       const all = await database.productos.toArray()
-      return all.filter((prod) => String(prod[criterio]).toLowerCase().includes(String(valor).toLowerCase()))
+      return all.filter((prod) =>
+        String(prod[criterio]).toLowerCase().includes(String(valor).toLowerCase())
+      )
     }
   } catch (e) {
     console.error('[OfflineDB] buscarProductosOffline:', e)
@@ -352,9 +355,10 @@ export async function getProductoOffline(busqueda) {
 
     // Intentar buscar por nombre (case insensitive)
     const todos = await database.productos.toArray()
-    producto = todos.find(p =>
-      p.nombre?.toLowerCase() === busqueda.toLowerCase() ||
-      p.codigo?.toLowerCase() === busqueda.toLowerCase()
+    producto = todos.find(
+      (p) =>
+        p.nombre?.toLowerCase() === busqueda.toLowerCase() ||
+        p.codigo?.toLowerCase() === busqueda.toLowerCase()
     )
 
     return producto || null
@@ -418,7 +422,9 @@ export async function getCachedByCondition(tabla, campo, valor) {
     const valorNormalizado = String(valor).trim().toLowerCase()
 
     return all.filter((reg) => {
-      const valorReg = String(reg[campo] || '').trim().toLowerCase()
+      const valorReg = String(reg[campo] || '')
+        .trim()
+        .toLowerCase()
       return valorReg === valorNormalizado
     })
   } catch (e) {
@@ -461,7 +467,9 @@ export async function getDataAsArrayLazy(tabla, opciones = {}) {
     // Aplicar filtro de campo simple
     if (filtroCampo && filtroValor) {
       registros = registros.filter((reg) => {
-        const valorReg = String(reg[filtroCampo] || '').trim().toLowerCase()
+        const valorReg = String(reg[filtroCampo] || '')
+          .trim()
+          .toLowerCase()
         const valorBuscar = String(filtroValor).trim().toLowerCase()
         return valorReg === valorBuscar
       })
@@ -472,7 +480,9 @@ export async function getDataAsArrayLazy(tabla, opciones = {}) {
       filtros.forEach((filtro) => {
         if (filtro.campo && filtro.valor !== undefined) {
           registros = registros.filter((reg) => {
-            const valorReg = String(reg[filtro.campo] || '').trim().toLowerCase()
+            const valorReg = String(reg[filtro.campo] || '')
+              .trim()
+              .toLowerCase()
             const valorBuscar = String(filtro.valor).trim().toLowerCase()
             return valorReg === valorBuscar || valorReg.includes(valorBuscar)
           })
@@ -494,7 +504,9 @@ export async function getDataAsArrayLazy(tabla, opciones = {}) {
       const termino = search.trim().toLowerCase()
       registros = registros.filter((reg) => {
         return searchFields.some((campo) => {
-          const valor = String(reg[campo] || '').trim().toLowerCase()
+          const valor = String(reg[campo] || '')
+            .trim()
+            .toLowerCase()
           return valor.includes(termino)
         })
       })

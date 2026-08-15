@@ -19,10 +19,7 @@ const generarGanancias = (productos, productosArray = []) => {
 
     const cantidad = parseFloat(prod.cantidad) || 1
     const precioVenta =
-      parseFloat(prod.precio_venta) ||
-      parseFloat(prod.precio_final) ||
-      parseFloat(prod.precio) ||
-      0
+      parseFloat(prod.precio_venta) || parseFloat(prod.precio_final) || parseFloat(prod.precio) || 0
 
     let precioCompra = 0
 
@@ -139,7 +136,12 @@ const aplicarDistribucionUtilidadesVenta = async ({ data, ganancia, datosUsuario
         const montoAsignado = Number(((baseMonto * porcentaje) / 100).toFixed(2))
         if (montoAsignado <= 0) continue
 
-        const cuentaRaw = await peticionesFetchOffline('getDataByField', 'cuentas', 'id', regla.id_cuenta)
+        const cuentaRaw = await peticionesFetchOffline(
+          'getDataByField',
+          'cuentas',
+          'id',
+          regla.id_cuenta
+        )
         const cuenta = obtenerRegistro(cuentaRaw)
         if (!cuenta?.id) continue
 
@@ -161,7 +163,8 @@ const aplicarDistribucionUtilidadesVenta = async ({ data, ganancia, datosUsuario
             porcentaje,
             monto_asignado: montoAsignado,
             no_factura: data.nofactura,
-            usuario: data.cajeroFN || data.vendedorFN || datosUsuarioLocal?.[0]?.usuario || 'SISTEMA',
+            usuario:
+              data.cajeroFN || data.vendedorFN || datosUsuarioLocal?.[0]?.usuario || 'SISTEMA',
             created_at: nfecha('timestamp'),
             updated_at: nfecha('timestamp')
           }

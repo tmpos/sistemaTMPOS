@@ -43,13 +43,13 @@
  * @returns {Promise<string>} Token de autenticación
  */
 const authenticate = async (environment = 'TesteCF', credentials = {}) => {
-  const host = `https://ecf.api.mseller.app/${environment}`;
-  const loginUrl = `${host}/customer/authentication`;
+  const host = `https://ecf.api.mseller.app/${environment}`
+  const loginUrl = `${host}/customer/authentication`
 
   const loginData = {
     email: credentials.email || '',
     password: credentials.password || ''
-  };
+  }
 
   try {
     const loginResponse = await fetch(loginUrl, {
@@ -58,19 +58,19 @@ const authenticate = async (environment = 'TesteCF', credentials = {}) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(loginData)
-    });
+    })
 
     if (!loginResponse.ok) {
-      throw new Error('Error al iniciar sesión en DGII');
+      throw new Error('Error al iniciar sesión en DGII')
     }
 
-    const loginResult = await loginResponse.json();
-    return loginResult.idToken;
+    const loginResult = await loginResponse.json()
+    return loginResult.idToken
   } catch (error) {
-    console.error('Error en autenticación DGII:', error);
-    throw error;
+    console.error('Error en autenticación DGII:', error)
+    throw error
   }
-};
+}
 
 /**
  * Enviar factura electrónica a DGII
@@ -79,21 +79,21 @@ const authenticate = async (environment = 'TesteCF', credentials = {}) => {
  * @returns {Promise<Object>} Respuesta de la API con RNC, ECF, código de seguridad, QR URL, etc.
  */
 export const enviarFacturaElectronica = async (datosFactura, options = {}) => {
-  const environment = options.environment || 'TesteCF';
-  const host = `https://ecf.api.mseller.app/${environment}`;
-  const apiUrl = `${host}/documentos-ecf`;
+  const environment = options.environment || 'TesteCF'
+  const host = `https://ecf.api.mseller.app/${environment}`
+  const apiUrl = `${host}/documentos-ecf`
 
   try {
     const idToken = await authenticate(environment, {
       email: options.email,
       password: options.password
-    });
+    })
 
     // Determinar el tipo de documento
-    const tipoDocumento = datosFactura.tipoNCF || '31';
-    const esFacturaConsumo = tipoDocumento === '32';
-    const esNotaCredito = tipoDocumento === '34';
-    const esNotaDebito = tipoDocumento === '33';
+    const tipoDocumento = datosFactura.tipoNCF || '31'
+    const esFacturaConsumo = tipoDocumento === '32'
+    const esNotaCredito = tipoDocumento === '34'
+    const esNotaDebito = tipoDocumento === '33'
 
     // Construir IdDoc según el tipo de documento
     const idDoc = {
@@ -103,13 +103,13 @@ export const enviarFacturaElectronica = async (datosFactura, options = {}) => {
       IndicadorMontoGravado: '0',
       TipoIngresos: datosFactura.tipoIngresos || '05',
       TipoPago: datosFactura.tipoPago || '2'
-    };
+    }
 
     // Para e-CF 31 (Factura de Crédito Fiscal) agregar campos de fecha
     if (tipoDocumento === '31') {
-      idDoc.FechaVencimientoSecuencia = datosFactura.fechaVencimientoSecuencia || '31-12-2028';
-      idDoc.FechaLimitePago = datosFactura.fechaLimitePago;
-      idDoc.TotalPaginas = 1;
+      idDoc.FechaVencimientoSecuencia = datosFactura.fechaVencimientoSecuencia || '31-12-2028'
+      idDoc.FechaLimitePago = datosFactura.fechaLimitePago
+      idDoc.TotalPaginas = 1
     }
 
     // Para e-CF 32 (Factura de Consumo) NO incluir fechas de vencimiento ni límite de pago
@@ -118,8 +118,8 @@ export const enviarFacturaElectronica = async (datosFactura, options = {}) => {
     // Para Notas de Crédito/Débito (33, 34) agregar referencia al documento original
     if (esNotaCredito || esNotaDebito) {
       if (datosFactura.documentoReferencia) {
-        idDoc.NumeroDocumentoModificado = datosFactura.documentoReferencia;
-        idDoc.FechaEmisionDocumentoModificado = datosFactura.fechaDocumentoReferencia;
+        idDoc.NumeroDocumentoModificado = datosFactura.documentoReferencia
+        idDoc.FechaEmisionDocumentoModificado = datosFactura.fechaDocumentoReferencia
       }
     }
 
@@ -162,11 +162,13 @@ export const enviarFacturaElectronica = async (datosFactura, options = {}) => {
             DescuentoMonto: item.descuento || 0,
             ...(item.descuento > 0 && {
               TablaSubDescuento: {
-                SubDescuento: [{
-                  TipoSubDescuento: '%',
-                  SubDescuentoPorcentaje: item.porcentajeDescuento || 0,
-                  MontoSubDescuento: item.descuento
-                }]
+                SubDescuento: [
+                  {
+                    TipoSubDescuento: '%',
+                    SubDescuentoPorcentaje: item.porcentajeDescuento || 0,
+                    MontoSubDescuento: item.descuento
+                  }
+                ]
               }
             }),
             MontoItem: item.total
@@ -175,43 +177,45 @@ export const enviarFacturaElectronica = async (datosFactura, options = {}) => {
         // Paginación solo para e-CF 31 (Factura de Crédito Fiscal)
         ...(tipoDocumento === '31' && {
           Paginacion: {
-            Pagina: [{
-              PaginaNo: 1,
-              NoLineaDesde: 1,
-              NoLineaHasta: datosFactura.items.length,
-              SubtotalMontoGravadoPagina: datosFactura.subtotal,
-              SubtotalMontoGravado1Pagina: datosFactura.subtotal,
-              SubtotalExentoPagina: datosFactura.montoExento || 0,
-              SubtotalItbisPagina: datosFactura.itbis,
-              SubtotalItbis1Pagina: datosFactura.itbis,
-              MontoSubtotalPagina: datosFactura.total,
-              SubtotalMontoNoFacturablePagina: 0
-            }]
+            Pagina: [
+              {
+                PaginaNo: 1,
+                NoLineaDesde: 1,
+                NoLineaHasta: datosFactura.items.length,
+                SubtotalMontoGravadoPagina: datosFactura.subtotal,
+                SubtotalMontoGravado1Pagina: datosFactura.subtotal,
+                SubtotalExentoPagina: datosFactura.montoExento || 0,
+                SubtotalItbisPagina: datosFactura.itbis,
+                SubtotalItbis1Pagina: datosFactura.itbis,
+                MontoSubtotalPagina: datosFactura.total,
+                SubtotalMontoNoFacturablePagina: 0
+              }
+            ]
           }
         }),
         FechaHoraFirma: ''
       }
-    };
+    }
 
-    console.log('📨 Objeto ECF completo a enviar:', JSON.stringify(ecfData, null, 2));
+    console.log('📨 Objeto ECF completo a enviar:', JSON.stringify(ecfData, null, 2))
 
     // Enviar a la API
     const apiResponse = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${idToken}`,
+        Authorization: `Bearer ${idToken}`,
         'x-api-key': options.apiKey || ''
       },
       body: JSON.stringify(ecfData)
-    });
+    })
 
     if (!apiResponse.ok) {
-      const errorData = await apiResponse.json();
-      throw new Error(`Error en la API de DGII: ${JSON.stringify(errorData)}`);
+      const errorData = await apiResponse.json()
+      throw new Error(`Error en la API de DGII: ${JSON.stringify(errorData)}`)
     }
 
-    const apiResult = await apiResponse.json();
+    const apiResult = await apiResponse.json()
 
     // Estructura esperada de la respuesta:
     // {
@@ -223,9 +227,9 @@ export const enviarFacturaElectronica = async (datosFactura, options = {}) => {
     //   "signedDate": "25-03-2026 01:45:29"
     // }
 
-    return apiResult;
+    return apiResult
   } catch (error) {
-    console.error('Error al enviar factura electrónica a DGII:', error);
-    throw error;
+    console.error('Error al enviar factura electrónica a DGII:', error)
+    throw error
   }
-};
+}
