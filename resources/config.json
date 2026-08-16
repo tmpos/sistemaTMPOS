@@ -44,8 +44,8 @@
   "datosDefault": "{\"logo\":true,\"direccion\":true,\"telefono\":true,\"email\":true,\"legal\":false,\"fecha\":true,\"hora\":true,\"rnc\":true,\"nombre_cliente\":true,\"vendedor\":false,\"cajero\":true,\"mesero\":false,\"instalador\":false,\"mesa\":false,\"delivery\":false,\"metodopago\":true,\"comprobante\":true,\"no_factura\":true,\"subtotal\":true,\"descuento\":true,\"impuestos\":true,\"total\":true,\"cambio\":false,\"barcode\":true,\"firma\":false,\"nota\":true,\"empaque\":false}",
   "VITE_IMPRESORA_TINTA": "",
   "VITE_IMPRESORA_TERMICA": "POS80",
-  "ONLINE": "false",
-  "OFFLINE": "true",
+  "ONLINE": "true",
+  "OFFLINE": "false",
   "HUELLA": "false",
   "subirData": "false",
   "SERVIDORLOCAL": "http://localhost:3000/api"

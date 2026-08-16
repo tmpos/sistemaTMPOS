@@ -1,4 +1,14 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, session, Menu, clipboard } from 'electron'
+import {
+  app,
+  shell,
+  BrowserWindow,
+  ipcMain,
+  dialog,
+  session,
+  Menu,
+  clipboard,
+  safeStorage
+} from 'electron'
 import { join } from 'path'
 import * as path from 'path'
 import { readFileSync, writeFileSync } from 'fs'
@@ -126,8 +136,6 @@ import { PosPrinter, PosPrintData, PosPrintOptions } from '@alvarosacari/electro
 import fs from 'fs/promises'
 
 //import Printer from 'electron-printer';
-
-import OpenAI from 'openai'
 
 let progressWin
 
@@ -664,6 +672,9 @@ function buildMenuTemplate() {
     ...(hasPermission(['Administrador', 'Soporte', 'Gerente', 'Cajero'])
       ? [crearItemMenu('Vender', '/vender')]
       : []),
+    ...(hasPermission(['Administrador', 'Soporte', 'Gerente', 'Cajero', 'Vendedor', 'Técnico'])
+      ? [crearItemMenu('Asistente AI', '/asistente-ia')]
+      : []),
     crearItemMenu('Salir', '/salir')
   ]
 
@@ -888,6 +899,100 @@ ipcMain.handle('devtools', (event) => {
   if (mainWindow) {
     mainWindow.webContents.openDevTools()
   }
+})
+/***********************************************************************/
+let pruebasVenderEnCurso = false
+
+const buscarRaizPruebasVender = () => {
+  const candidatos = [app.getAppPath(), process.cwd(), path.resolve(__dirname, '../..')]
+
+  for (const candidato of candidatos) {
+    let actual = path.resolve(candidato)
+    for (let nivel = 0; nivel < 5; nivel += 1) {
+      const packagePath = path.join(actual, 'package.json')
+      const pruebasPath = path.join(
+        actual,
+        'src',
+        'renderer',
+        'src',
+        'views',
+        'Vender',
+        '__tests__'
+      )
+      if (fsSync.existsSync(packagePath) && fsSync.existsSync(pruebasPath)) return actual
+      const padre = path.dirname(actual)
+      if (padre === actual) break
+      actual = padre
+    }
+  }
+
+  return null
+}
+
+ipcMain.handle('ejecutar-pruebas-vender', async () => {
+  if (pruebasVenderEnCurso) {
+    return { success: false, busy: true, error: 'Ya hay una ejecución de pruebas en curso.' }
+  }
+
+  const raizProyecto = buscarRaizPruebasVender()
+  if (!raizProyecto) {
+    return {
+      success: false,
+      unavailable: true,
+      error:
+        'La suite técnica no está incluida en esta instalación. Ejecútala desde una compilación que conserve la carpeta fuente del sistema.'
+    }
+  }
+
+  pruebasVenderEnCurso = true
+  const inicio = Date.now()
+
+  return await new Promise((resolve) => {
+    const comando = process.platform === 'win32' ? process.env.ComSpec || 'cmd.exe' : 'npm'
+    const argumentos =
+      process.platform === 'win32'
+        ? ['/d', '/s', '/c', 'npm.cmd test -- --run']
+        : ['test', '--', '--run']
+    const proceso = spawn(comando, argumentos, {
+      cwd: raizProyecto,
+      windowsHide: true,
+      env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0' }
+    })
+    const limiteSalida = 2 * 1024 * 1024
+    let salida = ''
+    let finalizado = false
+
+    const agregarSalida = (data) => {
+      if (salida.length >= limiteSalida) return
+      salida += String(data).slice(0, limiteSalida - salida.length)
+    }
+
+    const finalizar = (resultado) => {
+      if (finalizado) return
+      finalizado = true
+      clearTimeout(temporizador)
+      pruebasVenderEnCurso = false
+      resolve({ ...resultado, output: salida, durationMs: Date.now() - inicio })
+    }
+
+    proceso.stdout.on('data', agregarSalida)
+    proceso.stderr.on('data', agregarSalida)
+    proceso.on('error', (error) =>
+      finalizar({ success: false, error: `No se pudieron iniciar las pruebas: ${error.message}` })
+    )
+    proceso.on('close', (codigo) =>
+      finalizar({
+        success: codigo === 0,
+        exitCode: codigo,
+        error: codigo === 0 ? '' : `Las pruebas terminaron con código ${codigo}.`
+      })
+    )
+
+    const temporizador = setTimeout(() => {
+      proceso.kill()
+      finalizar({ success: false, timedOut: true, error: 'Las pruebas excedieron 2 minutos.' })
+    }, 120000)
+  })
 })
 /***********************************************************************/
 ipcMain.handle('open-external', async (event, url) => {
@@ -2510,24 +2615,116 @@ ipcMain.handle('print-html', async (event, args) => {
   }
 })
 /**************************************************************/
-/*const openai = new OpenAI({
-  //apiKey: process.env.CHATGPT_TOKEN || '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',
-  apiKey:
-    process.env.CHATGPT_TOKEN ||
-    'sk-tecnico-celulare-ySEjeF6DIF001LPLdkxoT3BlbkFJwG8Kl0tSmCrUsFVp3zVz'
-  //apiKey: process.env.CHATGPT_TOKEN || 'sk-proj-8Pycdep200QIammPoKbIT3BlbkFJ4DIUTLOwXKIWEfWufUhH',
-})*/
+const openAIConfigPath = () => join(app.getPath('userData'), 'openai-settings.json')
 
-/*const chatCompletion = openai.chat.completions.create({
-    messages: [{ role: "user", content: "Say this is a test" }],
-    model: "gpt-3.5-turbo",
-});*/
-/**************************************************************/
-// Configura tu API Key de OpenAI
+const readOpenAIConfig = async () => {
+  try {
+    const raw = await fs.readFile(openAIConfigPath(), 'utf8')
+    const config = JSON.parse(raw)
+    let apiKey = ''
+    if (config.encryptedApiKey && safeStorage.isEncryptionAvailable()) {
+      apiKey = safeStorage.decryptString(Buffer.from(config.encryptedApiKey, 'base64'))
+    }
+    return {
+      apiKey,
+      model: String(config.model || 'gpt-4.1-mini').trim() || 'gpt-4.1-mini'
+    }
+  } catch (error) {
+    if (error?.code !== 'ENOENT') console.error('No se pudo leer la configuracion de OpenAI:', error)
+    return { apiKey: '', model: 'gpt-4.1-mini' }
+  }
+}
 
-const openai = new OpenAI({
-  apiKey:
-    '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' // Reemplaza con tu clave API
+const publicOpenAIConfig = (config) => ({
+  configured: Boolean(config.apiKey),
+  model: config.model,
+  maskedKey: config.apiKey ? `${config.apiKey.slice(0, 7)}...${config.apiKey.slice(-4)}` : ''
+})
+
+ipcMain.handle('openai-config:get', async () => publicOpenAIConfig(await readOpenAIConfig()))
+
+ipcMain.handle('openai-config:save', async (_event, payload = {}) => {
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error('El cifrado seguro de Electron no esta disponible en este equipo.')
+  }
+  const current = await readOpenAIConfig()
+  const apiKey = String(payload.apiKey || current.apiKey || '').trim()
+  const model = String(payload.model || current.model || 'gpt-4.1-mini').trim()
+  if (!apiKey.startsWith('sk-')) throw new Error('La API Key de OpenAI no parece valida.')
+  if (!/^[a-zA-Z0-9._-]+$/.test(model)) throw new Error('El nombre del modelo no es valido.')
+  const encryptedApiKey = safeStorage.encryptString(apiKey).toString('base64')
+  await fs.writeFile(openAIConfigPath(), JSON.stringify({ encryptedApiKey, model }, null, 2), 'utf8')
+  return publicOpenAIConfig({ apiKey, model })
+})
+
+ipcMain.handle('openai-config:clear', async () => {
+  try {
+    await fs.unlink(openAIConfigPath())
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error
+  }
+  return { configured: false, model: 'gpt-4.1-mini', maskedKey: '' }
+})
+
+const extractResponseText = (response = {}) =>
+  (response.output || [])
+    .filter((item) => item?.type === 'message')
+    .flatMap((item) => item.content || [])
+    .filter((item) => item?.type === 'output_text')
+    .map((item) => item.text || '')
+    .join('\n')
+    .trim()
+
+ipcMain.handle('openai-assistant:request', async (_event, payload = {}) => {
+  const config = await readOpenAIConfig()
+  if (!config.apiKey) throw new Error('Configura primero una API Key de OpenAI.')
+  const input = Array.isArray(payload.input) ? payload.input.slice(-12) : []
+  if (!input.length) throw new Error('La conversacion esta vacia.')
+
+  try {
+    const { data } = await axios.post(
+      'https://api.openai.com/v1/responses',
+      {
+        model: String(payload.model || config.model).trim(),
+        instructions: String(payload.instructions || '').slice(0, 120000),
+        input,
+        tools: Array.isArray(payload.tools) ? payload.tools.slice(0, 12) : [],
+        tool_choice: 'auto',
+        temperature: 0.1,
+        store: false
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${config.apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 90000
+      }
+    )
+    const toolCalls = (data.output || [])
+      .filter((item) => item?.type === 'function_call')
+      .map((item) => ({ callId: item.call_id, name: item.name, arguments: item.arguments }))
+    return { id: data.id, text: extractResponseText(data), toolCalls }
+  } catch (error) {
+    const message = error?.response?.data?.error?.message || error.message || 'Error consultando OpenAI.'
+    console.error('Error en el asistente OpenAI:', message)
+    throw new Error(message)
+  }
+})
+
+ipcMain.handle('chatGpt', async (_event, pregunta) => {
+  const config = await readOpenAIConfig()
+  if (!config.apiKey) return 'Configura la API Key de OpenAI desde el Asistente IA.'
+  try {
+    const { data } = await axios.post(
+      'https://api.openai.com/v1/responses',
+      { model: config.model, input: String(pregunta || ''), store: false },
+      { headers: { Authorization: `Bearer ${config.apiKey}` }, timeout: 90000 }
+    )
+    return extractResponseText(data) || 'OpenAI no devolvio una respuesta.'
+  } catch (error) {
+    return error?.response?.data?.error?.message || 'No se pudo procesar la solicitud.'
+  }
 })
 
 let chatHistory = [
@@ -2538,16 +2735,12 @@ let chatHistory = [
   }
 ]
 
-ipcMain.handle('chatGpt', async (event, pregunta) => {
+ipcMain.handle('chatGptLegacy', async (event, pregunta) => {
   try {
     // Agregar el mensaje del usuario al historial
     chatHistory.push({ role: 'user', content: pregunta })
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      store: true,
-      messages: chatHistory
-    })
+    const response = { choices: [{ message: { content: 'Manejador deshabilitado.' } }] }
 
     const botResponse = response.choices[0].message.content
 
@@ -2772,8 +2965,8 @@ async function loadConfig() {
         '{"logo":true,"direccion":true,"telefono":true,"email":true,"legal":false,"fecha":true,"hora":true,"rnc":true,"nombre_cliente":true,"vendedor":false,"cajero":true,"mesero":false,"instalador":false,"mesa":false,"delivery":false,"metodopago":true,"comprobante":true,"no_factura":true,"subtotal":true,"descuento":true,"impuestos":true,"total":true,"cambio":false,"barcode":true,"firma":false,"nota":true,"empaque":false}',
       VITE_IMPRESORA_TINTA: '',
       VITE_IMPRESORA_TERMICA: 'POS80',
-      ONLINE: 'false',
-      OFFLINE: 'true',
+      ONLINE: 'true',
+      OFFLINE: 'false',
       HUELLA: 'false',
       subirData: 'false',
       SERVIDORLOCAL: 'http://localhost:3000/api'
@@ -2784,7 +2977,14 @@ async function loadConfig() {
 }
 
 function normalizeRendererConfig(config) {
-  return config
+  // La API es la única fuente de datos, incluso cuando una instalación
+  // conserva un config antiguo dentro de userData.
+  return {
+    ...config,
+    ONLINE: 'true',
+    OFFLINE: 'false',
+    subirData: 'false'
+  }
 }
 
 /**************************************************************/

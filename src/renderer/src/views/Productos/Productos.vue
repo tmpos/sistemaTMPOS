@@ -2545,6 +2545,10 @@ const fnPasarDeAlmacenIndividual = async (producto) => {
     // Cargar IMEIs disponibles
     try {
       imeisDisponibles = await peticionesFetchOffline('getDataArrayByTwoConditions', 'imei', 'id_equi', producto.id, 'estado', 'DISPONIBLE')
+      const almacenOrigen = `${producto.almacen ?? ''}`.trim().toUpperCase()
+      imeisDisponibles = (Array.isArray(imeisDisponibles) ? imeisDisponibles : []).filter(
+        imei => `${imei.almacen ?? ''}`.trim().toUpperCase() === almacenOrigen
+      )
 
       if (imeisDisponibles.length === 0) {
         Swal.fire('Sin IMEI/Seriales', 'Este producto no tiene IMEI/Seriales disponibles para transferir', 'warning')
@@ -2670,8 +2674,20 @@ const fnPasarDeAlmacenIndividual = async (producto) => {
 
       // Generar nuevos códigos para el producto duplicado
       const timestampSufijo = Date.now().toString().slice(-6)
-      const nuevoCodigo = `${producto.codigo}-T${timestampSufijo}`
-      const nuevoCodigoBarra = `${producto.codigo_barra || producto.codigo}-T${timestampSufijo}`
+      const normalizar = valor => `${valor ?? ''}`.trim().toUpperCase()
+      const productosYaEnDestino = await peticionesFetchOffline('getDataAsArray', 'productos', '')
+      const equivalentesDestino = (Array.isArray(productosYaEnDestino) ? productosYaEnDestino : []).filter(
+        p =>
+          normalizar(p.almacen) === normalizar(empresaSeleccionada) &&
+          normalizar(p.nombre) === normalizar(producto.nombre) &&
+          normalizar(p.categoria) === normalizar(producto.categoria)
+      )
+      if (equivalentesDestino.length > 1) {
+        throw new Error(`Hay ${equivalentesDestino.length} productos equivalentes en el almacén destino`)
+      }
+      const productoExistenteDestino = equivalentesDestino[0]
+      const nuevoCodigo = productoExistenteDestino?.codigo || `${producto.codigo}-T${timestampSufijo}`
+      const nuevoCodigoBarra = productoExistenteDestino?.codigo_barra || `${producto.codigo_barra || producto.codigo}-T${timestampSufijo}`
 
       // Crear producto duplicado en el almacén destino
       const productoDuplicado = {
@@ -2687,7 +2703,9 @@ const fnPasarDeAlmacenIndividual = async (producto) => {
       delete productoDuplicado.id
       delete productoDuplicado.otro
 
-      const resultadoInsercion = await peticionesFetchOffline('insertData', 'productos', JSON.stringify(productoDuplicado))
+      const resultadoInsercion = productoExistenteDestino
+        ? ['ok']
+        : await peticionesFetchOffline('insertData', 'productos', JSON.stringify(productoDuplicado))
 
       if (resultadoInsercion[0] === 'ok') {
         // Obtener el ID del nuevo producto
@@ -2704,11 +2722,10 @@ const fnPasarDeAlmacenIndividual = async (producto) => {
           }
 
           // Actualizar stock del producto original
-          const imeisRestantes = await peticionesFetchOffline('getDataArrayByTwoConditions', 'imei', 'id_equi', producto.id, 'estado', 'DISPONIBLE')
-          producto.stock = imeisRestantes.length
-          producto.updated_at = nfecha('timestamp')
-          delete producto.otro
-          await peticionesFetchOffline('updateData', 'productos', JSON.stringify(producto))
+          await sincronizarStockProductoPorImeiDisponible(producto.id)
+          await sincronizarStockProductoPorImeiDisponible(nuevoProducto.id)
+          const productoOrigenActualizado = await peticionesFetchOffline('getDataByField', 'productos', 'id', producto.id)
+          producto.stock = Number(productoOrigenActualizado?.stock || 0)
 
           Swal.fire({
             icon: 'success',

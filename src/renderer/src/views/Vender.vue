@@ -12,7 +12,10 @@
     <div class="px-4 lg:px-6">
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <!-- COLUMNA PRINCIPAL - AREA DE TRABAJO -->
-        <div class="lg:col-span-8 xl:col-span-9 space-y-6">
+        <div
+          class="space-y-6"
+          :class="['ai', 'pruebas'].includes(tabVentaActiva) ? 'lg:col-span-12' : 'lg:col-span-8 xl:col-span-9'"
+        >
           <div
             :class="
               modoSimple
@@ -84,6 +87,21 @@
                   :severity="tabVentaActiva === 'configuracion' ? 'info' : 'secondary'"
                   :outlined="tabVentaActiva !== 'configuracion'"
                   @click="seleccionarTabConfiguracion"
+                />
+                <Button
+                  label="AI"
+                  icon="pi pi-bolt"
+                  :severity="tabVentaActiva === 'ai' ? 'success' : 'secondary'"
+                  :outlined="tabVentaActiva !== 'ai'"
+                  @click="tabVentaActiva = 'ai'"
+                />
+                <Button
+                  v-show="!modoSimple"
+                  label="Pruebas"
+                  icon="pi pi-check-circle"
+                  :severity="tabVentaActiva === 'pruebas' ? 'help' : 'secondary'"
+                  :outlined="tabVentaActiva !== 'pruebas'"
+                  @click="tabVentaActiva = 'pruebas'"
                 />
               </div>
 
@@ -2106,6 +2124,14 @@
             </Card>
           </div>
 
+          <div v-if="tabVentaActiva === 'ai'" class="vender-ai-tab">
+            <AiAsistente />
+          </div>
+
+          <div v-if="tabVentaActiva === 'pruebas'" class="space-y-6">
+            <PruebasVender />
+          </div>
+
           <div v-show="tabVentaActiva === 'configuracion'" class="space-y-6">
             <!-- CARD: Configuración General -->
             <Card class="shadow-lg border border-slate-200 dark:border-slate-700">
@@ -2524,7 +2550,7 @@
         <!-- FIN COLUMNA PRINCIPAL -->
 
         <!-- COLUMNA LATERAL DERECHA - TOTALES Y ACCIONES -->
-        <div class="lg:col-span-4 xl:col-span-3">
+        <div v-show="!['ai', 'pruebas'].includes(tabVentaActiva)" class="lg:col-span-4 xl:col-span-3">
           <div class="sticky top-24 space-y-6">
             <!-- CARD: RESUMEN DE TOTALES -->
             <Card
@@ -9917,10 +9943,36 @@ import {
 } from '@/funciones/funcionesVentas.js'
 import { enviarFacturaElectronica } from '@/funciones/dgiiService.js'
 import { useDelivery } from '@/composables/useDelivery.js'
+import {
+  attachAvailableImeis,
+  buildProductCategories,
+  calculateCardSurcharge,
+  calculateDiscountOptions,
+  calculateProductDiscount,
+  calculateProductProfit,
+  calculateProductTax,
+  calculateProductTotal,
+  calculatePureProfit,
+  calculateSaleSummary,
+  calculateStoredProductsTotal,
+  createTemporaryClient,
+  distributeSurcharge,
+  filterPosProducts,
+  getCartProductQuantity,
+  getProductSalePrice,
+  getProductStock,
+  isInvoiceStateLocked,
+  mergeRecordsByCode,
+  parseStoredProducts,
+  productHasImei,
+  roundDownToInterval
+} from '@/views/Vender/venderCore.js'
 //import bcrypt from 'bcryptjs';
 //import config from '../../../../resources/config.json';
 import LoadingOverlay from '../Loading/LoadingOverlay.vue'
 import TabDelivery from '@/components/vender/TabDelivery.vue'
+import AiAsistente from '@/views/AiAsistente/AiAsistente.vue'
+import PruebasVender from '@/components/vender/PruebasVender.vue'
 import noIMG from '@/assets/img/noimagen.jpg'
 const toast = useToast()
 /****************************************************/
@@ -10092,15 +10144,7 @@ const clientesSugeridos = ref([])
 let clientesSearchToken = 0
 
 const agregarClientesACache = (clientes = []) => {
-  const mapa = new Map(allClientes.value.map((cliente) => [cliente.codigo, cliente]))
-
-  clientes
-    .filter((cliente) => cliente && cliente.codigo)
-    .forEach((cliente) => {
-      mapa.set(cliente.codigo, { ...(mapa.get(cliente.codigo) || {}), ...cliente })
-    })
-
-  allClientes.value = Array.from(mapa.values())
+  allClientes.value = mergeRecordsByCode(allClientes.value, clientes)
   itemsclientes.value = allClientes.value
 }
 
@@ -10135,27 +10179,7 @@ const buscarClientePorCampo = async (campo, valor) => {
   return null
 }
 
-const crearClienteTemporalFactura = (nombre) => {
-  const nombreCliente = String(nombre || '')
-    .trim()
-    .toUpperCase()
-  if (!nombreCliente) return null
-
-  return {
-    codigo: `TEMP-${nombreCliente.replace(/\s+/g, '-').slice(0, 20)}`,
-    nombre: nombreCliente,
-    n_comercial: nombreCliente,
-    cedula: '',
-    rnc: '',
-    telefono: '',
-    whatsapp: '',
-    email: '',
-    direccion: '',
-    precio_fijado: 'Normal',
-    tipo_cliente: 'temporal',
-    cliente_temporal: true
-  }
-}
+const crearClienteTemporalFactura = (nombre) => createTemporaryClient(nombre)
 
 const cargarClientesLazy = async ({
   search = '',
@@ -12353,60 +12377,17 @@ const ventaDetalleRequestId = ref(0)
 
 const agregarProductosACache = (productos = []) => {
   const productosConImei = anexarImeisDisponiblesAProductos(productos)
-  const mapa = new Map(productosArray.value.map((producto) => [producto.codigo, producto]))
-
-  productosConImei
-    .filter((producto) => producto && producto.codigo)
-    .forEach((producto) => {
-      mapa.set(producto.codigo, { ...(mapa.get(producto.codigo) || {}), ...producto })
-    })
-
-  productosArray.value = Array.from(mapa.values())
+  productosArray.value = mergeRecordsByCode(productosArray.value, productosConImei)
   items.value = productosArray.value
   productosArraySinModificaciones.value = JSON.parse(JSON.stringify(productosArray.value))
 }
 
 const anexarImeisDisponiblesAProductos = (productos = []) => {
-  if (!Array.isArray(productos) || productos.length === 0) {
-    return []
-  }
-
-  const mapaImeisPorProducto = new Map()
-  imeiArray.value.forEach((item) => {
-    const idEqui = String(item?.id_equi ?? '').trim()
-    const imei = String(item?.imei ?? '').trim()
-    if (!idEqui || !imei) return
-
-    if (!mapaImeisPorProducto.has(idEqui)) {
-      mapaImeisPorProducto.set(idEqui, [])
-    }
-    mapaImeisPorProducto.get(idEqui).push(imei)
-  })
-
-  return productos.map((producto) => {
-    const idProducto = String(producto?.id ?? '').trim()
-    const imeis = mapaImeisPorProducto.get(idProducto) || []
-
-    return {
-      ...producto,
-      imeis_disponibles: imeis,
-      imeis_disponibles_texto: imeis.join(',')
-    }
-  })
+  return attachAvailableImeis(productos, imeiArray.value)
 }
 
 const productoTieneImei = (producto, imeiBuscado) => {
-  const objetivo = String(imeiBuscado || '').trim()
-  if (!objetivo) return false
-
-  const imeis = Array.isArray(producto?.imeis_disponibles)
-    ? producto.imeis_disponibles
-    : String(producto?.imeis_disponibles_texto || '')
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean)
-
-  return imeis.includes(objetivo)
+  return productHasImei(producto, imeiBuscado)
 }
 
 const obtenerProductoEnCache = (campo, valor) => {
@@ -12857,12 +12838,7 @@ const numerodocumentoEditado = ref(null)
 const productoSeleccionadoLista = ref(null)
 /****************************************************/
 const usuarioLocal = ref({})
-const bloquearEstadoFactura = computed(() => {
-  const rol = String(usuarioLocal.value?.usuario || '')
-    .trim()
-    .toUpperCase()
-  return rol === 'CAJERO' || rol === 'VENDEDOR'
-})
+const bloquearEstadoFactura = computed(() => isInvoiceStateLocked(usuarioLocal.value?.usuario))
 const configuracionFactura = ref({})
 /****************************************************/
 const allFacturasArray = ref([])
@@ -13073,53 +13049,19 @@ const mostrarImagenesProductosVender = ref(false)
 const seleccionarTabPOS = () => {
   tabVentaActiva.value = 'pos'
 }
-const categoriasProductosPOS = computed(() => {
-  const categorias = new Set(['TODAS'])
-  productosArray.value.forEach((producto) => {
-    const categoria = String(producto?.categoria || '').trim()
-    if (categoria) categorias.add(categoria)
+const categoriasProductosPOS = computed(() => buildProductCategories(productosArray.value))
+const productosPOSFiltrados = computed(() =>
+  filterPosProducts(productosArray.value, {
+    search: busquedaProductosPOS.value,
+    category: categoriaProductosPOS.value,
+    showOutOfStock: mostrarProductosSinStockPOS.value,
+    limit: 120
   })
-  return Array.from(categorias)
-})
-const productosPOSFiltrados = computed(() => {
-  const termino = String(busquedaProductosPOS.value || '')
-    .trim()
-    .toLowerCase()
-  const categoria = String(categoriaProductosPOS.value || 'TODAS').trim()
-  const productos = Array.isArray(productosArray.value) ? productosArray.value : []
-
-  return productos
-    .filter((producto) => {
-      if (!producto?.codigo && !producto?.id) return false
-      if (!mostrarProductosSinStockPOS.value && obtenerStockProductoPOS(producto) <= 0) return false
-      const coincideCategoria =
-        categoria === 'TODAS' || String(producto?.categoria || '').trim() === categoria
-      if (!coincideCategoria) return false
-      if (!termino) return true
-
-      return [
-        producto?.nombre,
-        producto?.codigo,
-        producto?.codigo_barra,
-        producto?.categoria,
-        producto?.ubicacion
-      ].some((valor) =>
-        String(valor || '')
-          .toLowerCase()
-          .includes(termino)
-      )
-    })
-    .slice(0, 120)
-})
-const obtenerStockProductoPOS = (producto) =>
-  Number(producto?.stock ?? producto?.existencia ?? producto?.cantidad ?? 0)
-const obtenerPrecioProductoPOS = (producto) => Number(producto?.precio_venta ?? 0)
-const obtenerCantidadProductoCarritoPOS = (producto) => {
-  const codigo = producto?.codigo
-  if (!codigo) return 0
-  const productoEnCarrito = productosVenta.value.find((item) => item?.codigo === codigo)
-  return Number(productoEnCarrito?.cantidad || 0)
-}
+)
+const obtenerStockProductoPOS = (producto) => getProductStock(producto)
+const obtenerPrecioProductoPOS = (producto) => getProductSalePrice(producto)
+const obtenerCantidadProductoCarritoPOS = (producto) =>
+  getCartProductQuantity(productosVenta.value, producto)
 const imagenProductoCache = ref({})
 
 const precargarImagenProducto = async (folder) => {
@@ -18389,20 +18331,10 @@ console.log(tipo.value)*/
   }
 }
 /************************************************************/
-const calcularDescuento = (producto) => {
-  return Number(producto.descuento) || 0
-}
+const calcularDescuento = (producto) => calculateProductDiscount(producto)
 /************************************************************/
 
-const obtenerImpuestoTotalProducto = (producto) => {
-  const impuestoPorcentaje = Number(producto.impuestos) || 0
-  if (!impuestoPorcentaje) return 0
-
-  const cantidad = Number(producto.cantidad) || 1
-  const impuestoUnitario = Number(producto.impuesto_venta) || 0
-
-  return Number((impuestoUnitario * cantidad).toFixed(2))
-}
+const obtenerImpuestoTotalProducto = (producto) => calculateProductTax(producto)
 
 const calcularImpuesto = (producto) => {
   return obtenerImpuestoTotalProducto(producto).toFixed(2)
@@ -18524,35 +18456,11 @@ const verificaComoVaElImpuesto = (producto) => {
 };*/
 
 const calcularGanancias = (producto) => {
-  // Buscar el producto en productosArray por su código
-  const datosProd = productosArray.value
-    ? productosArray.value.find((prod) => prod.codigo == producto.codigo)
-    : null
-
-  // Convertir precio_venta y precio_compra a número, y manejar valores por defecto
-  const precioVenta = Number(producto.precio_venta) || 0
-  const precioCompra =
-    Number(producto.precio_compra) || (datosProd ? Number(datosProd.precio_compra) : 0) || 0
-  const cantidad = Number(producto.cantidad) || 0
-
-  // Calcular la ganancia
-  const calculo = Math.round((precioVenta - precioCompra) * cantidad) // usando redondeo
-  //console.log("calculo", calculo);
-
-  return calculo
+  return calculateProductProfit(producto, productosArray.value || [])
 }
 
 /************************************************************/
-const calcularTotal = (producto) => {
-  // Usar precio_final que ya incluye el impuesto calculado, fallback a precio_venta
-  const cantidad = Number(producto.cantidad) || 1
-  const descuento = Number(producto.descuento) || 0
-  const precioFinal = Number(producto.precio_final) || Number(producto.precio_venta) || 0
-
-  const total = precioFinal * cantidad - descuento
-
-  return total
-}
+const calcularTotal = (producto) => calculateProductTotal(producto)
 
 /************************************************************/
 const visiblepreciomodal = (producto) => {
@@ -18560,26 +18468,7 @@ const visiblepreciomodal = (producto) => {
 }
 
 /************************************************************/
-const calcularGananciaReal = () => {
-  let gananciaPura = 0
-
-  productosVenta.value.forEach((producto) => {
-    const nombre = (producto.nombre || '').toUpperCase()
-
-    if (nombre.includes('DESCUENTO') || nombre.includes('DELIVERY')) {
-      return // Saltar este producto
-    }
-
-    const precioVenta = parseFloat(producto.precio_venta) || 0
-    const precioCompra = parseFloat(producto.precio_compra) || 0
-    const cantidad = parseFloat(producto.cantidad) || 0
-
-    const calculo = (precioVenta - precioCompra) * cantidad
-    gananciaPura += calculo
-  })
-
-  return gananciaPura
-}
+const calcularGananciaReal = () => calculatePureProfit(productosVenta.value)
 
 /************************************************************/
 let recalculando = false
@@ -18589,29 +18478,23 @@ const calcularTotalFactura = async () => {
   if (recalculando) return
   recalculando = true
 
-  let totalN = 0
-  let impuestosN = 0
-  let descuentoN = 0
-  let ganancias = 0
-  cantidadProductosLocal.value = 0
+  const resumen = calculateSaleSummary(
+    productosVenta.value,
+    productosArray.value || [],
+    obtenerImpuestoTotalResumen
+  )
+  cantidadProductosLocal.value = resumen.quantity
 
   productosVenta.value.forEach((producto) => {
-    totalN += Number(calcularTotal(producto)) || 0
-    if (producto.nombre != 'DESCUENTO' && producto.nombre != 'DESCUENTO APLICADO') {
-      impuestosN += obtenerImpuestoTotalResumen(producto)
-    }
-    descuentoN += Number(calcularDescuento(producto)) || 0
-    ganancias += Number(calcularGanancias(producto)) || 0
-    cantidadProductosLocal.value += parseFloat(producto.cantidad) || 0
-    producto.total = Number(calcularTotal(producto)) || 0
+    producto.total = calculateProductTotal(producto)
   })
 
-  totalfactura.value = totalN
-  total.value = totalN.toFixed(2)
-  impuesto.value = impuestosN.toFixed(2)
-  descuento.value = descuentoN.toFixed(2)
+  totalfactura.value = resumen.total
+  total.value = resumen.total.toFixed(2)
+  impuesto.value = resumen.tax.toFixed(2)
+  descuento.value = resumen.discount.toFixed(2)
   gananciaFN.value = calcularGananciaReal()
-  subtotal.value = (totalN - descuentoN - impuestosN).toFixed(2)
+  subtotal.value = resumen.subtotal.toFixed(2)
   pagaCon.value = total.value
   localStorage.setItem('productosVenta', JSON.stringify(productosVenta.value))
 
@@ -18654,21 +18537,11 @@ const ejecutarConWatchProductosEnPausa = async (callback) => {
 
 /************************************************************/
 // Calcula las opciones de descuento según el total
-const calcularOpcionesDescuento = (total) => {
-  const opciones = []
-  const intervalo = 5 // Intervalos de 5 para los descuentos
-
-  for (let i = 1; i <= 3; i++) {
-    opciones.push(redondearAlIntervaloInferior(total - i * intervalo, intervalo))
-  }
-
-  return opciones
-}
+const calcularOpcionesDescuento = (total) => calculateDiscountOptions(total, 5, 3)
 
 // Redondea el total al intervalo inferior más cercano
-const redondearAlIntervaloInferior = (valor, intervalo) => {
-  return Math.floor(valor / intervalo) * intervalo
-}
+const redondearAlIntervaloInferior = (valor, intervalo) =>
+  roundDownToInterval(valor, intervalo)
 
 // Calcula las opciones de descuento basadas en el total de la factura
 const opcionesDescuento = computed(() => calcularOpcionesDescuento(totalfactura.value))
@@ -22301,7 +22174,7 @@ const continuarGuardandoFactura = async () => {
     toast.add({
       severity: 'error',
       summary: 'Error',
-      detail: 'No se pudo guardar la factura en modo offline',
+      detail: 'No se pudo guardar la factura en el servidor',
       life: 3000
     })
     loading.value = false
@@ -22310,9 +22183,7 @@ const continuarGuardandoFactura = async () => {
   }
 
   if (retorno[0] == 'ok') {
-    const datosArchivoFactura = await envioElectron('datosarchivo')
-    const modoOfflineFactura =
-      datosArchivoFactura?.OFFLINE === true || datosArchivoFactura?.OFFLINE === 'true'
+    const modoOfflineFactura = false
 
     // Optimización: Asignar puntos de fidelización en segundo plano (no crítico)
     asignarPuntosFidelizacion(noFacturaFN.value, clienteSelected.value.codigo, total.value)
@@ -25424,57 +25295,9 @@ const cambiarFacturasACredito = async (facturasSeleccionadas) => {
   }
 }
 /************************************************************/
-const parseProductosVentaSeguro = (productos) => {
-  if (Array.isArray(productos)) {
-    return productos
-  }
+const parseProductosVentaSeguro = (productos) => parseStoredProducts(productos)
 
-  if (typeof productos !== 'string') {
-    return []
-  }
-
-  const raw = productos.trim()
-  if (!raw) {
-    return []
-  }
-
-  let parsed = null
-
-  try {
-    parsed = JSON.parse(raw)
-  } catch (error) {
-    try {
-      const productosLimpios = raw
-        .replace(/"otro":"\[[^\]]*?\]",?/g, '')
-        .replace(/"caracteristicas":"\[\]",?/g, '')
-      parsed = JSON.parse(productosLimpios)
-    } catch (errorInterno) {
-      return []
-    }
-  }
-
-  const lista = Array.isArray(parsed) ? parsed : parsed ? [parsed] : []
-
-  return lista.map((producto) => {
-    if (!producto || typeof producto !== 'object') {
-      return {}
-    }
-
-    const productoLimpio = { ...producto }
-    delete productoLimpio.otro
-    delete productoLimpio.caracteristicas
-    return productoLimpio
-  })
-}
-
-const calcularTotalProductos = (productos) => {
-  const productosParsed = parseProductosVentaSeguro(productos)
-  const total = productosParsed.reduce(
-    (acumulado, producto) => acumulado + Number(producto?.total || 0),
-    0
-  )
-  return total.toFixed(2)
-}
+const calcularTotalProductos = (productos) => calculateStoredProductsTotal(productos)
 
 const obtenerCantidadProductosGuardados = (productos) => {
   return parseProductosVentaSeguro(productos).length
@@ -26610,7 +26433,7 @@ const aplicarRecargoTarjeta = () => {
 
   if (porcentaje > 0 && montoBase > 0) {
     montoTarjetaOriginal.value = montoBase
-    montoTarjetaConRecargo.value = Number((montoBase * (1 + porcentaje / 100)).toFixed(2))
+    montoTarjetaConRecargo.value = calculateCardSurcharge(montoBase, porcentaje)
   } else {
     montoTarjetaOriginal.value = montoBase
     montoTarjetaConRecargo.value = montoBase
@@ -26648,16 +26471,16 @@ const distribuirRecargoEnProductos = () => {
     return
   }
 
-  // Calcular el total de los productos seleccionados
-  const totalProductosSeleccionados = productosSeleccionadosRecargo.value.reduce((sum, index) => {
-    const producto = productosVenta.value[index]
-    return (
-      sum +
-      Number(producto.precio_final || producto.precio_venta || 0) * Number(producto.cantidad || 1)
-    )
-  }, 0)
+  const productosConRecargo = distributeSurcharge(
+    productosVenta.value,
+    productosSeleccionadosRecargo.value,
+    recargo
+  )
+  const huboCambios = productosConRecargo.some(
+    (producto, index) => producto.precio_final !== productosVenta.value[index]?.precio_final
+  )
 
-  if (totalProductosSeleccionados === 0) {
+  if (!huboCambios) {
     toast.add({
       severity: 'warn',
       summary: 'Advertencia',
@@ -26667,26 +26490,7 @@ const distribuirRecargoEnProductos = () => {
     return
   }
 
-  // Distribuir el recargo proporcionalmente
-  productosSeleccionadosRecargo.value.forEach((index) => {
-    const producto = productosVenta.value[index]
-    const precioActual = Number(producto.precio_final || producto.precio_venta || 0)
-    const cantidad = Number(producto.cantidad || 1)
-    const subtotalProducto = precioActual * cantidad
-
-    // Calcular la proporción del recargo que le corresponde a este producto
-    const proporcion = subtotalProducto / totalProductosSeleccionados
-    const recargoProducto = recargo * proporcion
-
-    // Distribuir el recargo entre las unidades del producto
-    const recargoUnidad = recargoProducto / cantidad
-    const nuevoPrecio = Number((precioActual + recargoUnidad).toFixed(2))
-
-    // Actualizar el precio del producto
-    producto.precio_venta = nuevoPrecio
-    producto.precio_final = nuevoPrecio
-    producto.recargo_aplicado = recargoUnidad
-  })
+  productosVenta.value = productosConRecargo
 
   toast.add({
     severity: 'success',

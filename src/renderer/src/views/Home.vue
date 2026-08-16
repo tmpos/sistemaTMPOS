@@ -3824,7 +3824,7 @@ if (!imeiModal.value || imeiModal.value =='') {
                 <div class="action-tab-grid action-tab-grid-primary">
                   <Button :label="$t('POS')" raised outlined severity="secondary" as="router-link" to="/pos" icon="pi icon-th" iconPos="top" />
                   <Button :label="$t('Sell').toUpperCase()" raised outlined severity="secondary" as="router-link" to="/vender" icon="pi icon-basket" iconPos="top" />
-                  <Button label="Asistente IA" raised severity="success" as="router-link" to="/asistente-ia" icon="pi pi-bolt" iconPos="top" v-if="datosEmpresa.usuario.nivel_seguridad === 'Soporte'" />
+                  <Button label="Asistente IA" raised severity="success" as="router-link" to="/asistente-ia" icon="pi pi-bolt" iconPos="top" />
                   <Button :label="$t('Clients')" raised outlined severity="secondary" as="router-link" to="/clientes" icon="pi icon-users" iconPos="top" />
                   <Button label="Rutas Publicas" raised outlined severity="info" icon="pi pi-globe" iconPos="top" @click="visibleRutasPublicas = true" />
                 </div>
@@ -3955,7 +3955,7 @@ if (!imeiModal.value || imeiModal.value =='') {
                        <div class="actions-grid">
                          <Button :label="$t('POS')" raised outlined severity="secondary" as="router-link" to="/pos" icon="pi icon-th" iconPos="top" />
                          <Button :label="$t('Sell').toUpperCase()" raised outlined severity="secondary" as="router-link" to="/vender" icon="pi icon-basket" iconPos="top" />
-                         <Button label="Asistente IA" raised severity="success" as="router-link" to="/asistente-ia" icon="pi pi-bolt" iconPos="top" v-if="datosEmpresa.usuario.nivel_seguridad === 'Soporte'" />
+                         <Button label="Asistente IA" raised severity="success" as="router-link" to="/asistente-ia" icon="pi pi-bolt" iconPos="top" />
                          <Button :label="$t('Clients')" raised outlined severity="secondary" as="router-link" to="/clientes" icon="pi icon-users" iconPos="top" />
                          <Button label="Rutas Publicas" raised outlined severity="info" icon="pi pi-globe" iconPos="top" @click="visibleRutasPublicas = true" />
                          <Button label="Fidelizacion" raised outlined severity="warning" as="router-link" to="/fidelizacion" icon="pi pi-heart" iconPos="top" />

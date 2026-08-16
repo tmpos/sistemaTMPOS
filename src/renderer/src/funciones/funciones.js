@@ -675,8 +675,9 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
   const linkImpresora = datosJSON.VITE_IMPRESORA_LOCAL
   const patroncedula = datosJSON.VITE_PATRON_CEDULA
   const tokenCorto = datosJSON.VITE_TOKEN_CORTO
-  //const offline = datosJSON.OFFLINE === 'true' ? true : false;
-  const offline = !navigator.onLine
+  // La API es la única fuente de datos. Sin conexión, la operación falla y
+  // nunca utiliza SQLite, IndexedDB o localStorage como reemplazo.
+  const offline = false
 
   const tokenCifrado = await encryptarPassword(token, 10)
 
@@ -749,42 +750,7 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
   }
 
   const asegurarTablaBitacoraDirecta = async () => {
-    try {
-      if (window.electron) {
-        const existe = await window.electron.ipcRenderer.invoke(
-          'consultaservidor',
-          'tableExists',
-          BITACORA_TABLE
-        )
-        if (!Array.isArray(existe) || existe[0] !== 'ok') {
-          await window.electron.ipcRenderer.invoke(
-            'consultaservidor',
-            'crearTabla',
-            BITACORA_TABLE,
-            BITACORA_FIELDS.join(',')
-          )
-        }
-
-        const columnas = await window.electron.ipcRenderer.invoke(
-          'consultaservidor',
-          'getTableColumns',
-          BITACORA_TABLE
-        )
-        const columnasActuales = Array.isArray(columnas) ? columnas : []
-        for (const campo of BITACORA_FIELDS) {
-          if (!columnasActuales.includes(campo)) {
-            await window.electron.ipcRenderer.invoke(
-              'consultaservidor',
-              'addColumnToTable',
-              BITACORA_TABLE,
-              campo
-            )
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error asegurando tabla bitacora:', error)
-    }
+    // La estructura pertenece al servidor; el cliente no crea tablas SQLite.
   }
 
   const obtenerRegistroPrevio = async (tablaNombre, registro = {}) => {
@@ -796,21 +762,6 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
         (campo) => registro[campo] != null && registro[campo] !== ''
       )
       if (!clave) return null
-
-      if (window.electron) {
-        return await window.electron.ipcRenderer.invoke(
-          'consultaservidor',
-          'getDataByField',
-          tablaNombre,
-          clave,
-          registro[clave]
-        )
-      }
-
-      if (offline) {
-        initOfflineDB()
-        return await getCachedByField(tablaNombre, clave, registro[clave])
-      }
 
       return await peticionesFetch(
         `${link}${api}`,
@@ -828,17 +779,6 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
   const obtenerTodosRegistros = async (tablaNombre) => {
     try {
       if (!tablaNombre) return []
-      if (window.electron) {
-        return await window.electron.ipcRenderer.invoke(
-          'consultaservidor',
-          'getDataAsArray',
-          tablaNombre
-        )
-      }
-      if (offline) {
-        initOfflineDB()
-        return await getCachedTable(tablaNombre)
-      }
       return await peticionesFetch(
         `${link}${api}`,
         `datosarray/${tablaNombre}`,
@@ -854,20 +794,6 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
 
   const insertarRegistroBitacora = async (payload) => {
     try {
-      await asegurarTablaBitacoraDirecta()
-      if (window.electron) {
-        return await window.electron.ipcRenderer.invoke(
-          'consultaservidor',
-          'insertData',
-          BITACORA_TABLE,
-          JSON.stringify(payload)
-        )
-      }
-      if (offline) {
-        initOfflineDB()
-        await insertOffline(BITACORA_TABLE, payload)
-        return ['ok']
-      }
       return await enviarDatosPorPost(
         `${link}${api}/insertar/${BITACORA_TABLE}`,
         payload,
@@ -880,22 +806,11 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
   }
 
   const guardarCacheLocalSiAplica = (tablaNombre, respuesta) => {
-    if (Array.isArray(respuesta)) {
-      guardarTablaLocalStorage(tablaNombre, respuesta)
-    }
+    // Sin caché operativo: cada lectura debe reflejar el servidor.
   }
 
   const asegurarCacheLocalTabla = async (tablaNombre) => {
-    if (!esTablaLocalStorage(tablaNombre) || Array.isArray(obtenerTablaLocalStorage(tablaNombre)))
-      return
-    const registros = await peticionesFetch(
-      `${link}${api}`,
-      `datosarray/${tablaNombre}`,
-      {},
-      tokenCifrado,
-      'GET'
-    )
-    guardarCacheLocalSiAplica(tablaNombre, registros)
+    return
   }
 
   const registrarBitacora = async ({
@@ -933,14 +848,14 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
     }
   }
 
-  const forzarApi = datos?.[0]?.forceApi === true
-  const respuestaLocal =
-    !offline && !forzarApi
-      ? leerRespuestaLocalStorage(peticion, tabla, datos)
-      : { disponible: false }
+  const respuestaLocal = { disponible: false }
 
   if (respuestaLocal.disponible) {
     return respuestaLocal.valor
+  }
+
+  if (peticion === 'descargarDatosServidor' || peticion === 'sincronizarCambiosPendientes') {
+    return ['error', 'El modo offline y su sincronización están deshabilitados.']
   }
 
   switch (peticion) {
@@ -4920,7 +4835,13 @@ export async function sincronizarStockProductoPorImeiDisponible(idProducto) {
       'DISPONIBLE'
     )
 
-    const nuevoStock = Array.isArray(imeisDisponibles) ? imeisDisponibles.length : 0
+    const almacenProducto = `${producto.almacen ?? ''}`.trim().toUpperCase()
+    const imeisDelProductoYAlmacen = Array.isArray(imeisDisponibles)
+      ? imeisDisponibles.filter(
+          (imei) => `${imei.almacen ?? ''}`.trim().toUpperCase() === almacenProducto
+        )
+      : []
+    const nuevoStock = imeisDelProductoYAlmacen.length
 
     producto.stock = nuevoStock
     if (producto.hasOwnProperty('updated_at')) {

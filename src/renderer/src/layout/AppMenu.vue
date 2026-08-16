@@ -762,6 +762,12 @@ const model = ref([
                 to: '/vender'
             },
             {
+                label: 'Asistente AI',
+                icon: 'pi pi-bolt',
+                permiso: "Administrador,Gerente,Soporte,Cajero,Vendedor,Técnico",
+                to: '/asistente-ia'
+            },
+            {
                 label: 'Integraciones',
                 icon: 'pi pi-plug',
                 permiso: "Administrador,Gerente,Soporte",
@@ -861,4 +867,3 @@ input {
 
 
 </style>
-

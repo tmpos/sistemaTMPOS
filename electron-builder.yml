@@ -13,7 +13,7 @@ asarUnpack:
 win:
   executableName: nuevo-tmpos
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
+  artifactName: TM-POS-${version}.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always

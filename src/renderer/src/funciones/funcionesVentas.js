@@ -327,14 +327,10 @@ export async function facturaNueva(url, data, metodo, token) {
     usuario: data.vendedorFN
   }
 
-  // OFFLINE: guardar factura localmente y encolar para sync
+  // El sistema es exclusivamente online: nunca crear una factura local que
+  // después pueda sobrescribir inventario o almacenes del servidor.
   if (!navigator.onLine) {
-    const retorno = await peticionesFetchOffline('insertData', 'facturas', JSON.stringify(datos))
-    if (Array.isArray(retorno) && retorno[0] === 'ok') {
-      await sincronizarStockCelularesFactura(productos)
-      await aplicarDistribucionUtilidadesVenta({ data, ganancia, datosUsuarioLocal })
-    }
-    return retorno
+    return ['error', 'Se requiere conexión a Internet para registrar la factura.']
   }
 
   // ONLINE: verificar en servidor y guardar
@@ -581,28 +577,9 @@ export async function cotizacionNueva(url, data, metodo, token) {
 }
 /*********************************************************/
 export async function restarStock(url, prods, metodo, token) {
-  // OFFLINE: reducir stock localmente
+  // El servidor es la única autoridad del inventario.
   if (!navigator.onLine) {
-    try {
-      const productosLocales = await peticionesFetchOffline('getDataAsArray', 'productos')
-      for (const prod of prods) {
-        const codigoBuscar = prod.codigo_interno || prod.codigo
-        const productoLocal = productosLocales.find(
-          (p) => p.codigo_interno === codigoBuscar || p.codigo === codigoBuscar
-        )
-        if (productoLocal) {
-          const stockActual = parseFloat(productoLocal.stock) || 0
-          const cantidad = parseFloat(prod.cantidad) || 0
-          productoLocal.stock = Math.max(0, stockActual - cantidad).toString()
-          productoLocal.updated_at = nfecha('timestamp')
-          await peticionesFetchOffline('updateData', 'productos', JSON.stringify(productoLocal))
-        }
-      }
-      return ['ok']
-    } catch (error) {
-      console.error('Error al restar stock offline:', error)
-      return ['ok'] // No bloquear la factura por stock
-    }
+    return ['error', 'Se requiere conexión a Internet para actualizar el inventario.']
   }
 
   try {
@@ -610,7 +587,9 @@ export async function restarStock(url, prods, metodo, token) {
     const prodsString = typeof prods === 'string' ? prods : JSON.stringify(prods)
 
     const resp = await peticiones(url, { productos: prodsString }, metodo, token)
-
+    if (resp?.status === 'success' || resp?.success === true) {
+      return ['ok', resp]
+    }
     return resp
   } catch (error) {
     console.error('Error al restar stock:', error)
@@ -706,8 +685,14 @@ export async function actualizarStockPorImei(idProducto) {
       'DISPONIBLE'
     )
 
-    // El nuevo stock es la cantidad de IMEIs disponibles
-    const nuevoStock = imeisDisponibles ? imeisDisponibles.length : 0
+    // Un IMEI de otro almacén nunca puede aumentar el stock de este producto.
+    const almacenProducto = `${datosProd.almacen ?? ''}`.trim().toUpperCase()
+    const imeisDelProductoYAlmacen = Array.isArray(imeisDisponibles)
+      ? imeisDisponibles.filter(
+          (imei) => `${imei.almacen ?? ''}`.trim().toUpperCase() === almacenProducto
+        )
+      : []
+    const nuevoStock = imeisDelProductoYAlmacen.length
 
     // Actualizar el stock del producto
     const datosActualizar = {

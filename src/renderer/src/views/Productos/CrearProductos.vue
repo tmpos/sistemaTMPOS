@@ -442,7 +442,29 @@ const imagen = await peticionesFetch(`${link.value}${api.value}`,'creardirectori
 
 }
 
-   datoscamposProductos.value.tipo_impuesto = addImpuestos.value;
+  datoscamposProductos.value.tipo_impuesto = addImpuestos.value;
+
+  const [codigoExistente, barcodeExistente, nombreExistente] = await Promise.all([
+    peticionesFetchOffline('getDataByField', 'productos', 'codigo', datoscamposProductos.value.codigo),
+    peticionesFetchOffline('getDataByField', 'productos', 'codigo_barra', datoscamposProductos.value.codigo_barra),
+    peticionesFetchOffline('getDataByField', 'productos', 'nombre', datoscamposProductos.value.nombre)
+  ]);
+  const mismoAlmacen = producto =>
+    producto && `${producto.almacen ?? ''}`.trim().toUpperCase() === `${datosEmpresa.empresa.nombre ?? ''}`.trim().toUpperCase();
+  const existeRegistro = valor => Array.isArray(valor) ? valor.length > 0 : Boolean(valor);
+  if (existeRegistro(codigoExistente) || existeRegistro(barcodeExistente) || mismoAlmacen(nombreExistente)) {
+    toast.add({
+      severity: 'error',
+      summary: 'Producto duplicado',
+      detail: existeRegistro(codigoExistente)
+        ? 'El código ya está registrado.'
+        : existeRegistro(barcodeExistente)
+          ? 'El código de barras ya está registrado.'
+          : 'Ya existe un producto con ese nombre en este almacén.',
+      life: 5000
+    });
+    return;
+  }
 
   const envioDatos = await peticionesFetchOffline('insertData', 'productos',JSON.stringify(datoscamposProductos.value));
 

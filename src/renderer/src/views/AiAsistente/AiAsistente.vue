@@ -1,6 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
-import axios from 'axios';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import Button from 'primevue/button';
 import Card from 'primevue/card';
 import Dialog from 'primevue/dialog';
@@ -10,6 +9,7 @@ import { useToast } from 'primevue/usetoast';
 import { useRouter } from 'vue-router';
 import {
   arrayToObjetoFromTablaOffline,
+  agregarDiasalaFechaActual,
   generarCodigoUnico,
   generadorCodigo,
   mensajetoast,
@@ -40,6 +40,18 @@ const ejemplosTablas = ref({});
 const modalClienteNoEncontrado = ref(false);
 const clientePendiente = ref(null);
 const respuestaIAPendiente = ref(null);
+const propuestaPendiente = ref(null);
+const mensajes = ref([
+  {
+    role: 'assistant',
+    content: 'Hola. Puedo consultar clientes y productos, y preparar clientes, cotizaciones o facturas. Las operaciones se guardan solamente despues de tu confirmacion.'
+  }
+]);
+const chatContainer = ref(null);
+const modalConfiguracion = ref(false);
+const apiKeyInput = ref('');
+const modeloInput = ref('gpt-4.1-mini');
+const configuracionOpenAI = ref({ configured: false, model: 'gpt-4.1-mini', maskedKey: '' });
 
 const ejemplosPrompt = [
   'Crea un cliente llamado Maria Lopez, telefono 8095550101, whatsapp 8095550101 y direccion en Santiago.',
@@ -51,6 +63,16 @@ const ejemplosPrompt = [
 const datosEmpresaNombre = computed(() => datosEmpresa?.empresa?.nombre || 'PRINCIPAL');
 const usuarioNombre = computed(() => datosEmpresa?.usuario?.nombre || 'IA');
 const usuarioEmail = computed(() => datosEmpresa?.usuario?.email || 'ia@local');
+const nivelUsuario = computed(() => normalizarTexto(datosEmpresa?.usuario?.nivel_seguridad || ''));
+const puedeConfigurarIA = computed(() =>
+  ['ADMINISTRADOR', 'GERENTE', 'SOPORTE'].includes(nivelUsuario.value)
+);
+const puedeCrearVentas = computed(() =>
+  ['ADMINISTRADOR', 'GERENTE', 'SOPORTE', 'VENDEDOR', 'CAJERO'].includes(nivelUsuario.value)
+);
+const puedeCrearProductos = computed(() =>
+  ['ADMINISTRADOR', 'GERENTE', 'SOPORTE'].includes(nivelUsuario.value)
+);
 
 const extraerJsonDesdeTexto = (texto) => {
   let limpio = String(texto || '').trim();
@@ -149,8 +171,6 @@ const buscarMejorCoincidencia = (coleccion = [], textoBusqueda, extractorCampos,
 
   return mejorPuntaje >= puntajeMinimo ? { item: mejor, puntaje: mejorPuntaje } : null;
 };
-
-const obtenerApiKey = () => datosConfiguracion.value?.openai_api_key || '';
 
 const inicializarReconocimientoVoz = () => {
   const SpeechRecognition =
@@ -326,7 +346,7 @@ const construirEjemploManual = (tabla, campos = []) => {
       descuento: '0.00',
       subtotal: '48000.00',
       total: '48000.00',
-      estado_cotizacion: 'ACTIVA',
+      estado_cotizacion: 'PENDIENTE',
       no_factura: '',
       fecha_cambio: '',
       entidad_financiera: '',
@@ -767,11 +787,14 @@ const crearRegistroCotizacion = async (payload) => {
     descuento: formatoMonto(totales.descuento),
     subtotal: formatoMonto(totales.subtotal),
     total: formatoMonto(totales.total),
-    estado_cotizacion: textoPlano(payload.estado_cotizacion || 'ACTIVA'),
+    estado_cotizacion: textoPlano(payload.estado_cotizacion || 'PENDIENTE'),
     no_factura: textoPlano(payload.no_factura || ''),
     fecha_cambio: textoPlano(payload.fecha_cambio || ''),
     entidad_financiera: textoPlano(payload.entidad_financiera || ''),
-    vencimiento: textoPlano(payload.vencimiento || ''),
+    vencimiento: textoPlano(
+      payload.vencimiento ||
+        agregarDiasalaFechaActual(Number(datosConfiguracion.value?.dias_cotizacion) || 30)
+    ),
     nota: textoPlano(payload.nota || 'CREADA POR IA'),
     almacen: datosEmpresaNombre.value,
     mes: nfecha('mes'),
@@ -947,6 +970,11 @@ const crearClienteYContinuar = async () => {
 
     modalClienteNoEncontrado.value = false;
     await procesarRespuestaIA(respuestaIAPendiente.value, payload);
+    mensajes.value.push({
+      role: 'assistant',
+      content: `${respuestaIAPendiente.value.summary || 'Operacion completada.'} Se creo el cliente y se guardo el documento.`
+    });
+    propuestaPendiente.value = null;
   } catch (error) {
     console.error('Error creando cliente pendiente:', error);
     mensajetoast(toast, 'Error', error.message || 'No se pudo crear el cliente.', 'error', 5000);
@@ -968,7 +996,13 @@ const construirPromptSistema = () => {
   const catalogoClientes = JSON.stringify(construirCatalogoClientesIA(), null, 2);
   const catalogoProductos = JSON.stringify(construirCatalogoProductosIA(), null, 2);
 
-  return `Eres un asistente para un sistema ERP/POS. Tu trabajo es convertir instrucciones del usuario en un JSON valido, sin markdown.
+  return `Eres el asistente transaccional del sistema ERP/POS TM-POS. Responde siempre en espanol claro y breve.
+
+Puedes conversar, aclarar dudas y consultar el contexto entregado. Cuando el usuario pida crear un cliente, producto, cotizacion o factura, DEBES usar la funcion proponer_operacion. La funcion solo prepara una propuesta: la aplicacion pedira confirmacion humana antes de guardar.
+
+Usuario actual: ${usuarioNombre.value}. Nivel: ${nivelUsuario.value || 'SIN NIVEL'}.
+Permisos efectivos: crear clientes/cotizaciones/facturas=${puedeCrearVentas.value ? 'SI' : 'NO'}; crear productos=${puedeCrearProductos.value ? 'SI' : 'NO'}.
+Si una accion no esta permitida, explicalo y no llames la funcion.
 
 Debes basarte en los campos reales de las tablas del sistema que se te entregan a continuacion. Todas incluyen campos y plantilla vacia. Solo facturas y cotizacion incluyen ejemplos detallados del documento:
 ${contextoTablas}
@@ -980,25 +1014,13 @@ ${catalogoClientes}
 PRODUCTOS:
 ${catalogoProductos}
 
-Responde exclusivamente con esta estructura:
-{
-  "operation": "create",
-  "entityType": "cliente|producto|cotizacion|factura",
-  "targetTable": "clientes|productos|cotizacion|facturas",
-  "summary": "resumen corto",
-  "missingFields": [],
-  "warnings": [],
-  "requiredFields": [],
-  "data": {}
-}
-
 Reglas:
 1. Solo tipos soportados: cliente, producto, cotizacion, factura.
 2. Debes elegir la tabla correcta en "targetTable".
 3. En "data" devuelve la plantilla de la tabla elegida, usando los mismos nombres de campos.
 4. Llena los campos que puedas inferir y deja vacio "" lo que no sepas.
 5. No inventes nombres de campos que no existan en la plantilla.
-6. Si faltan datos criticos, llena "missingFields" con nombres concretos.
+6. Solo coloca en "missingFields" datos que el usuario realmente deba proporcionar.
 7. Para cotizacion y factura, si el usuario describe items, agrega un arreglo "items" aunque luego el sistema lo transforme.
 8. Campos numericos pueden venir como numero o texto numerico.
 9. Usa los ejemplos de facturas y cotizacion como referencia principal de formato y estilo de llenado.
@@ -1007,109 +1029,318 @@ Reglas:
 12. Solo usa un producto del array PRODUCTOS si la coincidencia es clara y pertenece a la misma marca o modelo pedido.
 13. Si no hay coincidencia clara, conserva exactamente el producto descrito por el usuario y usa el precio indicado por el usuario.
 14. No sustituyas LG o Samsung por iPhone ni por otro producto distinto.
-15. Para FACTURA y COTIZACION, considera obligatorios: productos/items, cod_cliente, nombre_cliente, subtotal, impuesto, descuento, total, metodo_pago, fecha_emision.
-16. En "requiredFields" devuelve la lista de campos obligatorios de la tabla elegida.
-17. Aunque envies subtotal, impuesto, descuento y total, el sistema recalculara esos valores usando los items.
-18. Si el usuario indica impuestos, distribuyelos en los items usando "impuesto", "impuesto_venta" o "impuestos".
-19. Si el usuario pide cliente, producto, factura o cotizacion, "data" debe venir lista para insertarse en la tabla destino.
-20. No expliques nada fuera del JSON.
-21. Usa espanol en "summary" y "warnings".`;
+15. Para FACTURA y COTIZACION, el usuario solo necesita identificar al cliente y describir los productos con sus cantidades. Si el cliente o producto existe en los catalogos, usa sus datos.
+16. NUNCA pidas cod_cliente si el usuario dio nombre, apodo o telefono: el sistema buscara y completara el codigo. Tampoco pidas subtotal, impuesto, descuento, total, metodo_pago ni fecha_emision.
+17. El sistema calcula subtotal, impuesto, descuento y total; usa impuesto y descuento cero si el usuario no los menciona. El sistema tambien coloca la fecha actual y "POR DEFINIR" como metodo de pago.
+18. Para cotizaciones, el sistema coloca estado PENDIENTE y vencimiento a ${Number(datosConfiguracion.value?.dias_cotizacion) || 30} dias desde hoy cuando el usuario no indique otra fecha.
+19. Si el usuario indica impuestos, distribuyelos en los items usando "impuesto", "impuesto_venta" o "impuestos".
+20. Si el usuario pide cliente, producto, factura o cotizacion, "data" debe venir lista para insertarse en la tabla destino.
+21. Solo pregunta si falta el cliente, no hay productos, falta una cantidad necesaria o un producto no registrado tampoco tiene precio indicado.
+22. Una factura creada por este asistente siempre es BORRADOR IA: no cobra, no descuenta inventario y no registra movimientos contables.
+23. Nunca afirmes que guardaste algo; la aplicacion lo hara solamente despues de confirmar.
+24. Usa espanol en "summary" y "warnings".`;
+};
+
+const herramientasIA = [
+  {
+    type: 'function',
+    name: 'proponer_operacion',
+    description: 'Prepara una operacion para crear un cliente, producto, cotizacion o factura borrador. No guarda datos por si sola.',
+    parameters: {
+      type: 'object',
+      properties: {
+        operation: { type: 'string', enum: ['create'] },
+        entityType: { type: 'string', enum: ['cliente', 'producto', 'cotizacion', 'factura'] },
+        targetTable: { type: 'string', enum: ['clientes', 'productos', 'cotizacion', 'facturas'] },
+        summary: { type: 'string' },
+        missingFields: { type: 'array', items: { type: 'string' } },
+        warnings: { type: 'array', items: { type: 'string' } },
+        requiredFields: { type: 'array', items: { type: 'string' } },
+        data: { type: 'object', additionalProperties: true }
+      },
+      required: [
+        'operation',
+        'entityType',
+        'targetTable',
+        'summary',
+        'missingFields',
+        'warnings',
+        'requiredFields',
+        'data'
+      ],
+      additionalProperties: false
+    }
+  }
+];
+
+const cargarConfiguracionOpenAI = async () => {
+  configuracionOpenAI.value = await window.electron.ipcRenderer.invoke('openai-config:get');
+  modeloInput.value = configuracionOpenAI.value.model || 'gpt-4.1-mini';
+};
+
+const guardarConfiguracionOpenAI = async () => {
+  if (!puedeConfigurarIA.value) {
+    mensajetoast(toast, 'Sin permiso', 'Solo Administrador, Gerente o Soporte puede configurar OpenAI.', 'warn', 5000);
+    return;
+  }
+  try {
+    configuracionOpenAI.value = await window.electron.ipcRenderer.invoke('openai-config:save', {
+      apiKey: apiKeyInput.value,
+      model: modeloInput.value
+    });
+    apiKeyInput.value = '';
+    modalConfiguracion.value = false;
+    mensajetoast(toast, 'OpenAI configurado', 'La clave se guardo cifrada en este equipo.', 'success', 4000);
+  } catch (error) {
+    mensajetoast(toast, 'Error', error.message || 'No se pudo guardar la configuracion.', 'error', 6000);
+  }
+};
+
+const irAlFinalChat = async () => {
+  await nextTick();
+  if (chatContainer.value) chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
+};
+
+const validarPermisoPropuesta = (respuesta) => {
+  const entidad = normalizarTexto(respuesta?.entityType);
+  if (entidad === 'PRODUCTO' && !puedeCrearProductos.value) {
+    throw new Error('Tu usuario no tiene permiso para crear productos desde el asistente.');
+  }
+  if (['CLIENTE', 'COTIZACION', 'FACTURA'].includes(entidad) && !puedeCrearVentas.value) {
+    throw new Error('Tu usuario no tiene permiso para crear clientes o documentos de venta.');
+  }
+};
+
+const camposCompletadosPorSistema = new Set([
+  'SUBTOTAL',
+  'IMPUESTO',
+  'IMPUESTOS',
+  'DESCUENTO',
+  'TOTAL',
+  'GANANCIA',
+  'METODO PAGO',
+  'FECHA EMISION',
+  'VENCIMIENTO',
+  'FECHA VENCIMIENTO',
+  'FECHA EXPIRACION',
+  'FECHA',
+  'HORA',
+  'MES',
+  'YEAR',
+  'ANO',
+  'CREATED AT',
+  'UPDATED AT',
+  'USUARIO',
+  'ALMACEN',
+  'NO FACTURA',
+  'NO COTIZACION'
+]);
+
+const depurarCamposFaltantes = (respuesta) => {
+  const data = respuesta?.data || {};
+  const clienteIdentificado = textoPlano(
+    data.cod_cliente || data.nombre_cliente || data.cliente || data.telefono_cliente
+  );
+
+  const faltantes = Array.isArray(respuesta?.missingFields) ? respuesta.missingFields : [];
+  return faltantes.filter((campo) => {
+    const campoNormalizado = normalizarTexto(campo).replace(/_/g, ' ');
+    if (camposCompletadosPorSistema.has(campoNormalizado)) return false;
+    if (clienteIdentificado && ['COD CLIENTE', 'NOMBRE CLIENTE', 'CLIENTE'].includes(campoNormalizado)) {
+      return false;
+    }
+    return true;
+  });
+};
+
+const completarValoresObvios = (respuesta) => {
+  const entidad = normalizarTexto(respuesta?.entityType);
+  const data = { ...(respuesta?.data || {}) };
+  const hoy = nfecha('fecha');
+  const diasCotizacion = Number(datosConfiguracion.value?.dias_cotizacion) || 30;
+
+  if (entidad === 'CLIENTE') {
+    const nombre = textoPlano(data.nombre || data.cliente);
+    data.nombre = nombre;
+    data.apodo = textoPlano(data.apodo || nombre);
+    data.whatsapp = textoPlano(data.whatsapp || data.telefono || '');
+    data.direccion = textoPlano(data.direccion || 'SIN REGISTRO');
+    data.precio_fijado = textoPlano(data.precio_fijado || 'Normal');
+    data.limite_credito = textoPlano(data.limite_credito || '1');
+    data.activo = textoPlano(data.activo || 'ON');
+    data.estado = textoPlano(data.estado || 'ACTIVO');
+    data.estado_membresia = textoPlano(data.estado_membresia || 'ACTIVO');
+  }
+
+  if (entidad === 'PRODUCTO') {
+    const descripcion = textoPlano(data.descripcion || data.nombre || data.modelo);
+    data.nombre = textoPlano(data.nombre || descripcion);
+    data.descripcion = descripcion;
+    data.categoria = textoPlano(data.categoria || 'GENERAL').toUpperCase();
+    data.condicion = textoPlano(data.condicion || 'NUEVO').toUpperCase();
+    data.situacion = textoPlano(data.situacion || 'DISPONIBLE').toUpperCase();
+    data.empaque = textoPlano(data.empaque || 'UNIDAD');
+    data.stock = aNumero(data.stock, 0);
+    data.alerta = aNumero(data.alerta, 1);
+  }
+
+  if (['COTIZACION', 'FACTURA'].includes(entidad)) {
+    const items = construirItems(data.items || data.productos || []);
+    const totales = calcularTotales(items);
+    data.items = items;
+    data.fecha_emision = textoPlano(data.fecha_emision || hoy);
+    data.metodo_pago = textoPlano(data.metodo_pago || 'POR DEFINIR');
+    data.vendedor = textoPlano(data.vendedor || usuarioNombre.value);
+    data.subtotal = formatoMonto(totales.subtotal);
+    data.impuesto = formatoMonto(totales.impuesto);
+    data.descuento = formatoMonto(totales.descuento);
+    data.total = formatoMonto(totales.total);
+  }
+
+  if (entidad === 'COTIZACION') {
+    data.vencimiento = textoPlano(
+      data.vencimiento || agregarDiasalaFechaActual(diasCotizacion)
+    );
+    data.estado_cotizacion = textoPlano(data.estado_cotizacion || 'PENDIENTE');
+    data.nota = textoPlano(data.nota || 'CREADA POR IA');
+  }
+
+  if (entidad === 'FACTURA') {
+    data.tipo_factura = textoPlano(data.tipo_factura || 'BORRADOR IA');
+    data.comprobante = textoPlano(data.comprobante || 'SIN COMPROBANTE');
+    data.estado_factura = textoPlano(data.estado_factura || 'BORRADOR IA');
+    data.fecha_estado = textoPlano(data.fecha_estado || hoy);
+    data.canal_venta = textoPlano(data.canal_venta || 'ASISTENTE IA');
+    data.efectivo = formatoMonto(data.efectivo ?? 0);
+    data.transferencia = formatoMonto(data.transferencia ?? 0);
+    data.tarjeta = formatoMonto(data.tarjeta ?? 0);
+    data.cheque = formatoMonto(data.cheque ?? 0);
+    data.nota = textoPlano(data.nota || 'FACTURA BORRADOR CREADA POR IA');
+  }
+
+  respuesta.data = data;
+  return respuesta;
+};
+
+const validarPropuestaDeterministica = (respuesta) => {
+  const entidad = normalizarTexto(respuesta?.entityType);
+  const data = respuesta?.data || {};
+  if (entidad === 'CLIENTE' && !textoPlano(data.nombre || data.cliente)) {
+    throw new Error('Falta el nombre del cliente.');
+  }
+  if (entidad === 'PRODUCTO' && !textoPlano(data.nombre || data.descripcion || data.modelo)) {
+    throw new Error('Falta el nombre o descripcion del producto.');
+  }
+  if (['COTIZACION', 'FACTURA'].includes(entidad)) {
+    const items = data.items || data.productos || [];
+    if (!Array.isArray(items) || !items.length) throw new Error('Faltan los productos del documento.');
+    if (!textoPlano(data.cod_cliente || data.nombre_cliente || data.cliente)) {
+      throw new Error('Falta identificar el cliente del documento.');
+    }
+  }
 };
 
 const solicitarIA = async () => {
-  if (!textoPlano(promptUsuario.value)) {
-    mensajetoast(toast, 'Aviso', 'Escribe una instruccion para crear un registro.', 'warn');
+  const texto = textoPlano(promptUsuario.value);
+  if (!texto) return;
+
+  if (!configuracionOpenAI.value.configured) {
+    modalConfiguracion.value = true;
+    mensajetoast(toast, 'OpenAI no configurado', 'Agrega una API Key para comenzar.', 'warn', 4000);
     return;
   }
 
-  const apiKey = obtenerApiKey();
-  if (!apiKey) {
-    mensajetoast(
-      toast,
-      'OpenAI no configurado',
-      'No hay API Key de OpenAI en la configuracion del sistema.',
-      'warn',
-      5000
-    );
-    return;
-  }
-
-  loading.value = true;
+  mensajes.value.push({ role: 'user', content: texto });
+  promptUsuario.value = '';
+  propuestaPendiente.value = null;
   resultadoIA.value = null;
-  ultimoRegistro.value = null;
+  loading.value = true;
+  await irAlFinalChat();
 
   try {
-    const response = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: 'gpt-3.5-turbo',
-        temperature: 0.1,
-        messages: [
-          {
-            role: 'system',
-            content: construirPromptSistema()
-          },
-          {
-            role: 'user',
-            content: promptUsuario.value
-          }
-        ],
-        max_tokens: 1600
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        }
+    const input = mensajes.value
+      .filter((mensaje) => ['user', 'assistant'].includes(mensaje.role))
+      .slice(-10)
+      .map((mensaje) => ({ role: mensaje.role, content: mensaje.content }));
+
+    const response = await window.electron.ipcRenderer.invoke('openai-assistant:request', {
+      model: configuracionOpenAI.value.model,
+      instructions: construirPromptSistema(),
+      input,
+      tools: herramientasIA
+    });
+
+    const llamada = response?.toolCalls?.find((tool) => tool.name === 'proponer_operacion');
+    if (llamada) {
+      const propuesta = typeof llamada.arguments === 'string'
+        ? extraerJsonDesdeTexto(llamada.arguments)
+        : llamada.arguments;
+      validarPermisoPropuesta(propuesta);
+      completarValoresObvios(propuesta);
+      propuesta.missingFields = depurarCamposFaltantes(propuesta);
+      resultadoIA.value = propuesta;
+
+      if (propuesta.missingFields?.length) {
+        mensajes.value.push({
+          role: 'assistant',
+          content: `Necesito estos datos antes de preparar el registro: ${propuesta.missingFields.join(', ')}.`
+        });
+      } else {
+        validarPropuestaDeterministica(propuesta);
+        propuestaPendiente.value = propuesta;
+        mensajes.value.push({
+          role: 'assistant',
+          content: propuesta.summary || `Prepare una propuesta de ${propuesta.entityType}. Revisa los datos y confirma para guardarla.`
+        });
       }
-    );
-
-    const contenido = response.data?.choices?.[0]?.message?.content || '{}';
-    resultadoIA.value = extraerJsonDesdeTexto(contenido);
-
-    if (Array.isArray(resultadoIA.value?.missingFields) && resultadoIA.value.missingFields.length) {
-      mensajetoast(
-        toast,
-        'Faltan datos',
-        `La IA necesita: ${resultadoIA.value.missingFields.join(', ')}`,
-        'warn',
-        5000
-      );
-      return;
+    } else {
+      mensajes.value.push({
+        role: 'assistant',
+        content: response?.text || 'No pude interpretar la solicitud. Puedes darme mas detalles.'
+      });
     }
-
-    const entidadDocumento = normalizarTexto(
-      resultadoIA.value?.entityType || resultadoIA.value?.entidad || resultadoIA.value?.tipo
-    );
-    if (['FACTURA', 'FACTURAS', 'COTIZACION', 'COTIZACIONES'].includes(entidadDocumento)) {
-      const itemsIA = resultadoIA.value?.data?.items || resultadoIA.value?.data?.productos || [];
-      if (!Array.isArray(itemsIA) || !itemsIA.length) {
-        throw new Error('La IA no devolvio items suficientes para generar el documento.');
-      }
-    }
-
-    const validacionCliente = await validarClienteDocumento(resultadoIA.value);
-    if (!validacionCliente.ok) {
-      return;
-    }
-
-    await procesarRespuestaIA(resultadoIA.value, validacionCliente.payload);
   } catch (error) {
-    console.error('Error creando registro con IA:', error);
-    mensajetoast(
-      toast,
-      'Error',
-      error?.response?.data?.error?.message || error.message || 'No se pudo completar la operacion.',
-      'error',
-      6000
-    );
+    console.error('Error consultando el asistente:', error);
+    const detalle = error.message || 'No se pudo consultar OpenAI.';
+    mensajes.value.push({ role: 'assistant', content: `No pude completar la solicitud: ${detalle}` });
+    mensajetoast(toast, 'Error', detalle, 'error', 6000);
   } finally {
     loading.value = false;
+    await irAlFinalChat();
   }
+};
+
+const confirmarPropuesta = async () => {
+  if (!propuestaPendiente.value || loading.value) return;
+  loading.value = true;
+  try {
+    validarPermisoPropuesta(propuestaPendiente.value);
+    validarPropuestaDeterministica(propuestaPendiente.value);
+    const validacionCliente = await validarClienteDocumento(propuestaPendiente.value);
+    if (!validacionCliente.ok) return;
+    await procesarRespuestaIA(propuestaPendiente.value, validacionCliente.payload);
+    mensajes.value.push({
+      role: 'assistant',
+      content: `${propuestaPendiente.value.summary || 'Operacion completada.'} El registro fue guardado correctamente.`
+    });
+    propuestaPendiente.value = null;
+  } catch (error) {
+    mensajetoast(toast, 'Error', error.message || 'No se pudo guardar la propuesta.', 'error', 6000);
+  } finally {
+    loading.value = false;
+    await irAlFinalChat();
+  }
+};
+
+const cancelarPropuesta = () => {
+  propuestaPendiente.value = null;
+  resultadoIA.value = null;
+  mensajes.value.push({ role: 'assistant', content: 'Propuesta cancelada. No se guardo ningun dato.' });
 };
 
 onMounted(async () => {
   await cargarDatosBase();
+  await cargarConfiguracionOpenAI();
   inicializarReconocimientoVoz();
 });
 </script>
@@ -1125,7 +1356,16 @@ onMounted(async () => {
             Escribe una instruccion como "crea un cliente", "haz una cotizacion" o "genera un producto".
           </p>
         </div>
-        <Button label="Volver al inicio" icon="pi pi-home" severity="secondary" outlined @click="router.push('/home')" />
+        <div class="ai-hero-actions">
+          <Button
+            label="Configurar OpenAI"
+            icon="pi pi-key"
+            severity="secondary"
+            outlined
+            @click="modalConfiguracion = true"
+          />
+          <Button label="Volver al inicio" icon="pi pi-home" severity="secondary" outlined @click="router.push('/home')" />
+        </div>
       </section>
 
       <section class="ai-grid">
@@ -1133,17 +1373,37 @@ onMounted(async () => {
           <template #content>
             <div class="ai-form-head">
               <div>
-                <h2>Solicitud</h2>
-                <p>El asistente analizara tu texto, armara el registro y lo guardara en el sistema.</p>
+                <h2>Chat del sistema</h2>
+                <p>Consulta datos o prepara operaciones. Siempre te pedira confirmacion antes de guardar.</p>
               </div>
-              <Tag value="OpenAI" severity="info" />
+              <Tag
+                :value="configuracionOpenAI.configured ? `OpenAI: ${configuracionOpenAI.model}` : 'OpenAI sin configurar'"
+                :severity="configuracionOpenAI.configured ? 'success' : 'warn'"
+              />
+            </div>
+
+            <div ref="chatContainer" class="ai-chat">
+              <div
+                v-for="(mensaje, indice) in mensajes"
+                :key="`${indice}-${mensaje.role}`"
+                class="ai-message"
+                :class="`ai-message-${mensaje.role}`"
+              >
+                <span class="ai-message-role">{{ mensaje.role === 'user' ? usuarioNombre : 'Asistente IA' }}</span>
+                <p>{{ mensaje.content }}</p>
+              </div>
+              <div v-if="loading" class="ai-message ai-message-assistant ai-message-loading">
+                <ProgressSpinner style="width: 24px; height: 24px" strokeWidth="5" />
+                <p>Analizando la solicitud...</p>
+              </div>
             </div>
 
             <textarea
               v-model="promptUsuario"
               class="ai-textarea"
-              rows="8"
+              rows="4"
               placeholder="Ejemplo: crea una cotizacion para Juan Perez con 2 Samsung A15 a 9500 cada uno."
+              @keydown.enter.exact.prevent="solicitarIA"
             />
 
             <div class="ai-actions">
@@ -1154,7 +1414,7 @@ onMounted(async () => {
                 icon="pi pi-microphone"
                 @click="alternarMicrofono"
               />
-              <Button label="Crear con IA" icon="pi pi-bolt" :loading="loading" @click="solicitarIA" />
+              <Button label="Enviar" icon="pi pi-send" :loading="loading" @click="solicitarIA" />
             </div>
 
             <p class="ai-voice-hint" v-if="vozDisponible">
@@ -1164,18 +1424,18 @@ onMounted(async () => {
               El reconocimiento de voz no esta disponible en este equipo.
             </p>
 
-            <div class="ai-loading" v-if="loading">
-              <ProgressSpinner style="width: 40px; height: 40px" strokeWidth="4" />
-              <span>Consultando OpenAI y creando el registro...</span>
-            </div>
-
-            <div class="ai-result" v-if="resultadoIA">
-              <h3>Lectura de la IA</h3>
+            <div class="ai-result ai-proposal" v-if="propuestaPendiente">
+              <h3>Propuesta pendiente de confirmacion</h3>
               <p><strong>Tipo:</strong> {{ resultadoIA.entityType }}</p>
               <p><strong>Resumen:</strong> {{ resultadoIA.summary || 'Sin resumen' }}</p>
               <p v-if="resultadoIA.warnings?.length">
                 <strong>Notas:</strong> {{ resultadoIA.warnings.join(' | ') }}
               </p>
+              <pre>{{ JSON.stringify(resultadoIA.data, null, 2) }}</pre>
+              <div class="ai-actions">
+                <Button label="Cancelar" severity="secondary" outlined @click="cancelarPropuesta" />
+                <Button label="Confirmar y guardar" icon="pi pi-check" severity="success" :loading="loading" @click="confirmarPropuesta" />
+              </div>
             </div>
 
             <div class="ai-result ai-result-success" v-if="ultimoRegistro">
@@ -1249,6 +1509,37 @@ onMounted(async () => {
         <Button label="Crear y continuar" severity="success" @click="crearClienteYContinuar" />
       </template>
     </Dialog>
+    <Dialog
+      v-model:visible="modalConfiguracion"
+      modal
+      header="Configurar OpenAI"
+      :style="{ width: '34rem', maxWidth: '95vw' }"
+    >
+      <div class="ai-config-form">
+        <p v-if="configuracionOpenAI.configured">
+          Clave actual: <strong>{{ configuracionOpenAI.maskedKey }}</strong>
+        </p>
+        <label for="openai-key">API Key</label>
+        <input
+          id="openai-key"
+          v-model="apiKeyInput"
+          type="password"
+          autocomplete="new-password"
+          :placeholder="configuracionOpenAI.configured ? 'Dejar vacio para conservar la actual' : 'sk-...'"
+          :disabled="!puedeConfigurarIA"
+        />
+        <label for="openai-model">Modelo</label>
+        <input id="openai-model" v-model="modeloInput" type="text" :disabled="!puedeConfigurarIA" />
+        <small>La clave se cifra y queda guardada solamente en este equipo.</small>
+        <small v-if="!puedeConfigurarIA" class="ai-config-warning">
+          Solo Administrador, Gerente o Soporte puede cambiar esta configuracion.
+        </small>
+      </div>
+      <template #footer>
+        <Button label="Cerrar" severity="secondary" outlined @click="modalConfiguracion = false" />
+        <Button v-if="puedeConfigurarIA" label="Guardar" icon="pi pi-save" @click="guardarConfiguracionOpenAI" />
+      </template>
+    </Dialog>
     <Toast />
   </main>
 </template>
@@ -1299,6 +1590,13 @@ onMounted(async () => {
   color: rgba(255, 255, 255, 0.82);
 }
 
+.ai-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  justify-content: flex-end;
+}
+
 .ai-grid {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
@@ -1347,6 +1645,57 @@ onMounted(async () => {
   background: #fcfdfd;
 }
 
+.ai-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 280px;
+  max-height: 460px;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  overflow-y: auto;
+  border: 1px solid #dbeafe;
+  border-radius: 18px;
+  background: #f8fafc;
+}
+
+.ai-message {
+  max-width: 84%;
+  padding: 0.75rem 0.9rem;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+.ai-message-user {
+  align-self: flex-end;
+  background: #0f766e;
+  color: #fff;
+}
+
+.ai-message-assistant {
+  align-self: flex-start;
+}
+
+.ai-message-role {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  opacity: 0.72;
+}
+
+.ai-message p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.ai-message-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
 .ai-textarea:focus {
   outline: none;
   border-color: #0891b2;
@@ -1386,6 +1735,22 @@ onMounted(async () => {
 
 .ai-result-success {
   background: #ecfdf5;
+}
+
+.ai-proposal {
+  border: 1px solid #86efac;
+  background: #f0fdf4;
+}
+
+.ai-proposal pre {
+  max-height: 260px;
+  padding: 0.85rem;
+  overflow: auto;
+  border-radius: 12px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
 }
 
 .ai-example-list {
@@ -1431,6 +1796,35 @@ onMounted(async () => {
   color: #334155;
 }
 
+.ai-config-form {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.ai-config-form p {
+  margin: 0 0 0.35rem;
+}
+
+.ai-config-form label {
+  font-weight: 700;
+  color: #334155;
+}
+
+.ai-config-form input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+}
+
+.ai-config-form small {
+  color: #64748b;
+}
+
+.ai-config-warning {
+  color: #b45309 !important;
+}
+
 @media (max-width: 960px) {
   .ai-grid {
     grid-template-columns: 1fr;
@@ -1438,6 +1832,15 @@ onMounted(async () => {
 
   .ai-hero {
     flex-direction: column;
+  }
+
+  .ai-hero-actions,
+  .ai-hero-actions :deep(.p-button) {
+    width: 100%;
+  }
+
+  .ai-message {
+    max-width: 94%;
   }
 }
 </style>

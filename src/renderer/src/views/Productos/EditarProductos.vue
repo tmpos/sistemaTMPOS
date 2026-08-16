@@ -830,6 +830,20 @@ async function funcionActualizar(e) {
     return;
   }
 
+  const productoServidor = await peticionesFetchOffline('getDataByField', 'productos', 'id', datoscampos.value.id);
+  const almacenServidor = `${productoServidor?.almacen ?? ''}`.trim().toUpperCase();
+  const almacenEditado = `${datoscampos.value.almacen ?? ''}`.trim().toUpperCase();
+  if (productoServidor && almacenServidor !== almacenEditado) {
+    toast.add({
+      severity: 'error',
+      summary: 'Cambio de almacén bloqueado',
+      detail: 'Use la opción Transferir almacén para mover el producto y sus IMEI de forma consistente.',
+      life: 5000
+    });
+    datoscampos.value.almacen = productoServidor.almacen;
+    return;
+  }
+
 
   // Funcion para verificar si una fecha es valida
   function esFechaValida(fecha) {

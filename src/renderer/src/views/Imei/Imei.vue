@@ -219,8 +219,11 @@ async function campos() {
 /************************************************************************/
 const arrayProductos = async()=>{
  const response = await peticionesFetchOffline('getDataArrayByCondition','productos','categoria','CELULARES');
- productosArray.value = response;
- listaBuscador.value = response.map(producto=>producto.nombre);
+ const almacenActual = `${datosEmpresa.empresa.nombre ?? ''}`.trim().toUpperCase();
+ productosArray.value = (Array.isArray(response) ? response : []).filter(
+  producto => `${producto.almacen ?? ''}`.trim().toUpperCase() === almacenActual
+ );
+ listaBuscador.value = productosArray.value.map(producto=>producto.nombre);
 }
 /************************************************************************/
 const fetchProveedores = async () => {
@@ -401,44 +404,13 @@ async function borrarSeleccionados() {
 
 /************************************************************************/
 async function actualizarStockProducto(id, operacion = 'restar') {
- // Filtrar productos con el mismo id_equi
- const cantidadProductosArray = data.value.filter(prod => prod.id_equi == id);
-
- // Encontrar el producto en productosArray
- const datosProducto = productosArray.value.find(prod => prod.id == id);
-
- // Validar si datosProducto existe
- if (!datosProducto) {
- console.error(`Producto con ID ${id} no encontrado en productosArray`);
- return;
- }
-
-
-
- const disponiblesIMEI = data.value.filter(datos=>datos.estado === 'DISPONIBLE')
- 
-
-
- /* // Calcular nuevo stock basado en la operacion
- if (operacion === 'sumar') {
- } else {
- datosProducto.stock = Math.max(0, cantidadProductosArray.length - 1); // Asegurarse de que el stock no sea negativo
- }*/
-
- datosProducto.stock = disponiblesIMEI.length;
- // Preparar URL y actualizar timestamp
- const url = `${link.value}${api.value}/actualizarcampos/productos`;
- if (datosProducto.hasOwnProperty('created_at')) {
- datosProducto.updated_at = nfecha('timestamp');
- }
-
- // Enviar datos a la API
- const envioDatos = await peticionesFetchOffline('updateData','productos',JSON.stringify(datosProducto));
- if (envioDatos[0] == 'ok') {
+ const resultado = await sincronizarStockProductoPorImeiDisponible(id);
+ if (resultado?.success) {
  toast.add({ severity: 'success', summary: 'Éxito', detail: 'Stock Actualizado', life: 3000 });
  } else {
  toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar el stock.', life: 3000 });
  }
+ return resultado;
 }
 
 /************************************************************************/
@@ -566,10 +538,8 @@ const toggleImei = async (event, rowData) => {
  { label: 'Estado', icon: 'pi icon-exchange', command: async () => { 
  if (rowData.estado === 'DISPONIBLE') {
  rowData.estado = 'VENDIDO';
- await actualizarStockProducto(rowData.id_equi, 'restar');
  } else if (rowData.estado === 'VENDIDO') {
  rowData.estado = 'DISPONIBLE';
- await actualizarStockProducto(rowData.id_equi, 'sumar');
  }
 
  const url = `${link.value}${api.value}/actualizarcampos/imei`;
@@ -579,6 +549,7 @@ const toggleImei = async (event, rowData) => {
 
  const envioDatos = await peticionesFetchOffline('updateData','imei',JSON.stringify(rowData));
  if (envioDatos[0] == 'ok') {
+ await actualizarStockProducto(rowData.id_equi);
  toast.add({ severity: 'success', summary: 'Éxito', detail: 'Estado Cambiado', life: 3000 });
  } else {
  toast.add({ severity: 'error', summary: 'Error', detail: 'Error al Cambiar el Estado', life: 3000 });
@@ -1051,10 +1022,8 @@ const fnDisponibles = async()=>{
 
  if (rowData.estado === 'DISPONIBLE') {
  rowData.estado = 'VENDIDO';
- await actualizarStockProducto(rowData.id_equi,'restar')
  } else if (rowData.estado === 'VENDIDO') {
  rowData.estado = 'DISPONIBLE';
- await actualizarStockProducto(rowData.id_equi,'sumar')
  }
 
 
@@ -1065,6 +1034,7 @@ const fnDisponibles = async()=>{
 
  const envioDatos = await peticionesFetchOffline('updateData','imei',JSON.stringify(rowData));
  if (envioDatos[0] == 'ok') {
+ await actualizarStockProducto(rowData.id_equi)
  toast.add({ severity: 'success', summary: 'Éxito', detail: 'Estado Cambiado', life: 3000 });
  }else{
  toast.add({ severity: 'success', summary: 'Éxito', detail: 'Error al Cambiar el Estado', life: 3000 });
@@ -1294,11 +1264,15 @@ const fnActualizarPrecios = async () => {
  // Iterar sobre todos los IMEIs
  for (let imei of data.value) {
  // Buscar el producto por id_equi
- let productoDatos = productosArrayN.find(prod => prod.id === imei.id_equi);
+ const almacenImei = `${imei.almacen ?? ''}`.trim().toUpperCase();
+ const productosMismoAlmacen = (Array.isArray(productosArrayN) ? productosArrayN : []).filter(
+  prod => `${prod.almacen ?? ''}`.trim().toUpperCase() === almacenImei
+ );
+ let productoDatos = productosMismoAlmacen.find(prod => `${prod.id}` === `${imei.id_equi}`);
 
  if (!productoDatos) {
  // Si no se encuentra por id_equi, buscar por nombre
- productoDatos = productosArrayN.find(prod => prod.nombre === imei.equipo);
+ productoDatos = productosMismoAlmacen.find(prod => prod.nombre === imei.equipo);
  }
 
  if (productoDatos) {
@@ -1813,12 +1787,37 @@ const fnCambiarAlmacen = async () => {
  if (!nuevoAlmacen) return;
 
  const ids = obtenerIdsSeleccionados(selectedImei.value);
+ const todosProductos = await peticionesFetchOffline('getDataAsArray', 'productos');
+ const normalizar = valor => `${valor ?? ''}`.trim().toUpperCase();
+ const idsEquiAfectados = new Set();
  let exito = 0;
+ let omitidos = 0;
 
  for (const id of ids) {
  const rowData = data.value.find(item => item.id == id);
  if (rowData) {
+ const productoOrigen = (Array.isArray(todosProductos) ? todosProductos : []).find(
+  producto => `${producto.id}` === `${rowData.id_equi}`
+ );
+ const candidatosDestino = (Array.isArray(todosProductos) ? todosProductos : []).filter(
+  producto =>
+   normalizar(producto.almacen) === normalizar(nuevoAlmacen) &&
+   normalizar(producto.nombre) === normalizar(productoOrigen?.nombre || rowData.equipo)
+ );
+
+ // No cambiar solamente el texto del almacén: el IMEI debe apuntar al
+ // producto equivalente que realmente pertenece al almacén destino.
+ if (candidatosDestino.length !== 1) {
+  omitidos++;
+  continue;
+ }
+
+ const productoDestino = candidatosDestino[0];
+ if (rowData.id_equi) idsEquiAfectados.add(rowData.id_equi);
+ idsEquiAfectados.add(productoDestino.id);
  rowData.almacen = nuevoAlmacen;
+ rowData.id_equi = productoDestino.id;
+ rowData.equipo = productoDestino.nombre;
  if (rowData.hasOwnProperty('updated_at')) {
  rowData.updated_at = nfecha('timestamp');
  }
@@ -1827,7 +1826,11 @@ const fnCambiarAlmacen = async () => {
  }
  }
 
-  toast.add({ severity: 'success', summary: 'Exito', detail: `Almacen actualizado en ${exito} IMEI(s)`, life: 3000 });
+ await sincronizarStockPorImeis([...idsEquiAfectados]);
+ const detalleOmitidos = omitidos
+  ? ` ${omitidos} omitido(s): falta un único producto equivalente en el almacén destino.`
+  : '';
+ toast.add({ severity: omitidos ? 'warn' : 'success', summary: 'Cambio de almacén', detail: `Almacén actualizado en ${exito} IMEI(s).${detalleOmitidos}`, life: 5000 });
  selectedImei.value = [];
  await fetchAndSetupData();
 };
@@ -1874,6 +1877,11 @@ const fnConfirmarCambioEquipo = async () => {
  }
 
  const productoDestino = productosArray.value.find(prod => prod.id == equipoSeleccionado.value.id) || equipoSeleccionado.value
+ const almacenDestino = `${productoDestino.almacen ?? ''}`.trim();
+ if (!almacenDestino || almacenDestino.toUpperCase() !== `${datosEmpresa.empresa.nombre ?? ''}`.trim().toUpperCase()) {
+ toast.add({ severity: 'error', summary: 'Almacén inválido', detail: 'El producto seleccionado no pertenece al almacén activo', life: 4000 });
+ return;
+ }
  const idsEquiAfectados = new Set([productoDestino.id])
  let exito = 0;
 
@@ -1887,6 +1895,7 @@ const fnConfirmarCambioEquipo = async () => {
 
  rowData.equipo = productoDestino.nombre
  rowData.id_equi = productoDestino.id
+ rowData.almacen = productoDestino.almacen
  rowData.proveedor = productoDestino.proveedor || rowData.proveedor || ''
  rowData.precio_compra = Number(cambioEquipoPrecios.value.precio_compra || 0)
  rowData.precio_venta = Number(cambioEquipoPrecios.value.precio_venta || 0)

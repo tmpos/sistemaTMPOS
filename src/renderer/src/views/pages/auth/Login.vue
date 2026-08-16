@@ -25,12 +25,9 @@
               <i class="pi pi-shield"></i>
               <span>Datos 100% Seguros</span>
             </div>
-            <div class="feature-pill" :class="{ 'loading': cargandoDatos }">
-              <i :class="cargandoDatos ? 'pi pi-spin pi-spinner' : 'pi pi-database'"></i>
-              <span v-if="!cargandoDatos">
-                {{ productosOffline > 0 ? `${productosOffline} productos offline` : 'Modo Offline Disponible' }}
-              </span>
-              <span v-else>Cargando productos...</span>
+            <div class="feature-pill">
+              <i class="pi pi-cloud"></i>
+              <span>Operación 100% en línea</span>
             </div>
             <div class="feature-pill">
               <i class="pi pi-sync"></i>
@@ -68,7 +65,7 @@
             <!-- Indicador de estado de conexión -->
             <div class="connection-status" :class="{ 'online': verificaINTERNET, 'offline': !verificaINTERNET }">
               <i :class="verificaINTERNET ? 'pi pi-wifi' : 'pi pi-wifi-slash'"></i>
-              <span>{{ verificaINTERNET ? 'En línea' : 'Sin conexión (Modo Offline)' }}</span>
+              <span>{{ verificaINTERNET ? 'En línea' : 'Sin conexión: acceso no disponible' }}</span>
             </div>
           </div>
 
@@ -666,7 +663,7 @@ const fetchUsers = async () => {
     datosUsers.value = response;
   } catch (error) {
     console.error('Error al obtener los usuarios:', error);
-    if (!navigator.onLine) {
+    if (false && !navigator.onLine) {
       try {
         initOfflineDB();
         const cachedUsers = await getCachedTable('usuarios');
@@ -865,7 +862,18 @@ const navigateToDashboard = async () => {
   }
 
   // Verificar si hay conexión a internet
-  const online = hayInternet();
+  if (!navigator.onLine) {
+    Swal.fire({
+      icon: 'error',
+      title: 'Sin conexión',
+      text: 'Este sistema requiere conexión a Internet para iniciar sesión.',
+      timer: 4000,
+      showConfirmButton: true
+    });
+    return;
+  }
+
+  const online = true;
 
   let datosUser = null;
 
@@ -927,7 +935,7 @@ const navigateToDashboard = async () => {
       window.localStorage.setItem('autenticacion', JSON.stringify({ activo: true }));
 
       // Si es login online, guardar usuario en IndexedDB para futuro acceso offline
-      if (online) {
+      if (false && online) {
         try {
           initOfflineDB();
           await guardarUsuarioOffline(datosUser);
@@ -1293,7 +1301,7 @@ const datosLocalStorage = async(envio,seguir = true)=>{
 
             await Promise.allSettled([
               datosEmpresa.inicializarDatosEmpresa(link.value+api.value),
-              cacheDataForOffline()
+              Promise.resolve()
             ]);
           } catch (error) {
             console.error('Error cargando datos post-login:', error);
@@ -1419,7 +1427,7 @@ const revisaInternet = async()=>{
   await datosConfig()
 
   // Si hay internet, cargar datos para uso offline
-  if (verificaINTERNET.value) {
+  if (false && verificaINTERNET.value) {
     try {
       await cachearTablasLocalStorage();
       console.log('[Login] Cargando datos offline en segundo plano...');
@@ -1466,10 +1474,10 @@ async function confirmarAlmacen() {
 /***********************************************************/
 onMounted(async () => {
   // Inicializar IndexedDB
-  initOfflineDB();
+  // Sin base IndexedDB: los datos se consultan directamente al servidor.
 
   // Actualizar contadores con datos existentes
-  await actualizarContadoresOffline();
+  productosOffline.value = 0;
 
   window.addEventListener('keydown', handlePinKeydown);
 
@@ -1482,7 +1490,7 @@ window.addEventListener('online', async function() {
 
   // Sincronizar cambios pendientes cuando regresa internet
   try {
-    const facturasSincronizadas = await sincronizarFacturas(peticionesFetchOffline);
+    const facturasSincronizadas = 0;
 
     if (facturasSincronizadas > 0) {
       toast.add({
@@ -1509,7 +1517,7 @@ window.addEventListener('online', async function() {
 });
 
 window.addEventListener('offline', function() {
-  toast.add({ severity: 'warn', summary: 'Sin conexión', detail: 'Trabajando en modo offline', life: 3000 });
+  toast.add({ severity: 'error', summary: 'Sin conexión', detail: 'Las operaciones están bloqueadas hasta recuperar Internet', life: 4000 });
   revisaInternet();
 });
 

@@ -32,7 +32,6 @@ arrayToObjetoFromTabla,
 peticionesFetchOffline,
 envioElectron
 } from '@/funciones/funciones.js';
-import { initOfflineDB, getSyncQueue, deleteSyncQueueItem } from '@/composables/useOfflineDB';
 
 import { useToast } from 'primevue/usetoast';
 const toast = useToast();
@@ -68,7 +67,7 @@ const ultimaTasaCambio = ref(null);
 const tokenCorto = ref(null);
 const previousRoute = ref(null);
 const loading = ref(false)
-const tipo = ref('Offline')
+const tipo = ref('Online')
 /****************************************************/
 import {useDatosEmpresa} from '@/stores'
 const datosEmpresa = useDatosEmpresa();
@@ -247,35 +246,14 @@ const imagenUsuario = async(location)=>{
 };
 /****************************************************/
 const processSyncQueue = async () => {
-  if (!navigator.onLine) return;
-  syncing.value = true;
-  try {
-    const queue = await getSyncQueue();
-    for (const item of queue) {
-      try {
-        const data = typeof item.data === 'string' ? JSON.parse(item.data) : item.data;
-        await peticionesFetch(`${link.value}${api.value}`, `insertar/${item.tabla}`, data, tokenCifrado.value, 'POST');
-        await deleteSyncQueueItem(item.id);
-      } catch (e) {
-        console.warn('[Sync] Error sincronizando item:', item.id, e);
-      }
-    }
-    pendingSync.value = (await getSyncQueue()).length;
-    if (pendingSync.value === 0 && queue.length > 0) {
-      toast.add({ severity: 'success', summary: 'Sync completo', detail: 'Datos sincronizados con el servidor', life: 3000 });
-    }
-  } finally {
-    syncing.value = false;
-  }
+  return null;
 };
 /****************************************************/
 const handleConnectionChange = async() => {
   if (navigator.onLine) {
     isOnline.value = true;
     toast.add({ severity: 'success', summary: 'Conexión restaurada', detail: 'Has vuelto a estar en línea', life: 3000 });
-    await processSyncQueue();
     //await revisaCambiosLocal();
-    await revisaCambios();
     //await peticionesFetchOffline('subirDatos');
   } else {
     isOnline.value = false;
@@ -699,13 +677,17 @@ if(!sonido){
 
 /****************************************************/
   if(window.electron){
-     await crearTablaSiNoExisteOffline('tokens','almacen, nombre, token, usuario, identificadordb',toast)
+     await crearTablaSiNoExiste(
+       link.value,
+       api.value,
+       'tokens',
+       ['almacen', 'nombre', 'token', 'usuario', 'identificadordb'],
+       tokenCifrado.value,
+       toast
+     )
   }
 /****************************************************/
-  if(!window.electron){
-    initOfflineDB();
-    pendingSync.value = (await getSyncQueue()).length;
-  }
+  pendingSync.value = 0;
 /****************************************************/
 /****************************************************/
 /*const worker = new Worker(new URL('@/workers/notificaciones.js', import.meta.url), {
@@ -1529,16 +1511,6 @@ const cambiarSigno = () => {
             <div class="quick-actions">
                 <!-- Offline indicator / sync button -->
                 <Tag v-if="!isOnline" severity="danger" value="Sin conexión" style="font-size:0.75rem;" />
-                <Button
-                  v-else-if="pendingSync > 0"
-                  @click="processSyncQueue"
-                  :label="`Sync (${pendingSync})`"
-                  :loading="syncing"
-                  icon="pi pi-cloud-upload"
-                  size="small"
-                  severity="warning"
-                  style="height:36px;"
-                />
 
                 <button @click="toggleDarkMode" class="topbar-icon-btn" v-tooltip.bottom="t('Theme')">
                     <i :class="['pi', { 'pi-moon': isDarkTheme, 'pi-sun': !isDarkTheme }]"></i>
