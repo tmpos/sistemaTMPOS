@@ -4,6 +4,60 @@ export const toFiniteNumber = (value, fallback = 0) => {
   return Number.isFinite(number) ? number : fallback
 }
 
+export const unwrapAlanubeDocumentResponse = (payload = {}) => {
+  if (Array.isArray(payload)) {
+    return unwrapAlanubeDocumentResponse(payload[0] || {})
+  }
+
+  if (!payload || typeof payload !== 'object') return {}
+
+  for (const key of ['data', 'result', 'document', 'invoice', 'response']) {
+    const nested = payload[key]
+    if (nested && typeof nested === 'object') {
+      return { ...payload, ...unwrapAlanubeDocumentResponse(nested) }
+    }
+  }
+
+  return payload
+}
+
+export const getAlanubeSecurityCode = (data = {}) => {
+  const document = unwrapAlanubeDocumentResponse(data)
+  return String(
+    document.securityCode ||
+      document.security_code ||
+      document.codigoSeguridad ||
+      document.codigo_seguridad ||
+      ''
+  ).trim()
+}
+
+export const getDgiiStampUrl = (data = {}) => {
+  const document = unwrapAlanubeDocumentResponse(data)
+  const candidate = String(
+    document.documentStampUrl ||
+      document.document_stamp_url ||
+      document.documentStampURL ||
+      document.stampUrl ||
+      document.qr_url ||
+      ''
+  ).trim()
+  if (!candidate) return ''
+
+  try {
+    const url = new URL(candidate)
+    const hostname = url.hostname.toLowerCase()
+    const pathname = url.pathname.toLowerCase()
+    const isStandardStamp =
+      hostname === 'ecf.dgii.gov.do' && /\/consultatimbre\/?$/.test(pathname)
+    const isConsumerStamp =
+      hostname === 'fc.dgii.gov.do' && /\/consultatimbrefc\/?$/.test(pathname)
+    return url.protocol === 'https:' && (isStandardStamp || isConsumerStamp) ? candidate : ''
+  } catch {
+    return ''
+  }
+}
+
 export const normalizeSearchText = (value) =>
   String(value ?? '')
     .trim()

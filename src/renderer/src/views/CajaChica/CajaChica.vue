@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { useToast } from "primevue/usetoast";
 import {
   envioElectron,
@@ -17,6 +18,7 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 
 const toast = useToast();
+const router = useRouter();
 const datosEmpresa = useDatosEmpresa();
 
 const link = ref('');
@@ -348,10 +350,10 @@ onMounted(async () => {
       await crearTablaSiNoExisteOffline('datos_config', ["id", "nombre", "valor", "created_at", "updated_at"], toast);
     } catch (e) { console.warn('Offline datos_config creation skipped:', e); }
     try {
-      await crearTablaSiNoExiste(link.value, api.value, 'gastosfijos', ["descripcion", "valor", "saldo", "fecha_pago", "alerta", "dias_alerta", "tipo", "cuentaporpagar", "ultimo_pago", "almacen", "estado", "categoria", "proveedor", "notas", "historial_pagos", "usuario"], tokenCifrado.value, toast);
+      await crearTablaSiNoExiste(link.value, api.value, 'gastosfijos', ["descripcion", "valor", "saldo", "fecha_pago", "alerta", "dias_alerta", "tipo", "cuentaporpagar", "ultimo_pago", "almacen", "estado", "categoria", "proveedor", "impuesto_selectivo_consumo", "otros_impuestos_tasas", "notas", "historial_pagos", "usuario"], tokenCifrado.value, toast);
     } catch (e) { console.warn('Online gastosfijos creation skipped:', e); }
     try {
-      await crearTablaSiNoExisteOffline('gastosfijos', ["descripcion", "valor", "saldo", "fecha_pago", "alerta", "dias_alerta", "tipo", "cuentaporpagar", "ultimo_pago", "almacen", "estado", "categoria", "proveedor", "notas", "historial_pagos", "usuario"], toast);
+      await crearTablaSiNoExisteOffline('gastosfijos', ["descripcion", "valor", "saldo", "fecha_pago", "alerta", "dias_alerta", "tipo", "cuentaporpagar", "ultimo_pago", "almacen", "estado", "categoria", "proveedor", "impuesto_selectivo_consumo", "otros_impuestos_tasas", "notas", "historial_pagos", "usuario"], toast);
     } catch (e) { console.warn('Offline gastosfijos creation skipped:', e); }
 
     usuarioLocal.value = JSON.parse(window.localStorage.getItem('usuarioLocal'))?.[0] || {};
@@ -1106,7 +1108,7 @@ watch(() => nuevaTransaccion.value.tipo, (t) => {
             <Button label="Nueva Compra" icon="pi pi-shopping-cart" severity="help" @click="abrirModalNuevaCompra" :disabled="!cuentaActiva" />
             <Button label="Pago Gasto Fijo" icon="pi pi-folder-open" severity="warning" @click="abrirModalPagoGastoFijo(null)" :disabled="!cuentaActiva" />
             <Button label="Reposición Fondos" icon="pi pi-refresh" severity="contrast" @click="visibleReposicion = true" :disabled="!cuentaActiva" />
-            <Button label="Ir a Cuentas" icon="pi pi-calculator" severity="success" text @click="window.open('/cuentas', '_self')" />
+            <Button label="Ir a Cuentas Contables" icon="pi pi-calculator" severity="success" text @click="router.push({ name: 'cuentas' })" />
           </div>
         </div>
       </div>

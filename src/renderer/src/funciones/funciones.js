@@ -664,6 +664,66 @@ const datosServidorLocal = async (peticion, data) => {
 }
 
 /***************************************************************/
+export function normalizarColumnasTabla(respuesta) {
+  let columnas = respuesta
+
+  if (!Array.isArray(columnas) && columnas && typeof columnas === 'object') {
+    const clavesRespuesta = Object.keys(columnas)
+    const esRespuestaError = ['error', 'message', 'detail'].some((clave) => clave in columnas)
+    columnas =
+      columnas.data ??
+      columnas.columns ??
+      columnas.columnas ??
+      columnas.campos ??
+      (clavesRespuesta.every((clave) => /^\d+$/.test(clave))
+        ? Object.values(columnas)
+        : !esRespuestaError && clavesRespuesta.length > 0
+          ? clavesRespuesta
+          : null)
+  }
+
+  if (!Array.isArray(columnas)) {
+    const mensajeServidor =
+      respuesta?.message || respuesta?.error || respuesta?.detail || 'respuesta no reconocida'
+    throw new Error(`No se pudieron obtener las columnas de la tabla: ${mensajeServidor}`)
+  }
+
+  return columnas
+    .map((columna) => {
+      if (typeof columna === 'string') return columna
+      if (!columna || typeof columna !== 'object') return ''
+      return columna.name || columna.field || columna.Field || columna.campo || ''
+    })
+    .filter(Boolean)
+}
+
+export function esRespuestaOperacionExitosa(respuesta) {
+  if (respuesta === true) return true
+
+  if (typeof respuesta === 'string') {
+    return ['ok', 'success', 'successful'].includes(respuesta.trim().toLowerCase())
+  }
+
+  if (Array.isArray(respuesta)) {
+    return respuesta.length > 0 && esRespuestaOperacionExitosa(respuesta[0])
+  }
+
+  if (respuesta && typeof respuesta === 'object') {
+    if (respuesta.success === true || respuesta.ok === true) return true
+    if (Number.isFinite(Number(respuesta.status)) && Number(respuesta.status) >= 200 && Number(respuesta.status) < 300) {
+      return true
+    }
+
+    for (const clave of ['data', 'result', 'response']) {
+      if (clave in respuesta && esRespuestaOperacionExitosa(respuesta[clave])) return true
+    }
+
+    if ('0' in respuesta) return esRespuestaOperacionExitosa(respuesta[0])
+  }
+
+  return false
+}
+
 export async function peticionesFetchOffline(peticion, parametros, ...datos) {
   let envio
   const datosJSON = await envioElectron('datosarchivo')
@@ -719,14 +779,6 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
     } catch (error) {
       return String(valor)
     }
-  }
-
-  const esRespuestaOK = (respuesta) => {
-    if (Array.isArray(respuesta)) return respuesta[0] === 'ok'
-    if (respuesta && typeof respuesta === 'object') {
-      return respuesta.success === true || respuesta.ok === true || respuesta[0] === 'ok'
-    }
-    return false
   }
 
   const obtenerReferenciaRegistro = (registro = {}) => {
@@ -1268,6 +1320,7 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
       } else {
         envio = await peticionesFetch(`${link}${api}`, `campos/${tabla}`, {}, tokenCifrado, 'GET')
       }
+      envio = normalizarColumnasTabla(envio)
       break
 
     case 'addColumnToTable': {
@@ -1369,7 +1422,7 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
         )
       }
 
-      if (esRespuestaOK(envio)) {
+      if (esRespuestaOperacionExitosa(envio)) {
         invalidarTablaLocalStorage(tabla)
         await registrarBitacora({
           tablaNombre: tabla,
@@ -1672,7 +1725,7 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
         envio = await enviarDatosPorPost(`${link}${api}/insertar/${tabla}`, data, tokenCifrado)
       }
 
-      if (esRespuestaOK(envio)) {
+      if (esRespuestaOperacionExitosa(envio)) {
         invalidarTablaLocalStorage(tabla)
         await registrarBitacora({
           tablaNombre: tabla,
@@ -1698,7 +1751,7 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
         )
       }
 
-      if (esRespuestaOK(envio) && tabla !== BITACORA_TABLE) {
+      if (esRespuestaOperacionExitosa(envio) && tabla !== BITACORA_TABLE) {
         invalidarTablaLocalStorage(tabla)
         await registrarBitacora({
           tablaNombre: tabla,
@@ -1742,7 +1795,7 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
         )
       }
 
-      if (esRespuestaOK(envio)) {
+      if (esRespuestaOperacionExitosa(envio)) {
         invalidarTablaLocalStorage(tabla)
         await registrarBitacora({
           tablaNombre: tabla,
@@ -1779,7 +1832,7 @@ export async function peticionesFetchOffline(peticion, parametros, ...datos) {
         )
       }
 
-      if (esRespuestaOK(envio) && tabla !== BITACORA_TABLE) {
+      if (esRespuestaOperacionExitosa(envio) && tabla !== BITACORA_TABLE) {
         invalidarTablaLocalStorage(tabla)
         await registrarBitacora({
           tablaNombre: tabla,
@@ -4933,55 +4986,86 @@ export async function crearTablaSiNoExisteOfflineRED(tabla, campos, toast) {
 }
 /***************************************************************/
 export async function crearTablaSiNoExisteOffline(tabla, campos, toast) {
-  const datos = await verificaTablaOffline(tabla)
-  if (datos[0] === 'ok') {
-    const camposT = await camposTabla(tabla)
-    if (typeof campos === 'string') {
-      campos = campos.split(',').map((c) => c.trim())
-    }
-    if (campos) {
-      const camposFaltantes = campos.filter((campo) => !camposT.includes(campo))
-      if (camposFaltantes.length > 0) {
-        if (toast) {
-          toast.add({
-            severity: 'warn',
-            summary: 'Upps',
-            detail: `Agregando Campos faltantes: ${camposFaltantes.join(', ')} ...`,
-            life: 3000
-          })
-        }
-        const agregarCampo = await agregarCamposTabla(tabla, camposFaltantes)
-        if (agregarCampo) {
-          toast.add({
-            severity: 'success',
-            summary: 'Genial',
-            detail: 'Campos agregados con éxito',
-            life: 3000
-          })
-        }
-      } else {
-        console.log('Todos los campos están presentes')
+  const camposNormalizados = Array.isArray(campos)
+    ? campos.map((campo) => String(campo).trim()).filter(Boolean)
+    : typeof campos === 'string'
+      ? campos.split(',').map((campo) => campo.trim()).filter(Boolean)
+      : []
+
+  let estadoTabla = await verificaTablaOffline(tabla)
+
+  if (estadoTabla?.[0] !== 'ok') {
+    await agregarTabla(tabla, camposNormalizados)
+
+    // En el API remoto crearTabla solo crea la tabla base. Se vuelve a
+    // consultar antes de agregar las columnas para garantizar que la tabla
+    // realmente exista en el servidor y no confundir un fallo con exito.
+    estadoTabla = await verificaTablaOffline(tabla)
+    if (estadoTabla?.[0] !== 'ok') {
+      if (toast) {
+        toast.add({
+          severity: 'error',
+          summary: 'Error',
+          detail: `No se pudo crear la tabla ${tabla} en el servidor`,
+          life: 3000
+        })
       }
+      return estadoTabla
     }
-  } else {
-    const createtable = await agregarTabla(tabla, campos)
-    if (createtable.success) {
+
+    if (toast) {
       toast.add({
         severity: 'success',
         summary: 'Genial',
-        detail: 'Tabla creada con éxito',
-        life: 3000
-      })
-    } else {
-      toast.add({
-        severity: 'error',
-        summary: 'Upps',
-        detail: 'Nos e pudo Crear la Tabla',
+        detail: 'Tabla creada con exito',
         life: 3000
       })
     }
   }
-  return datos
+
+  if (camposNormalizados.length > 0) {
+    const camposExistentes = await camposTabla(tabla)
+    const camposFaltantes = camposNormalizados.filter(
+      (campo) => !camposExistentes.includes(campo)
+    )
+
+    if (camposFaltantes.length > 0) {
+      if (toast) {
+        toast.add({
+          severity: 'warn',
+          summary: 'Upps',
+          detail: `Agregando Campos faltantes: ${camposFaltantes.join(', ')} ...`,
+          life: 3000
+        })
+      }
+
+      const camposAgregados = await agregarCamposTabla(tabla, camposFaltantes)
+      if (!camposAgregados) {
+        if (toast) {
+          toast.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: `No se pudieron completar los campos de la tabla ${tabla}`,
+            life: 3000
+          })
+        }
+        return ['error', `No se pudieron agregar campos a ${tabla}`]
+      }
+
+      if (toast) {
+        toast.add({
+          severity: 'success',
+          summary: 'Genial',
+          detail: 'Campos agregados con exito',
+          life: 3000
+        })
+      }
+    } else {
+      console.log('Todos los campos estan presentes')
+    }
+  }
+
+  return estadoTabla
 }
 /***************************************************************/
 export async function arrayToObjetoFromTablaOffline(tabla, quitarPrimero = true) {

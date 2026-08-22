@@ -14,7 +14,9 @@ import {
   createTemporaryClient,
   distributeSurcharge,
   filterPosProducts,
+  getAlanubeSecurityCode,
   getCartProductQuantity,
+  getDgiiStampUrl,
   getProductSalePrice,
   getProductStock,
   isInvoiceStateLocked,
@@ -23,8 +25,48 @@ import {
   parseStoredProducts,
   productHasImei,
   roundDownToInterval,
-  toFiniteNumber
+  toFiniteNumber,
+  unwrapAlanubeDocumentResponse
 } from '../venderCore.js'
+
+describe('Vender: URL oficial del timbre DGII', () => {
+  const officialUrl =
+    'https://ecf.dgii.gov.do/ecf/ConsultaTimbre?RncEmisor=131196901&ENCF=E310000000002'
+  const consumerInvoiceUrl =
+    'https://fc.dgii.gov.do/ecf/ConsultaTimbreFC?RncEmisor=131196901&ENCF=E320000000009&MontoTotal=200&CodigoSeguridad=X4T3vw'
+
+  it.each(['documentStampUrl', 'document_stamp_url', 'qr_url'])(
+    'acepta la URL oficial guardada en %s',
+    (field) => {
+      expect(getDgiiStampUrl({ [field]: officialUrl })).toBe(officialUrl)
+    }
+  )
+
+  it('rechaza enlaces internos o dominios que no son de DGII', () => {
+    expect(getDgiiStampUrl({ qr_url: 'https://tmposrd.com/receipt/factura?factura=1' })).toBe('')
+    expect(getDgiiStampUrl({ documentStampUrl: 'https://example.com/ConsultaTimbre' })).toBe('')
+  })
+
+  it('acepta el enlace oficial de factura de consumo E32 menor de RD$250,000', () => {
+    expect(getDgiiStampUrl({ documentStampUrl: consumerInvoiceUrl })).toBe(consumerInvoiceUrl)
+  })
+
+  it('extrae el timbre y el código desde respuestas anidadas o en arreglo', () => {
+    const nestedResponse = {
+      data: [
+        {
+          documentStampUrl: officialUrl,
+          security_code: 'ABC123',
+          documentNumber: 'E320000000001'
+        }
+      ]
+    }
+
+    expect(getDgiiStampUrl(nestedResponse)).toBe(officialUrl)
+    expect(getAlanubeSecurityCode(nestedResponse)).toBe('ABC123')
+    expect(unwrapAlanubeDocumentResponse(nestedResponse).documentNumber).toBe('E320000000001')
+  })
+})
 
 describe('Vender: normalización y permisos', () => {
   it.each([

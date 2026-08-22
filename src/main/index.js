@@ -408,6 +408,104 @@ function crearItemMenu(label, ruta) {
 
 function buildMenuTemplate() {
   const hasPermission = (permissions) => permissions.some((perm) => userPermissions.includes(perm))
+  menuTemplateGlobal = []
+
+  // Rutas presentes en el menu lateral que todavia no forman parte de las
+  // secciones historicas del menu nativo. Mantenerlas en un registro permite
+  // que Electron exponga los mismos modulos sin perder sus permisos.
+  const gruposMenuLateral = [
+    {
+      label: 'Sistema y configuracion',
+      items: [
+        ['Manual del Sistema', '/manual-sistema', ['Administrador', 'Gerente', 'Soporte']],
+        ['Configuracion Alanube', '/configuracion-alanube', ['Administrador', 'Gerente', 'Soporte']],
+        ['Log E-CF', '/facturacion-electronica-log', ['Administrador', 'Gerente', 'Soporte']],
+        ['Centro Empresarial', '/centro-empresarial', ['Administrador', 'Gerente', 'Soporte']],
+        ['Almacenes', '/almacenes', ['Administrador', 'Gerente', 'Soporte']],
+        ['Configuracion de Correo', '/config_correo', ['Administrador', 'Gerente', 'Soporte']],
+        ['Valores por Defecto', '/default', ['Administrador', 'Gerente', 'Soporte']],
+        ['Comprobantes Electronicos', '/comprobantes-electronicos', ['Administrador', 'Gerente', 'Soporte']]
+      ]
+    },
+    {
+      label: 'Inventario y productos',
+      items: [
+        ['Electrodomesticos', '/electrodomesticos', ['Administrador', 'Gerente', 'Soporte']],
+        ['Inventario Celular', '/inventario_celular', ['Administrador', 'Gerente', 'Soporte']],
+        ['Inventario de Accesorios', '/inventario_accesorios', ['Administrador', 'Soporte']],
+        ['Productos Danados', '/productos-danados', ['Administrador', 'Gerente', 'Soporte']],
+        ['Refurbished', '/refurbished', ['Administrador', 'Gerente', 'Soporte']],
+        ['Piezas', '/piezas', ['Administrador', 'Gerente', 'Soporte']],
+        ['Productos de Uso Interno', '/productos-uso-interno', ['Administrador', 'Gerente', 'Soporte']]
+      ]
+    },
+    {
+      label: 'Contactos y ventas',
+      items: [
+        ['Meseros', '/meseros', ['Administrador', 'Gerente', 'Soporte']],
+        ['Cargos', '/cargos', ['Administrador', 'Soporte']],
+        ['Instaladores', '/instaladores', ['Administrador', 'Gerente', 'Soporte']],
+        ['Ordenes', '/ordenes', ['Administrador', 'Gerente', 'Soporte']],
+        ['Pre Facturas', '/pre_facturas', ['Administrador', 'Gerente', 'Soporte']],
+        ['Metas', '/metas', ['Administrador', 'Gerente', 'Soporte']]
+      ]
+    },
+    {
+      label: 'Ruleta de Premios',
+      items: [
+        ['Girar Ruleta', '/ruleta', ['Administrador', 'Gerente', 'Soporte', 'Cajero', 'Vendedor']],
+        ['Gestionar Premios', '/ruleta/premios', ['Administrador', 'Gerente', 'Soporte']],
+        ['Configuracion de Ruleta', '/ruleta/configuracion', ['Administrador', 'Soporte']]
+      ]
+    },
+    {
+      label: 'Taller',
+      items: [
+        ['Mi Taller', '/mitaller', ['Administrador', 'Gerente', 'Soporte', 'Tecnico']],
+        ['Equipos', '/equipos', ['Administrador', 'Gerente', 'Soporte']],
+        ['Tecnicos', '/tecnicos', ['Administrador', 'Gerente', 'Soporte']],
+        ['Taller', '/taller', ['Administrador', 'Gerente', 'Soporte']],
+        ['Cellinfo', '/cellinfo', ['Soporte']],
+        ['Recibir Equipo', '/recibirequipo', ['Administrador', 'Gerente', 'Soporte', 'Vendedor', 'Cajero']],
+        ['Hoja de Entrada', '/hojaentrada', ['Administrador', 'Gerente', 'Soporte']]
+      ]
+    },
+    {
+      label: 'Contabilidad',
+      items: [
+        ['Cheques', '/cheques', ['Administrador', 'Gerente', 'Soporte', 'Contable']],
+        ['Conciliaciones Bancarias', '/conciliaciones', ['Administrador', 'Gerente', 'Soporte', 'Contable']],
+        ['Reportes y Analitica', '/reportes-analitica', ['Administrador', 'Gerente', 'Contable']],
+        ['Comisiones Bancarias', '/comisionesbancarias', ['Administrador', 'Gerente', 'Soporte', 'Contable']]
+      ]
+    },
+    {
+      label: 'Nomina y soporte',
+      items: [
+        ['Prueba', '/prueba', ['Administrador', 'Gerente', 'Soporte', 'Contable']],
+        ['Printer', '/factura', ['Administrador', 'Gerente', 'Soporte', 'Contable']],
+        ['Bitacora', '/bitacora', ['Soporte']],
+        ['Tokens', '/tokens', ['Administrador', 'Soporte']],
+        ['Variables', '/variables', ['Soporte']],
+        ['Configuracion de Correo', '/configuracion_correo', ['Administrador', 'Soporte']],
+        ['Cuadres', '/cuadres', ['Administrador', 'Soporte']],
+        ['Android', '/android', ['Soporte']]
+      ]
+    },
+    {
+      label: 'Integraciones',
+      items: [['Integraciones', '/integraciones', ['Administrador', 'Gerente', 'Soporte']]]
+    }
+  ]
+
+  const submenuSincronizado = gruposMenuLateral
+    .map((grupo) => ({
+      label: grupo.label,
+      submenu: grupo.items
+        .filter(([, , permisos]) => hasPermission(permisos))
+        .map(([label, ruta]) => crearItemMenu(label, ruta))
+    }))
+    .filter((grupo) => grupo.submenu.length > 0)
 
   const template = [
     ...(hasPermission(['Administrador', 'Soporte', 'Gerente'])
@@ -551,6 +649,14 @@ function buildMenuTemplate() {
                 ? [crearItemMenu('Nota de Crédito', '/notacredito')]
                 : []),
               ...(hasPermission(['Administrador', 'Gerente', 'Soporte'])
+                ? [
+                    crearItemMenu(
+                      'Nota de Crédito Electrónica E34',
+                      '/crear-nota-credito-electronica'
+                    )
+                  ]
+                : []),
+              ...(hasPermission(['Administrador', 'Gerente', 'Soporte'])
                 ? [crearItemMenu('Conduce', '/conduce')]
                 : []),
               ...(hasPermission(['Administrador', 'Gerente', 'Soporte'])
@@ -579,6 +685,51 @@ function buildMenuTemplate() {
                 : []),
               ...(hasPermission(['Administrador', 'Gerente', 'Soporte', 'Contable'])
                 ? [crearItemMenu('Transacciones Bancarias', '/transaccionesbancarias')]
+                : []),
+              ...(hasPermission(['Administrador', 'Gerente', 'Soporte', 'Contable'])
+                ? [crearItemMenu('Trazabilidad de Transacciones', '/trazabilidad-transacciones')]
+                : []),
+              ...(hasPermission(['Administrador', 'Gerente', 'Soporte', 'Contable'])
+                ? [crearItemMenu('Kardex de Inventario', '/kardex-inventario')]
+                : []),
+              ...(hasPermission(['Administrador', 'Gerente', 'Soporte', 'Contable'])
+                ? [crearItemMenu('Conteo Físico', '/conteo-fisico')]
+                : []),
+              ...(hasPermission(['Administrador', 'Gerente', 'Soporte', 'Contable'])
+                ? [crearItemMenu('Transferencias entre Almacenes', '/transferencias-almacenes')]
+                : []),
+              ...(hasPermission(['Administrador', 'Gerente', 'Soporte', 'Contable'])
+                ? [crearItemMenu('Órdenes de Compra', '/ordenes-compra')]
+                : []),
+              ...(hasPermission(['Administrador', 'Gerente', 'Soporte', 'Contable'])
+                ? [crearItemMenu('Antigüedad de Saldos', '/antiguedad-saldos')]
+                : []),
+              ...(hasPermission(['Administrador', 'Gerente', 'Soporte', 'Contable'])
+                ? [crearItemMenu('Flujo de Caja', '/flujo-caja')]
+                : []),
+              ...(hasPermission(['Administrador', 'Gerente', 'Soporte', 'Contable'])
+                ? [crearItemMenu('Períodos Contables', '/periodos-contables')]
+                : []),
+              ...(hasPermission(['Administrador', 'Gerente', 'Soporte', 'Contable'])
+                ? [crearItemMenu('Centro de Aprobaciones', '/centro-aprobaciones')]
+                : []),
+              ...(hasPermission(['Administrador', 'Gerente', 'Soporte', 'Contable'])
+                ? [crearItemMenu('Activos Fijos', '/activos-fijos')]
+                : []),
+              ...(hasPermission(['Administrador', 'Gerente', 'Soporte', 'Contable'])
+                ? [crearItemMenu('Centros de Costo', '/centros-costo')]
+                : []),
+              ...(hasPermission(['Administrador', 'Gerente', 'Soporte', 'Contable'])
+                ? [crearItemMenu('Valoración de Inventario', '/valoracion-inventario')]
+                : []),
+              ...(hasPermission(['Administrador', 'Gerente', 'Soporte', 'Contable'])
+                ? [crearItemMenu('Integridad del Sistema', '/integridad-sistema')]
+                : []),
+              ...(hasPermission(['Administrador', 'Gerente', 'Soporte', 'Contable'])
+                ? [crearItemMenu('Reportes', '/reportes')]
+                : []),
+              ...(hasPermission(['Administrador', 'Gerente', 'Soporte', 'Contable'])
+                ? [crearItemMenu('Impuestos y Retenciones', '/impuestos-retenciones')]
                 : []),
               ...(hasPermission(['Administrador', 'Gerente', 'Soporte'])
                 ? [crearItemMenu('Mayor General', '/mayorgeneral')]
@@ -668,6 +819,9 @@ function buildMenuTemplate() {
             ]
           }
         ]
+      : []),
+    ...(submenuSincronizado.length > 0
+      ? [{ label: 'Modulos del menu lateral', submenu: submenuSincronizado }]
       : []),
     ...(hasPermission(['Administrador', 'Soporte', 'Gerente', 'Cajero'])
       ? [crearItemMenu('Vender', '/vender')]

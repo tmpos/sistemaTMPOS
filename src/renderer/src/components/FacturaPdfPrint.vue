@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import QRCode from 'qrcode'
+import { getDgiiStampUrl } from '@/views/Vender/venderCore.js'
 import { formatoMonedaRD, peticionesFetch, peticionesFetchOffline, encryptarPassword,envioElectron } from '@/funciones/funciones.js'
 import { jsPDF } from 'jspdf'
 import html2canvas from 'html2canvas'
@@ -110,7 +111,7 @@ const generateFacturaHtml = async ({ factura, cliente, datosEmpresa, creditoData
           ? primerElemento.alanubeResponse
           : {}
       const datosElectronicos = { ...respuestaAlanube, ...primerElemento }
-      const qrUrlDGII = datosElectronicos.documentStampUrl
+      const qrUrlDGII = getDgiiStampUrl(datosElectronicos)
       const ecfDGII =
         datosElectronicos.documentNumber ||
         datosElectronicos.ecf ||

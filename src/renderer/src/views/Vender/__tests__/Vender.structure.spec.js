@@ -70,4 +70,11 @@ describe('Vender.vue: contrato estructural del componente completo', () => {
     expect(source).toContain('cotizacionNueva')
     expect(source).toContain('restarStock')
   })
+
+  it('avanza y persiste la secuencia después de registrar un e-NCF oficial', () => {
+    expect(source).toContain('const secuenciaConsumida = numeroECFOficial.slice(prefijoECF.length)')
+    expect(source).toContain('actualizarSecuenciaComprobanteElectronico(')
+    expect(source).toContain('secuencia_actual: String(secuenciaNumerica + 1)')
+    expect(source).toContain('esRespuestaOperacionExitosa(resultado)')
+  })
 })

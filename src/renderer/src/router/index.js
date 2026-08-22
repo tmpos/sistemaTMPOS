@@ -612,6 +612,11 @@ const privateRoutes = [
         component: () => import('@/views/Notacredito/CrearNotacredito.vue')
       },
       {
+        path: 'crear-nota-credito-electronica',
+        name: 'crear-nota-credito-electronica',
+        component: () => import('@/views/Notacredito/CrearNotaCreditoElectronica.vue')
+      },
+      {
         path: 'editarnotacredito/:id',
         name: 'editarnotacredito',
         component: () => import('@/views/Notacredito/EditarNotacredito.vue')
@@ -826,6 +831,11 @@ const privateRoutes = [
         path: 'reporte-606',
         name: 'reporte-606',
         component: () => import('@/views/Reporte606/Reporte606.vue')
+      },
+      {
+        path: 'impuestos-retenciones',
+        name: 'impuestos-retenciones',
+        component: () => import('@/views/ImpuestosRetenciones/ImpuestosRetenciones.vue')
       },
       {
         path: 'reporte-607',
@@ -1068,6 +1078,71 @@ const privateRoutes = [
         path: 'movimientos-cuentas',
         name: 'movimientos-cuentas',
         component: () => import('@/views/MovimientosCuentas/MovimientosCuentas.vue')
+      },
+      {
+        path: 'trazabilidad-transacciones',
+        name: 'trazabilidad-transacciones',
+        component: () => import('@/views/TrazabilidadTransacciones/TrazabilidadTransacciones.vue')
+      },
+      {
+        path: 'kardex-inventario',
+        name: 'kardex-inventario',
+        component: () => import('@/views/KardexInventario/KardexInventario.vue')
+      },
+      {
+        path: 'conteo-fisico',
+        name: 'conteo-fisico',
+        component: () => import('@/views/ConteoFisico/ConteoFisico.vue')
+      },
+      {
+        path: 'transferencias-almacenes',
+        name: 'transferencias-almacenes',
+        component: () => import('@/views/TransferenciasAlmacenes/TransferenciasAlmacenes.vue')
+      },
+      {
+        path: 'ordenes-compra',
+        name: 'ordenes-compra',
+        component: () => import('@/views/OrdenesCompra/OrdenesCompra.vue')
+      },
+      {
+        path: 'antiguedad-saldos',
+        name: 'antiguedad-saldos',
+        component: () => import('@/views/AntiguedadSaldos/AntiguedadSaldos.vue')
+      },
+      {
+        path: 'flujo-caja',
+        name: 'flujo-caja',
+        component: () => import('@/views/FlujoCaja/FlujoCaja.vue')
+      },
+      {
+        path: 'periodos-contables',
+        name: 'periodos-contables',
+        component: () => import('@/views/PeriodosContables/PeriodosContables.vue')
+      },
+      {
+        path: 'centro-aprobaciones',
+        name: 'centro-aprobaciones',
+        component: () => import('@/views/CentroAprobaciones/CentroAprobaciones.vue')
+      },
+      {
+        path: 'activos-fijos',
+        name: 'activos-fijos',
+        component: () => import('@/views/ActivosFijos/ActivosFijos.vue')
+      },
+      {
+        path: 'centros-costo',
+        name: 'centros-costo',
+        component: () => import('@/views/CentrosCosto/CentrosCosto.vue')
+      },
+      {
+        path: 'valoracion-inventario',
+        name: 'valoracion-inventario',
+        component: () => import('@/views/ValoracionInventario/ValoracionInventario.vue')
+      },
+      {
+        path: 'integridad-sistema',
+        name: 'integridad-sistema',
+        component: () => import('@/views/IntegridadSistema/IntegridadSistema.vue')
       },
       {
         path: 'notificaciones',

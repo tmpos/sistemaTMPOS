@@ -1,6 +1,7 @@
 <script setup>
 import QRCode from 'qrcode'
 import { envioElectron, encryptarPassword } from '@/funciones/funciones.js'
+import { getDgiiStampUrl } from '@/views/Vender/venderCore.js'
 import html2pdf from 'html2pdf.js'
 import Swal from 'sweetalert2'
 
@@ -590,7 +591,7 @@ const printTicket = async ({ factura, cliente, datosEmpresa }) => {
         ...respuestaAlanube,
         ...primerElemento
       }
-      const qrUrlDGII = datosElectronicos.documentStampUrl
+      const qrUrlDGII = getDgiiStampUrl(datosElectronicos)
       const ecfDGII =
         datosElectronicos.documentNumber || datosElectronicos.ecf || datosElectronicos.encf
       if (qrUrlDGII && ecfDGII) {

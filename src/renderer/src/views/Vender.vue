@@ -884,7 +884,12 @@
                           <td
                             class="px-4 py-3 text-center font-semibold text-slate-700 dark:text-slate-300"
                           >
-                            ${{ Number(producto.precio_venta).toFixed(2) }}
+                            ${{
+                              toFiniteNumber(
+                                producto.precio_venta,
+                                toFiniteNumber(producto.precio_final, 0)
+                              ).toFixed(2)
+                            }}
                           </td>
 
                           <td
@@ -2562,22 +2567,8 @@
             >
               <template #content>
                 <div class="grid grid-cols-12 gap-4">
-                  <!-- Impuestos -->
-                  <div v-show="!modoSimple" class="col-span-12 md:col-span-6">
-                    <label
-                      class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2"
-                      >{{ $t('TAXES') }}</label
-                    >
-                    <Select
-                      v-model="tipoImpuestoFactura"
-                      :options="['NO', 'INCLUIDO', 'AGREGADO']"
-                      class="w-full"
-                      @change="fncambioTipoImpuesto"
-                    />
-                  </div>
-
                   <!-- Comprobante -->
-                  <div v-show="!modoSimple" class="col-span-12 md:col-span-6">
+                  <div v-show="!modoSimple" class="col-span-12">
                     <label
                       class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2"
                       >{{ $t('RECEIPT') }}</label
@@ -2608,8 +2599,22 @@
                     </InputGroup>
                   </div>
 
+                  <!-- Impuestos -->
+                  <div v-show="!modoSimple" class="col-span-12 md:col-span-5">
+                    <label
+                      class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2"
+                      >{{ $t('TAXES') }}</label
+                    >
+                    <Select
+                      v-model="tipoImpuestoFactura"
+                      :options="['NO', 'INCLUIDO', 'AGREGADO']"
+                      class="w-full"
+                      @change="fncambioTipoImpuesto"
+                    />
+                  </div>
+
                   <!-- Método de Pago -->
-                  <div v-show="!modoSimple" class="col-span-12 md:col-span-12">
+                  <div v-show="!modoSimple" class="col-span-12 md:col-span-7">
                     <label
                       class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2"
                       >{{ $t('Payment Method').toUpperCase() }}</label
@@ -2663,7 +2668,7 @@
                       class="flex justify-between items-center p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm"
                     >
                       <span class="text-sm font-semibold text-slate-600 dark:text-slate-400"
-                        >{{ datosConfiguracion.nombre_impuesto }}:</span
+                        >{{ datosConfiguracion.nombre_impuesto || 'Impuesto' }}:</span
                       >
                       <span class="text-lg font-bold text-blue-600 dark:text-blue-400"
                         >${{ impuesto }}</span
@@ -9930,6 +9935,7 @@ import {
   buscarDatosIMEI,
   crearNotaCredito,
   peticionesFetchOffline,
+  esRespuestaOperacionExitosa,
   generarCodigoUnico4Digitos,
   arrayToObjetoFromTablaOffline,
   sincronizarStockProductoPorImeiDisponible,
@@ -9958,14 +9964,18 @@ import {
   createTemporaryClient,
   distributeSurcharge,
   filterPosProducts,
+  getAlanubeSecurityCode,
   getCartProductQuantity,
+  getDgiiStampUrl,
   getProductSalePrice,
   getProductStock,
   isInvoiceStateLocked,
   mergeRecordsByCode,
   parseStoredProducts,
   productHasImei,
-  roundDownToInterval
+  roundDownToInterval,
+  toFiniteNumber,
+  unwrapAlanubeDocumentResponse
 } from '@/views/Vender/venderCore.js'
 //import bcrypt from 'bcryptjs';
 //import config from '../../../../resources/config.json';
@@ -10636,7 +10646,7 @@ const fncambioTipoImpuesto = async () => {
         if (producto.nombre != 'DESCUENTO APLICADO') {
           // Si tiene precio personalizado, aplicar impuesto sobre el precio base personalizado
           if (producto.precio_personalizado) {
-            const impuestoValor = Number(impuestoSistema.value) || 18
+            const impuestoValor = obtenerTasaImpuestoSistema()
             if (
               producto.precio_ingresado_ferreteria === null ||
               producto.precio_ingresado_ferreteria === undefined ||
@@ -10688,7 +10698,7 @@ const fncambioTipoImpuesto = async () => {
         if (producto.nombre != 'DESCUENTO APLICADO') {
           // Si tiene precio personalizado, agregar impuesto sobre el precio base personalizado
           if (producto.precio_personalizado) {
-            const impuestoValor = Number(impuestoSistema.value) || 18
+            const impuestoValor = obtenerTasaImpuestoSistema()
             if (
               producto.precio_ingresado_ferreteria === null ||
               producto.precio_ingresado_ferreteria === undefined ||
@@ -10716,7 +10726,7 @@ const fncambioTipoImpuesto = async () => {
             producto.precio_base_personalizado = precioBase
           } else {
             guardarPrecioOriginalModoNormal(producto)
-            const impuestoValor = Number(impuestoSistema.value) || 18
+            const impuestoValor = obtenerTasaImpuestoSistema()
             const precioBase = obtenerPrecioOriginalModoNormal(producto)
             const montoImpuesto = precioBase * (impuestoValor / 100)
             const precioConImpuesto = precioBase + montoImpuesto
@@ -12915,6 +12925,26 @@ const items = ref([])
 const searchMode = ref('nombre')
 const filteredItems = ref([])
 const datosConfiguracion = ref({})
+const normalizarDatosConfiguracion = (configuracion) => {
+  if (Array.isArray(configuracion)) {
+    return configuracion.find((item) => item && typeof item === 'object') || {}
+  }
+
+  if (!configuracion || typeof configuracion !== 'object') return {}
+
+  if ('impuesto' in configuracion || 'nombre_impuesto' in configuracion) {
+    return configuracion
+  }
+
+  return (
+    Object.values(configuracion).find(
+      (item) =>
+        item &&
+        typeof item === 'object' &&
+        ('impuesto' in item || 'nombre_impuesto' in item)
+    ) || configuracion
+  )
+}
 const productosVenta = ref([])
 const totalfactura = ref(0)
 const clickedButton = ref('nombre')
@@ -13019,6 +13049,15 @@ const productoSeleccionado = ref({})
 const montosRapidosCliente = [100, 200, 250, 300, 400, 500, 750, 1000]
 const position = 'top'
 const impuestoSistema = ref(18)
+const sincronizarImpuestoSistema = () => {
+  const tasaConfigurada = Number(datosConfiguracion.value?.impuesto)
+  impuestoSistema.value = Number.isFinite(tasaConfigurada) ? tasaConfigurada : 18
+}
+
+const obtenerTasaImpuestoSistema = () => {
+  const tasa = Number(impuestoSistema.value)
+  return Number.isFinite(tasa) && tasa >= 0 ? tasa : 18
+}
 const normalizarProductoSeleccionadoInputNumber = () => {
   if (!productoSeleccionado.value || typeof productoSeleccionado.value !== 'object') return
 
@@ -16186,16 +16225,20 @@ const buscarPorImei = () => {
 /************************************************************/
 const fetchDataConfiguracion = async () => {
   try {
-    const verificaLocalStorage = JSON.parse(window.localStorage.getItem('configuracion')) || []
+    const verificaLocalStorage = normalizarDatosConfiguracion(
+      JSON.parse(window.localStorage.getItem('configuracion') || 'null')
+    )
 
-    if (verificaLocalStorage.length > 0) {
+    if (Object.keys(verificaLocalStorage).length > 0) {
       datosConfiguracion.value = verificaLocalStorage
     } else {
       const response = await peticionesFetchOffline('getDataByField', 'configuracion', 'id', 1)
 
-      datosConfiguracion.value = response
-      localStorage.setItem('configuracion', JSON.stringify(response))
+      datosConfiguracion.value = normalizarDatosConfiguracion(response)
+      localStorage.setItem('configuracion', JSON.stringify(datosConfiguracion.value))
     }
+
+    sincronizarImpuestoSistema()
 
     sincronizarImpresoraDesdeConfiguracion()
     sincronizarDockDesdeConfiguracion()
@@ -16541,23 +16584,42 @@ const fetchComprobantesElectronicos = async (tipoComprobante = null) => {
     const almacenActual = String(datosEmpresa?.empresa?.nombre || '').trim()
     const prefijoRequerido = obtenerPrefijoECFPorComprobante(tipoComprobante || comprobante.value)
 
-    const registrosPorAlmacen = registros.filter(
-      (item) => String(item?.almacen || '').trim() === almacenActual
+    // Buscar primero por el tipo e-CF solicitado. Filtrar antes por almacén podía
+    // ocultar un E31 global cuando el almacén sí tenía configurado otro e-CF.
+    const normalizarPrefijo = (valor) => {
+      const prefijo = String(valor || '').trim().toUpperCase()
+      return /^\d{2}$/.test(prefijo) ? `E${prefijo}` : prefijo
+    }
+    const registrosDelTipo = registros.filter(
+      (item) => normalizarPrefijo(item?.prefijo || item?.tipo_ecf) === prefijoRequerido
     )
-    comprobantesElectronicosData.value =
-      registrosPorAlmacen.length > 0 ? registrosPorAlmacen : registros
+    const prioridadAlmacen = (item) => {
+      const almacen = String(item?.almacen || '').trim()
+      if (almacenActual && almacen === almacenActual) return 0
+      if (!almacen) return 1
+      return 2
+    }
+    comprobantesElectronicosData.value = [...registrosDelTipo].sort(
+      (a, b) => {
+        const diferenciaAlmacen = prioridadAlmacen(a) - prioridadAlmacen(b)
+        if (diferenciaAlmacen !== 0) return diferenciaAlmacen
+        const vencimientoA = a?.expiracion || a?.fecha_vencimiento_secuencia || a?.fecha_vencimiento || a?.vencimiento
+        const vencimientoB = b?.expiracion || b?.fecha_vencimiento_secuencia || b?.fecha_vencimiento || b?.vencimiento
+        if (Boolean(vencimientoA) !== Boolean(vencimientoB)) return vencimientoA ? -1 : 1
+        return Number(b?.id || 0) - Number(a?.id || 0)
+      }
+    )
 
     const registroActivo = comprobantesElectronicosData.value.find((item) => {
-      const prefijo = String(item?.prefijo || item?.tipo_ecf || '')
-        .trim()
-        .toUpperCase()
       const estado = String(item?.estado || '')
         .trim()
         .toUpperCase()
       const activo = String(item?.activo || 'SI')
         .trim()
         .toUpperCase()
-      return prefijo === prefijoRequerido && estado === 'ACTIVO' && activo !== 'NO'
+      const estadoInactivo = ['INACTIVO', 'VENCIDO', 'CANCELADO', 'NO', 'FALSE', '0'].includes(estado)
+      const marcadoInactivo = ['NO', 'FALSE', '0', 'INACTIVO'].includes(activo)
+      return !estadoInactivo && !marcadoInactivo
     })
 
     comprobanteElectronicoActivo.value = registroActivo || null
@@ -16583,6 +16645,19 @@ const fetchComprobantesElectronicos = async (tipoComprobante = null) => {
       life: 3000
     })
   }
+}
+
+const solicitarConfiguracionComprobanteElectronico = async (prefijo) => {
+  const resultado = await Swal.fire({
+    icon: 'warning',
+    title: `Falta configurar ${prefijo}`,
+    html: `No existe una secuencia <strong>${prefijo}</strong> activa para emitir esta factura.<br><small>Configura el rango autorizado, la secuencia actual, la vigencia y el ambiente antes de continuar.</small>`,
+    showCancelButton: true,
+    confirmButtonText: 'Configurar e-CF',
+    cancelButtonText: 'Cerrar',
+    confirmButtonColor: '#2563eb'
+  })
+  if (resultado.isConfirmed) await router.push({ name: 'comprobantes-electronicos' })
 }
 /************************************************************/
 const fetchFabricacionDatosarray = async () => {
@@ -17235,13 +17310,13 @@ onMounted(async () => {
 
   // ✅ Cargar configuración PRIMERO antes de asignar cliente
   if (datosConfig) {
-    datosConfiguracion.value = JSON.parse(datosConfig)
+    datosConfiguracion.value = normalizarDatosConfiguracion(JSON.parse(datosConfig))
     sincronizarImpresoraDesdeConfiguracion()
     sincronizarDockDesdeConfiguracion()
     sincronizarImpresionRapidaDesdeConfiguracion()
     sincronizarFacturacionElectronicaDesdeConfiguracion()
     sincronizarPorMayorDesdeConfiguracion()
-    impuestoSistema.value = Number(datosConfiguracion.value.impuesto)
+    sincronizarImpuestoSistema()
     tipoImpuestoFactura.value = datosConfiguracion.value.tipo_papel
   } else {
     await fetchDataConfiguracion()
@@ -18720,7 +18795,7 @@ const fmImpuestoIncluido = async (
       : productosVenta.value.find((prod) => prod.codigo === productoOcodigo)
   if (!producto) return
 
-  const impuesto = impuestoSistema.value
+  const impuesto = obtenerTasaImpuestoSistema()
 
   // Verificar si ya tiene el impuesto incluido correctamente (solo si no es forzado)
   if (!forzarRecalculo && producto.tipo_impuesto === 'Incluido') {
@@ -20594,11 +20669,8 @@ const obtenerRespuestaElectronicaGuardada = (factura = null) => {
     }
     const numeroECF = obtenerNumeroECFRespuesta(respuesta)
 
-    if (
-      !esNumeroECFValido(numeroECF) ||
-      !respuesta.documentStampUrl ||
-      !respuesta.securityCode
-    ) {
+    const urlTimbreDGII = getDgiiStampUrl(respuesta)
+    if (!esNumeroECFValido(numeroECF) || !urlTimbreDGII || !respuesta.securityCode) {
       return null
     }
 
@@ -20607,7 +20679,8 @@ const obtenerRespuestaElectronicaGuardada = (factura = null) => {
       documentNumber: numeroECF,
       encf: numeroECF,
       ecf: numeroECF,
-      qr_url: respuesta.documentStampUrl,
+      documentStampUrl: urlTimbreDGII,
+      qr_url: urlTimbreDGII,
       signedDate: respuesta.signedDate || respuesta.signatureDate,
       internalTrackId: respuesta.internalTrackId || respuesta.id
     }
@@ -20620,6 +20693,39 @@ const obtenerRespuestaElectronicaGuardada = (factura = null) => {
 const limpiarPromesaEnvioADGII = () => {
   resolverEnvioADGII.value = null
   rechazarEnvioADGII.value = null
+}
+
+const obtenerDetalleErrorAlanube = (error) => {
+  const respuesta = error?.response?.data
+  const detalles = []
+  const agregarDetalle = (item) => {
+    if (!item) return
+    if (typeof item === 'string') {
+      detalles.push(item)
+      return
+    }
+    if (typeof item === 'object') {
+      const detalle = [item.code, item.field, item.message || item.detail]
+        .filter(Boolean)
+        .join(' - ')
+      if (detalle) detalles.push(detalle)
+    }
+  }
+
+  const errores = respuesta?.errors
+  const respuestas = respuesta?.response
+  if (Array.isArray(errores)) errores.forEach(agregarDetalle)
+  else agregarDetalle(errores)
+  if (Array.isArray(respuestas)) respuestas.forEach(agregarDetalle)
+  else agregarDetalle(respuestas)
+
+  agregarDetalle(respuesta?.error)
+  agregarDetalle(respuesta?.message)
+  agregarDetalle(respuesta?.detail)
+
+  if (detalles.length > 0) return [...new Set(detalles)].join(', ')
+  if (typeof respuesta === 'string' && respuesta.trim()) return respuesta.trim()
+  return error?.message || 'Error desconocido al comunicarse con Alanube'
 }
 
 const cancelarEnvioADGII = () => {
@@ -20697,13 +20803,8 @@ const mostrarModalSeleccionENCF = async (datosFactura) => {
   })
 
   if (!comprobanteElectronicoActivo.value) {
-    toast.add({
-      severity: 'error',
-      summary: 'e-CF',
-      detail: `No existe un comprobante electrónico ${prefijoRequerido} activo configurado.`,
-      life: 4000
-    })
-    throw new Error(`No existe un comprobante electrónico ${prefijoRequerido} activo configurado.`)
+    await solicitarConfiguracionComprobanteElectronico(prefijoRequerido)
+    return null
   }
 
   secuenciaENCF.value = String(
@@ -20778,7 +20879,7 @@ const actualizarFacturaConRespuestaDGII = async (noFactura, respuestaDGIIData) =
     'facturas',
     JSON.stringify(facturaGuardada)
   )
-  if (resultadoUpdate?.[0] !== 'ok') {
+  if (!esRespuestaOperacionExitosa(resultadoUpdate)) {
     throw new Error('No se pudo guardar la respuesta completa de Alanube en la factura.')
   }
 
@@ -20795,13 +20896,16 @@ const actualizarFacturaConRespuestaDGII = async (noFactura, respuestaDGIIData) =
   const datosElectronicosGuardados = Array.isArray(otroGuardado)
     ? otroGuardado[0]
     : otroGuardado
-  if (!datosElectronicosGuardados?.documentStampUrl || !datosElectronicosGuardados?.securityCode) {
-    throw new Error('La factura se actualizó, pero faltan el QR o el código de seguridad de DGII.')
-  }
+  const tieneTimbreGuardado = Boolean(getDgiiStampUrl(datosElectronicosGuardados))
+  const tieneCodigoSeguridadGuardado = Boolean(getAlanubeSecurityCode(datosElectronicosGuardados))
 
   console.log('✅ Respuesta DGII guardada en factura:', noFactura, resultadoUpdate)
   console.log('📋 Campo otro actualizado:', otroData[0])
-  return facturaActualizada
+  return {
+    factura: facturaActualizada,
+    tieneTimbreGuardado,
+    tieneCodigoSeguridadGuardado
+  }
 }
 
 const actualizarSecuenciaComprobanteElectronico = async (registro, secuenciaUsada) => {
@@ -20824,15 +20928,16 @@ const actualizarSecuenciaComprobanteElectronico = async (registro, secuenciaUsad
     'comprobantes_electronicos',
     JSON.stringify(actualizado)
   )
-  if (resultado?.[0] === 'ok') {
+  if (esRespuestaOperacionExitosa(resultado)) {
     comprobanteElectronicoActivo.value = actualizado
     secuenciaENCF.value = actualizado.secuencia_actual
-    await fetchComprobantesElectronicos()
+    await fetchComprobantesElectronicos(comprobante.value)
     console.log('✅ Secuencia e-CF actualizada:', actualizado.prefijo, actualizado.secuencia_actual)
-    return
+    return true
   }
 
   console.error('No se pudo actualizar la secuencia del comprobante electrónico:', resultado)
+  return false
 }
 
 const establecerSecuenciaComprobanteElectronico = async (registro, nuevaSecuencia) => {
@@ -20852,7 +20957,7 @@ const establecerSecuenciaComprobanteElectronico = async (registro, nuevaSecuenci
     'comprobantes_electronicos',
     JSON.stringify(actualizado)
   )
-  if (resultado?.[0] !== 'ok') return false
+  if (!esRespuestaOperacionExitosa(resultado)) return false
 
   comprobanteElectronicoActivo.value = actualizado
   secuenciaENCF.value = String(nuevaSecuencia)
@@ -20875,14 +20980,59 @@ const confirmarYEnviarADGII = async () => {
 
     const datosFactura = pendingFacturaData.value || {}
 
-    // Validar y limpiar RNC del comprador (debe ser 9-11 dígitos)
+    // Validar y limpiar RNC/Cedula (debe ser 9-11 digitos). No se usan
+    // identificaciones de prueba como reemplazo de datos fiscales faltantes.
     const validarRNC = (rnc) => {
-      if (!rnc) return '133023539'
+      if (!rnc) return ''
       const rncLimpio = String(rnc).replace(/\D/g, '')
       if (rncLimpio.length >= 9 && rncLimpio.length <= 11) {
         return rncLimpio
       }
-      return '133023539'
+      return ''
+    }
+
+    const validarCorreo = (correo) => {
+      const correoLimpio = String(correo || '').trim()
+      if (!correoLimpio || correoLimpio.length > 254) return ''
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correoLimpio) ? correoLimpio : ''
+    }
+
+    const normalizarFechaAlanube = (fecha) => {
+      if (!fecha) return ''
+      const completar = (valor) => String(valor).padStart(2, '0')
+      const construir = (year, month, day) => {
+        const fechaValidada = new Date(Number(year), Number(month) - 1, Number(day))
+        if (
+          fechaValidada.getFullYear() !== Number(year) ||
+          fechaValidada.getMonth() !== Number(month) - 1 ||
+          fechaValidada.getDate() !== Number(day)
+        ) return ''
+        return `${year}-${completar(month)}-${completar(day)}`
+      }
+
+      if (fecha instanceof Date && !Number.isNaN(fecha.getTime())) {
+        return construir(fecha.getFullYear(), fecha.getMonth() + 1, fecha.getDate())
+      }
+
+      const valor = String(fecha).trim()
+      // Incluye AAAA-MM-DD y fechas ISO serializadas por Calendar.
+      const formatoISO = valor.match(/^(\d{4})-(\d{2})-(\d{2})/)
+      if (formatoISO) return construir(formatoISO[1], formatoISO[2], formatoISO[3])
+
+      // Formatos dominicanos DD/MM/AAAA y DD-MM-AAAA.
+      const formatoLocal = valor.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/)
+      if (formatoLocal) return construir(formatoLocal[3], formatoLocal[2], formatoLocal[1])
+
+      // Compatibilidad con valores Date convertidos previamente a texto.
+      const fechaInterpretada = new Date(valor)
+      if (!Number.isNaN(fechaInterpretada.getTime())) {
+        return construir(
+          fechaInterpretada.getFullYear(),
+          fechaInterpretada.getMonth() + 1,
+          fechaInterpretada.getDate()
+        )
+      }
+      return ''
     }
 
     const noFacturaDocumento = String(datosFactura.noFactura || datosFactura.no_factura || '')
@@ -20941,8 +21091,7 @@ const confirmarYEnviarADGII = async () => {
       registroECF.prefijo || registroECF.tipo_ecf || prefijoFactura
     ).toUpperCase()
 
-    // Cargar config global de Alanube como fallback (por ambiente)
-    // Prioridad: 1) config global production, 2) config global sandbox, 3) registroECF.ambiente, 4) sandbox
+    // Seleccionar exactamente la configuracion del ambiente activo.
     let configProd = {},
       configSand = {}
     try {
@@ -20951,16 +21100,17 @@ const confirmarYEnviarADGII = async () => {
     try {
       configSand = JSON.parse(window.localStorage.getItem('alanube_config_sandbox') || '{}')
     } catch {}
-    const ambienteECF = String(
-      configProd.ambiente || configSand.ambiente || registroECF.ambiente || 'sandbox'
+    const ambientePreferido = String(
+      window.localStorage.getItem('alanube_last_ambiente') || registroECF.ambiente || 'sandbox'
     ).toLowerCase()
+    const ambienteECF = ambientePreferido === 'production' ? 'production' : 'sandbox'
     console.log('🔍 DGII debug - config:', {
-      configProd,
-      configSand,
+      productionConfigured: !!configProd.token_api,
+      sandboxConfigured: !!configSand.token_api,
       registroECF_ambiente: registroECF.ambiente,
       ambienteECF,
-      localStorage_prod: window.localStorage.getItem('alanube_config_production'),
-      localStorage_sand: window.localStorage.getItem('alanube_config_sandbox')
+      selectedEnvironmentConfigured:
+        ambienteECF === 'production' ? !!configProd.token_api : !!configSand.token_api
     })
     let configGlobalAlanube = {}
     try {
@@ -20971,13 +21121,13 @@ const confirmarYEnviarADGII = async () => {
       /* usar vacio */
     }
 
-    // Token de autenticación de A La Nube (prioridad: config global, luego hardcoded sandbox)
-    const token = String(
-      configGlobalAlanube.token_api ||
-        'eyJhbGciOiJSUzI1NiIsImtpZCI6ImU1ZTEzYzFiLTJiYTgtNGYzOC1hNWMxLTQ5NWEzMjk3ZjE4ZiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwZTIwYTFlYi1kYjJkLTQ0YTMtOTM3ZC1hMTk1YWQ4M2NjMmQiLCJlbWFpbCI6InRtcG9zc3JsQGFsYW51YmUuY28iLCJzY29wZSI6ImMuci51OmFwaWRvbV9mdWxsX2FjY2VzcyBnZW5lcmljIiwibGFzdFVwZGF0ZWRQYXNzd29yZCI6IjIwMjYtMDMtMjYgMjI6Mzc6MDkiLCJpc3MiOiJzYW5kLWF1dGgtYXBpLmFsZWdyYS5jb20iLCJpYXQiOjE3NzQ1NjQ2MzgsImV4cCI6MTE3MTczNDAyMiwianRpIjoiZTY4N2FhMDMtODc2NS00YWVmLWE5NTgtZTkwMzQzM2FiNjM2In0.UXoIZIoyhbXUlUFC-e7zcPed503KPm04nkq75C71KXJAlIhvpHwUvUszTnMuWfLLmPj_SVjuqnIkI7PRHSJ0awNmNq5H7fajjQnigNviTEfhxVkN-XiAj2UvLY5DZtBKbcDMdVvRO1K8XAExy-oHH43zuj1Tzx6hOhdIqdOmvmOEUda6VZ-gjUnI2RPY0ha2AgfL56lxx2pZSTQ_CB0cTvNU-YgO5Z6PZNW7krGRGkWalVUaZykJOZd1cWYe_g1fB143nsqiWj7PZIN6McjBXzt5iKGDDFmZI7fD1FsK75frBgLmIgPKWLrABhb9V1NbTIrHxNoJSQunFaLC-3VmAQ'
-    ).trim()
+    const token = String(configGlobalAlanube.token_api || '').trim()
 
-    console.log('🔑 Token usado:', token ? token.slice(0, 40) + '...' : 'VACÍO')
+    if (!token) {
+      throw new Error(`Falta el token API de Alanube para el ambiente ${ambienteECF}.`)
+    }
+
+    console.log('🔑 Token Alanube:', token ? 'CONFIGURADO' : 'VACÍO')
 
     const idCompania = String(
       configGlobalAlanube.id_compania || registroECF.id_compania || ''
@@ -20988,7 +21138,10 @@ const confirmarYEnviarADGII = async () => {
           registroECF.rnc_emisor ||
           datosConfiguracion.value.rnc ||
           ''
-      ).replace(/\D/g, '') || '133023539'
+      ).replace(/\D/g, '')
+    if (!validarRNC(rncEmisor)) {
+      throw new Error('El RNC del emisor de Alanube no es valido.')
+    }
     const apiUrl = obtenerEndpointAlanubePorPrefijo(prefijoECF, '', ambienteECF)
     console.log('🔍 DGII apiUrl debug:', {
       prefijoECF,
@@ -21071,92 +21224,182 @@ const confirmarYEnviarADGII = async () => {
           )
         }, 0)
     )
-    const impuestoFacturaGuardada = redondearMontoDGII(facturaGuardada?.impuesto || 0)
-
     const calcularLineaAlanube = (producto) => {
       const cantidad = Number(producto.cantidad || 1)
-      const precioConImpuesto = Number(
-        producto.precio_final || producto.precio_venta || producto.precio || 0
+      if (!Number.isFinite(cantidad) || cantidad <= 0) {
+        throw new Error(`Cantidad invalida en ${producto.nombre || producto.descripcion || 'producto'}.`)
+      }
+
+      let tasaItbis = Number(producto.impuestos ?? producto.itbis ?? 0)
+      const impuestoUnitario = Number(producto.impuesto_venta ?? producto.impuesto ?? 0)
+      let precioUnitarioBase = Number(producto.precio_venta ?? producto.precio ?? 0)
+      const precioUnitarioFinal = Number(producto.precio_final || 0)
+
+      if (tasaItbis <= 0 && impuestoUnitario > 0 && precioUnitarioBase > 0) {
+        tasaItbis = Number(((impuestoUnitario / precioUnitarioBase) * 100).toFixed(2))
+      }
+      if (precioUnitarioBase <= 0 && precioUnitarioFinal > 0) {
+        precioUnitarioBase =
+          tasaItbis > 0 ? precioUnitarioFinal / (1 + tasaItbis / 100) : precioUnitarioFinal
+      }
+
+      let indicadorFacturacion = 4
+      if (Math.abs(tasaItbis - 18) < 0.01) indicadorFacturacion = 1
+      else if (Math.abs(tasaItbis - 16) < 0.01) indicadorFacturacion = 2
+      else if (tasaItbis > 0) {
+        throw new Error(
+          `Alanube/DGII no admite la tasa de ITBIS ${tasaItbis}% del producto ${producto.nombre || producto.descripcion || ''}.`
+        )
+      }
+
+      const gravado = indicadorFacturacion === 1 || indicadorFacturacion === 2
+      const descuentoConImpuesto = Math.max(0, Number(producto.descuento || 0))
+      const descuentoBase = redondearMontoDGII(
+        gravado ? descuentoConImpuesto / (1 + tasaItbis / 100) : descuentoConImpuesto
       )
-      const totalConImpuesto = redondearMontoDGII(
-        Number(producto.total) || precioConImpuesto * cantidad
-      )
-      const tasaItbis = Number(producto.impuestos || producto.itbis || 0)
-      const impuestoProducto = Number(producto.impuesto_venta || producto.impuesto || 0)
-      const impuestoProporcionalFactura =
-        impuestoFacturaGuardada > 0 && montoTotal > 0
-          ? redondearMontoDGII(impuestoFacturaGuardada * (totalConImpuesto / montoTotal))
-          : 0
-      const tieneItbis = tasaItbis > 0 || impuestoProducto > 0 || impuestoProporcionalFactura > 0
-      const impuestoLinea = tieneItbis
-        ? redondearMontoDGII(
-            impuestoProducto > 0
-              ? impuestoProducto
-              : tasaItbis > 0
-                ? totalConImpuesto - totalConImpuesto / (1 + tasaItbis / 100)
-                : impuestoProporcionalFactura
-          )
+      const precioUnitarioDGII = Number(precioUnitarioBase.toFixed(4))
+      const montoBrutoBase = precioUnitarioDGII * cantidad
+      const montoItem = redondearMontoDGII(Math.max(0, montoBrutoBase - descuentoBase))
+      const impuestoLinea = gravado
+        ? redondearMontoDGII(montoItem * (tasaItbis / 100))
         : 0
-      const montoGravadoLinea = tieneItbis
-        ? redondearMontoDGII(totalConImpuesto - impuestoLinea)
-        : 0
-      const precioUnitarioGravado =
-        cantidad > 0 ? redondearMontoDGII(montoGravadoLinea / cantidad) : montoGravadoLinea
+      const totalConImpuesto = redondearMontoDGII(montoItem + impuestoLinea)
 
       return {
         cantidad,
+        indicadorFacturacion,
         totalConImpuesto,
         tasaItbis,
-        tieneItbis,
+        tieneItbis: gravado,
         impuestoLinea,
-        montoGravadoLinea,
-        precioUnitarioGravado
+        montoGravadoLinea: gravado ? montoItem : 0,
+        montoExentoLinea: gravado ? 0 : montoItem,
+        precioUnitarioGravado: precioUnitarioDGII,
+        descuentoBase
       }
     }
 
     const lineasAlanube = productosFactura.map(calcularLineaAlanube)
     const totalImpuesto = redondearMontoDGII(
-      impuestoFacturaGuardada ||
-        lineasAlanube.reduce((acum, linea) => acum + linea.impuestoLinea, 0)
+      lineasAlanube.reduce((acum, linea) => acum + linea.impuestoLinea, 0)
     )
     const totalTaxedAmount = redondearMontoDGII(
-      totalImpuesto > 0
-        ? montoTotal - totalImpuesto
-        : lineasAlanube.reduce((acum, linea) => acum + linea.montoGravadoLinea, 0)
+      lineasAlanube.reduce((acum, linea) => acum + linea.montoGravadoLinea, 0)
     )
+    const totalExento = redondearMontoDGII(
+      lineasAlanube.reduce((acum, linea) => acum + linea.montoExentoLinea, 0)
+    )
+    const montoGravadoI1 = redondearMontoDGII(
+      lineasAlanube
+        .filter((linea) => linea.indicadorFacturacion === 1)
+        .reduce((acum, linea) => acum + linea.montoGravadoLinea, 0)
+    )
+    const montoGravadoI2 = redondearMontoDGII(
+      lineasAlanube
+        .filter((linea) => linea.indicadorFacturacion === 2)
+        .reduce((acum, linea) => acum + linea.montoGravadoLinea, 0)
+    )
+    const totalItbis1 = redondearMontoDGII(
+      lineasAlanube
+        .filter((linea) => linea.indicadorFacturacion === 1)
+        .reduce((acum, linea) => acum + linea.impuestoLinea, 0)
+    )
+    const totalItbis2 = redondearMontoDGII(
+      lineasAlanube
+        .filter((linea) => linea.indicadorFacturacion === 2)
+        .reduce((acum, linea) => acum + linea.impuestoLinea, 0)
+    )
+    const montoTotalAlanube = redondearMontoDGII(totalTaxedAmount + totalExento + totalImpuesto)
 
+    if (Math.abs(montoTotalAlanube - montoTotal) > 0.05) {
+      throw new Error(
+        `El total fiscal calculado (${montoTotalAlanube.toFixed(2)}) no coincide con el total de la factura (${montoTotal.toFixed(2)}). Revise impuestos y descuentos antes de enviarla.`
+      )
+    }
+
+    let clienteFactura = clienteSelected.value || {}
+    const codigoClienteFactura = facturaGuardada?.cod_cliente || datosFactura?.cliente?.codigo
+    if (codigoClienteFactura) {
+      try {
+        const clientePersistido = await peticionesFetchOffline(
+          'getDataByField',
+          'clientes',
+          'codigo',
+          codigoClienteFactura
+        )
+        if (clientePersistido) clienteFactura = clientePersistido
+      } catch (errorCliente) {
+        console.warn('No se pudo cargar el cliente persistido para Alanube:', errorCliente)
+      }
+    }
     const rncComprador = validarRNC(
-      facturaGuardada?.rnc_cliente || facturaGuardada?.cedula_cliente || clienteSelected.value.rnc
+      facturaGuardada?.rnc_cliente ||
+        facturaGuardada?.cedula_cliente ||
+        clienteFactura.rnc ||
+        clienteFactura.cedula
     )
     const nombreComprador = String(
       facturaGuardada?.nombre_cliente ||
         facturaGuardada?.cliente ||
-        clienteSelected.value.nombre ||
+        clienteFactura.nombre ||
         'Cliente General'
     )
 
-    // Determinar método de pago (1=Efectivo por defecto)
-    const metodoPago = 1
+    const metodoPagoFactura = String(
+      facturaGuardada?.metodo_pago || datosFactura?.metodoPagoFN || metodoPago.value || ''
+    ).toUpperCase()
+    const tipoPagoAlanube =
+      metodoPagoFactura.includes('CREDITO') || metodoPagoFactura.includes('APARTADO') ? 2 : 1
+    const codigoMetodoPago = metodoPagoFactura.includes('TARJETA')
+      ? 3
+      : metodoPagoFactura.includes('TRANSFERENCIA') || metodoPagoFactura.includes('CHEQUE')
+        ? 2
+        : tipoPagoAlanube === 2
+          ? 4
+          : metodoPagoFactura.includes('EFECTIVO')
+            ? 1
+            : 8
+    const formasPagoRegistradas = [
+      { paymentMethod: 1, paymentAmount: redondearMontoDGII(facturaGuardada?.efectivo || 0) },
+      {
+        paymentMethod: 2,
+        paymentAmount: redondearMontoDGII(
+          Number(facturaGuardada?.transferencia || 0) + Number(facturaGuardada?.cheque || 0)
+        )
+      },
+      { paymentMethod: 3, paymentAmount: redondearMontoDGII(facturaGuardada?.tarjeta || 0) }
+    ].filter((forma) => forma.paymentAmount > 0)
+    let totalFormasPago = redondearMontoDGII(
+      formasPagoRegistradas.reduce((acum, forma) => acum + forma.paymentAmount, 0)
+    )
+
+    if (tipoPagoAlanube === 2 && totalFormasPago < montoTotalAlanube) {
+      formasPagoRegistradas.push({
+        paymentMethod: 4,
+        paymentAmount: redondearMontoDGII(montoTotalAlanube - totalFormasPago)
+      })
+      totalFormasPago = montoTotalAlanube
+    }
+
+    const formasPagoAlanube =
+      formasPagoRegistradas.length > 0 && Math.abs(totalFormasPago - montoTotalAlanube) <= 0.05
+        ? formasPagoRegistradas
+        : [{ paymentMethod: codigoMetodoPago, paymentAmount: montoTotalAlanube }]
 
     const itemDetails = productosFactura.map((producto, index) => {
       const lineaAlanube = lineasAlanube[index] || calcularLineaAlanube(producto)
-      const precioUnitario = lineaAlanube.tieneItbis
-        ? lineaAlanube.precioUnitarioGravado
-        : Number(producto.precio_final || producto.precio_venta || producto.precio || 0)
+      const precioUnitario = lineaAlanube.precioUnitarioGravado
       const cantidad = lineaAlanube.cantidad
       const montoItem = lineaAlanube.tieneItbis
         ? lineaAlanube.montoGravadoLinea
-        : lineaAlanube.totalConImpuesto
+        : lineaAlanube.montoExentoLinea
       const itemDetail = {
-        billingIndicator: 1,
-        retention: {
-          indicatorAgentWithholdingPerception: 1
-        },
-        goodServiceIndicator: 1,
-        otherCurrencyDetail: {
-          priceOtherCurrency: precioUnitario,
-          amountItemOtherCurrency: montoItem
-        },
+        billingIndicator: lineaAlanube.indicadorFacturacion,
+        goodServiceIndicator: String(
+          producto.tipo_producto || producto.tipo || producto.categoria || ''
+        ).toUpperCase().includes('SERVICIO')
+          ? 2
+          : 1,
         lineNumber: index + 1,
         itemName: String(producto.nombre || producto.descripcion || `Articulo ${index + 1}`),
         itemDescription: String(producto.descripcion || producto.nombre || 'Producto'),
@@ -21165,10 +21408,22 @@ const confirmarYEnviarADGII = async () => {
         unitPriceItem: precioUnitario
       }
 
-      if (lineaAlanube.tieneItbis) {
-        itemDetail.additionalTaxes = [
+      const codigoProducto = String(producto.codigo || producto.codigo_interno || '').trim()
+      if (codigoProducto) {
+        itemDetail.itemCodeTable = [
           {
-            taxType: 1
+            codeType: 'Interna',
+            itemCode: codigoProducto
+          }
+        ]
+      }
+
+      if (lineaAlanube.descuentoBase > 0) {
+        itemDetail.discountAmount = lineaAlanube.descuentoBase
+        itemDetail.subDiscounts = [
+          {
+            subDiscountRate: '$',
+            subDiscountAmount: lineaAlanube.descuentoBase
           }
         ]
       }
@@ -21181,33 +21436,32 @@ const confirmarYEnviarADGII = async () => {
 
     const facturaData = {}
 
-    facturaData.company = {
-      id: idCompania || undefined,
-      rnc: rncEmisor,
-      identification: rncEmisor,
-      companyName: String(
-        datosConfiguracion.value.nombre_empresa ||
-          configGlobalAlanube.nombre_empresa ||
-          'TM POS SRL'
-      )
-    }
+    if (idCompania) facturaData.company = { id: idCompania }
 
     facturaData.idDoc = {
       incomeType: 1,
-      paymentType: 1,
+      paymentType: tipoPagoAlanube,
       encf: eNCF,
-      sequenceDueDate: '2028-12-31',
-      paymentFormsTable: [
-        {
-          paymentMethod: metodoPago,
-          paymentAmount: montoTotal
-        }
-      ]
+      taxAmountIndicator: totalImpuesto > 0 ? 0 : undefined,
+      paymentFormsTable: formasPagoAlanube
+    }
+
+    if (esFiscal) {
+      const fechaVencimientoConfigurada =
+        registroECF.expiracion ||
+        registroECF.fecha_vencimiento_secuencia ||
+        registroECF.fecha_vencimiento ||
+        registroECF.vencimiento
+      const vencimientoSecuencia = normalizarFechaAlanube(fechaVencimientoConfigurada)
+      if (!vencimientoSecuencia) {
+        console.error('Fecha de vencimiento E31 no reconocida:', fechaVencimientoConfigurada)
+        throw new Error('La fecha de vencimiento configurada para la secuencia E31 no tiene un formato válido.')
+      }
+      facturaData.idDoc.sequenceDueDate = vencimientoSecuencia
     }
 
     facturaData.sender = {
       rnc: rncEmisor,
-      identification: rncEmisor,
       companyName: String(
         datosConfiguracion.value.nombre_empresa ||
           configGlobalAlanube.nombre_empresa ||
@@ -21218,26 +21472,47 @@ const confirmarYEnviarADGII = async () => {
     }
 
     facturaData.totals = {
-      totalTaxedAmount,
-      totalAmount: montoTotal
+      totalAmount: montoTotalAlanube
     }
+
+    if (totalTaxedAmount > 0) facturaData.totals.totalTaxedAmount = totalTaxedAmount
+    if (montoGravadoI1 > 0) {
+      facturaData.totals.i1AmountTaxed = montoGravadoI1
+      facturaData.totals.itbisS1 = 18
+      facturaData.totals.itbis1Total = totalItbis1
+    }
+    if (montoGravadoI2 > 0) {
+      facturaData.totals.i2AmountTaxed = montoGravadoI2
+      facturaData.totals.itbisS2 = 16
+      facturaData.totals.itbis2Total = totalItbis2
+    }
+    if (totalImpuesto > 0) facturaData.totals.itbisTotal = totalImpuesto
+    if (totalExento > 0) facturaData.totals.exemptAmount = totalExento
 
     facturaData.itemDetails = itemDetails
 
-    // E32 (consumo): buyer solo si el cliente tiene RNC real, E31 (fiscal): buyer requerido
-    if (esFiscal || (rncComprador && rncComprador !== '133023539' && rncComprador !== rncEmisor)) {
-      facturaData.buyer = {
-        rnc: rncComprador,
-        identification: rncComprador,
-        companyName: nombreComprador
-      }
+    if (esFiscal && !rncComprador) {
+      throw new Error('La factura E31 requiere un RNC o cedula valida del comprador.')
+    }
+    facturaData.buyer = { companyName: nombreComprador }
+    if (rncComprador) facturaData.buyer.rnc = rncComprador
+    const correoComprador = validarCorreo(clienteFactura.email || clienteFactura.correo)
+    if (correoComprador) facturaData.buyer.mail = correoComprador
+    if (clienteFactura.direccion) facturaData.buyer.address = String(clienteFactura.direccion)
+    const telefonoComprador = String(clienteFactura.telefono || '').replace(/\D/g, '').slice(-10)
+    if (telefonoComprador.length === 10) {
+      facturaData.buyer.additionalPhone = telefonoComprador.replace(
+        /^(\d{3})(\d{3})(\d{4})$/,
+        '$1-$2-$3'
+      )
     }
 
     console.log('📦 Datos preparados para A La Nube:', JSON.stringify(facturaData, null, 2))
     console.log('🧮 Totales DGII:', {
       subtotal: totalTaxedAmount,
       impuesto: totalImpuesto,
-      total: montoTotal
+      exento: totalExento,
+      total: montoTotalAlanube
     })
     console.log('🚀 POSTEANDO A:', apiUrl)
 
@@ -21253,7 +21528,22 @@ const confirmarYEnviarADGII = async () => {
           'Content-Type': 'application/json'
         }
       })
+      console.log('===== RESPUESTA RAW ALANUBE POST =====')
+      console.log(response.data)
+      console.log(JSON.stringify(response.data, null, 2))
+      console.log('===== FIN RESPUESTA RAW ALANUBE POST =====')
     } catch (errorEnvio) {
+      const detalleErrorEnvio = obtenerDetalleErrorAlanube(errorEnvio)
+      console.log('===== RESPUESTA RAW ALANUBE ERROR POST =====')
+      console.log(errorEnvio.response?.data)
+      console.log(JSON.stringify(errorEnvio.response?.data ?? null, null, 2))
+      console.log('===== FIN RESPUESTA RAW ALANUBE ERROR POST =====')
+      console.error('Alanube rechazó el documento electrónico:', {
+        status: errorEnvio.response?.status,
+        detalle: detalleErrorEnvio,
+        respuesta: errorEnvio.response?.data
+      })
+
       const erroresAlanube = Array.isArray(errorEnvio.response?.data?.errors)
         ? errorEnvio.response.data.errors
         : []
@@ -21262,6 +21552,7 @@ const confirmarYEnviarADGII = async () => {
       )
 
       if (!errorSecuenciaUtilizada) {
+        errorEnvio.message = detalleErrorEnvio
         throw errorEnvio
       }
 
@@ -21308,7 +21599,36 @@ const confirmarYEnviarADGII = async () => {
       }
     }
 
-    const respuestaAlanube = response.data?.data || response.data || {}
+    let respuestaAlanube = unwrapAlanubeDocumentResponse(response.data || {})
+
+    // Algunos POST retornan primero una respuesta resumida. Consultar el mismo
+    // documento por ID completa el timbre sin volver a emitir ni consumir otro e-NCF.
+    if (
+      respuestaAlanube.id &&
+      (!getDgiiStampUrl(respuestaAlanube) || !getAlanubeSecurityCode(respuestaAlanube))
+    ) {
+      try {
+        const consultaDocumento = await axios.get(
+          `${apiUrl}/${encodeURIComponent(respuestaAlanube.id)}`,
+          {
+            headers: {
+              Accept: 'application/json',
+              Authorization: `Bearer ${token}`
+            }
+          }
+        )
+        console.log('===== RESPUESTA RAW ALANUBE GET DOCUMENTO =====')
+        console.log(consultaDocumento.data)
+        console.log(JSON.stringify(consultaDocumento.data, null, 2))
+        console.log('===== FIN RESPUESTA RAW ALANUBE GET DOCUMENTO =====')
+        respuestaAlanube = {
+          ...respuestaAlanube,
+          ...unwrapAlanubeDocumentResponse(consultaDocumento.data || {})
+        }
+      } catch (errorConsulta) {
+        console.warn('El e-CF fue creado, pero el timbre aún no estuvo disponible:', errorConsulta)
+      }
+    }
     const numeroECFOficial = obtenerNumeroECFRespuesta(respuestaAlanube, eNCF)
 
     if (!esNumeroECFValido(numeroECFOficial)) {
@@ -21364,6 +21684,8 @@ const confirmarYEnviarADGII = async () => {
     }
 
     // Preparar respuesta en formato esperado
+    const urlTimbreDGII = getDgiiStampUrl(respuestaAlanube)
+    const codigoSeguridadDGII = getAlanubeSecurityCode(respuestaAlanube)
     const respuesta = {
       ...respuestaAlanube,
       id: respuestaAlanube.id || '',
@@ -21383,12 +21705,11 @@ const confirmarYEnviarADGII = async () => {
       xml: respuestaAlanube.xml || '',
       resumeXml: respuestaAlanube.resumeXml || respuestaAlanube.resume_xml || '',
       pdf: respuestaAlanube.pdf || '',
-      documentStampUrl:
-        respuestaAlanube.documentStampUrl || respuestaAlanube.document_stamp_url || '',
-      qr_url: respuestaAlanube.documentStampUrl || respuestaAlanube.document_stamp_url || '',
+      documentStampUrl: urlTimbreDGII,
+      qr_url: urlTimbreDGII,
       signatureDate: respuestaAlanube.signatureDate || respuestaAlanube.signature_date || '',
       signedDate: respuestaAlanube.signatureDate || respuestaAlanube.signature_date || '',
-      securityCode: respuestaAlanube.securityCode || respuestaAlanube.security_code || '',
+      securityCode: codigoSeguridadDGII,
       internalTrackId: respuestaAlanube.id || '',
       sequenceConsumed: respuestaAlanube.sequenceConsumed !== false,
       governmentResponse: govResponse,
@@ -21396,13 +21717,36 @@ const confirmarYEnviarADGII = async () => {
     }
 
     comprobanteFN.value = numeroECFOficial
-    await actualizarFacturaConRespuestaDGII(
+    const resultadoGuardadoDGII = await actualizarFacturaConRespuestaDGII(
       datosFactura.noFactura || datosFactura.no_factura,
       respuesta
     )
     if (respuesta.sequenceConsumed) {
       const secuenciaConsumida = numeroECFOficial.slice(prefijoECF.length)
-      await actualizarSecuenciaComprobanteElectronico(registroECF, secuenciaConsumida)
+      const secuenciaActualizada = await actualizarSecuenciaComprobanteElectronico(
+        registroECF,
+        secuenciaConsumida
+      )
+      if (!secuenciaActualizada) {
+        toast.add({
+          severity: 'warn',
+          summary: 'Secuencia electrónica',
+          detail: `El e-NCF ${numeroECFOficial} fue registrado, pero no se pudo guardar la próxima secuencia.`,
+          life: 6000
+        })
+      }
+    }
+
+    if (
+      !resultadoGuardadoDGII?.tieneTimbreGuardado ||
+      !resultadoGuardadoDGII?.tieneCodigoSeguridadGuardado
+    ) {
+      toast.add({
+        severity: 'warn',
+        summary: 'Timbre DGII pendiente',
+        detail: `El e-NCF ${numeroECFOficial} fue registrado correctamente, pero Alanube todavía no devolvió el QR completo.`,
+        life: 7000
+      })
     }
 
     // Guardar la respuesta y mostrar el modal
@@ -21426,11 +21770,7 @@ const confirmarYEnviarADGII = async () => {
   } catch (error) {
     console.error('Error al enviar a A La Nube DOM:', error)
 
-    const errorMessage = error.response?.data?.errors
-      ? error.response.data.errors
-          .map((e) => [e.code, e.field, e.message].filter(Boolean).join(' - '))
-          .join(', ')
-      : error.message
+    const errorMessage = obtenerDetalleErrorAlanube(error)
 
     toast.add({
       severity: 'error',
@@ -21440,7 +21780,9 @@ const confirmarYEnviarADGII = async () => {
     })
 
     if (typeof rechazarEnvioADGII.value === 'function') {
-      rechazarEnvioADGII.value(error)
+      const errorDetallado = new Error(errorMessage)
+      errorDetallado.cause = error
+      rechazarEnvioADGII.value(errorDetallado)
     }
     limpiarPromesaEnvioADGII()
     procesandoEnvioADGII.value = false
@@ -21608,14 +21950,9 @@ return
     const registroECF = comprobanteElectronicoActivo.value
     if (!registroECF) {
       const prefijoRequerido = obtenerPrefijoECFPorComprobante(comprobante.value)
-      toast.add({
-        severity: 'error',
-        summary: 'e-CF',
-        detail: `No existe un comprobante electrónico ${prefijoRequerido} activo configurado.`,
-        life: 5000
-      })
       loading.value = false
       generandoFactura.value = false
+      await solicitarConfiguracionComprobanteElectronico(prefijoRequerido)
       return
     }
 
@@ -27457,6 +27794,68 @@ const fnagregarProductoBuscado = async () => {
 
 /************************************************************/
 // Funciones para Acceso Rápido
+const obtenerClaveProductoAccesoRapido = (producto) => {
+  if (!producto || typeof producto !== 'object') return ''
+
+  const id = String(producto.id ?? '').trim()
+  if (id) return `id:${id}`
+
+  const codigo = String(producto.codigo ?? '').trim()
+  if (codigo) return `codigo:${codigo}`
+
+  const codigoBarra = String(producto.codigo_barra ?? '').trim()
+  return codigoBarra ? `codigo_barra:${codigoBarra}` : ''
+}
+
+const esProductoAccesoRapido = (producto) => {
+  const clave = obtenerClaveProductoAccesoRapido(producto)
+  return Boolean(
+    clave &&
+      productosAccesoRapido.value.some(
+        (acceso) => obtenerClaveProductoAccesoRapido(acceso) === clave
+      )
+  )
+}
+
+const alternarProductoAccesoRapido = async (producto) => {
+  const clave = obtenerClaveProductoAccesoRapido(producto)
+  if (!clave) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Advertencia',
+      detail: 'No se pudo identificar el producto para guardarlo como favorito',
+      life: 3000
+    })
+    return false
+  }
+
+  const yaEsFavorito = esProductoAccesoRapido(producto)
+  if (yaEsFavorito) {
+    productosAccesoRapido.value = productosAccesoRapido.value.filter(
+      (acceso) => obtenerClaveProductoAccesoRapido(acceso) !== clave
+    )
+  } else {
+    productosAccesoRapido.value.push({
+      ...producto,
+      cantidad_guardada: 1,
+      id_acceso: Date.now()
+    })
+  }
+
+  await persistirAccesosRapidosEnConfig()
+
+  toast.add({
+    severity: yaEsFavorito ? 'info' : 'success',
+    summary: yaEsFavorito ? 'Favorito eliminado' : 'Favorito agregado',
+    detail: yaEsFavorito
+      ? `${producto.nombre} fue eliminado de los accesos rápidos`
+      : `${producto.nombre} ya está disponible en los accesos rápidos`,
+    life: 2500
+  })
+
+  return !yaEsFavorito
+}
+
 const guardarProductoAccesoRapido = async () => {
   if (!datosProductoBuscado.value || !datosProductoBuscado.value.codigo) {
     toast.add({
@@ -30829,13 +31228,40 @@ const fnInfoProduct = async (codigo) => {
         <img src="${primeraIMG.value}" alt="Imagen del Producto" style="max-width: 100%; max-height: 100%;">
        </div>
     </div>
+    <div style="display: flex; justify-content: center; margin-top: 18px;">
+      <button
+        id="btn-favorito-producto"
+        type="button"
+        style="border: 1px solid #f59e0b; border-radius: 8px; padding: 10px 16px; background: ${esProductoAccesoRapido(datosProd) ? '#f59e0b' : '#ffffff'}; color: ${esProductoAccesoRapido(datosProd) ? '#ffffff' : '#b45309'}; font-weight: 700; cursor: pointer;"
+      >
+        ${esProductoAccesoRapido(datosProd) ? '★ Quitar de favoritos' : '☆ Agregar a favoritos'}
+      </button>
+    </div>
   `,
       icon: 'info',
       showCancelButton: true,
       showDenyButton: true,
       confirmButtonText: 'Ver Producto',
       cancelButtonText: 'Cerrar',
-      denyButtonText: 'Agregar Otro'
+      denyButtonText: 'Agregar Otro',
+      didOpen: () => {
+        const botonFavorito = Swal.getPopup()?.querySelector('#btn-favorito-producto')
+        if (!botonFavorito) return
+
+        botonFavorito.addEventListener('click', async () => {
+          botonFavorito.disabled = true
+          try {
+            const esFavorito = await alternarProductoAccesoRapido(datosProd)
+            botonFavorito.textContent = esFavorito
+              ? '★ Quitar de favoritos'
+              : '☆ Agregar a favoritos'
+            botonFavorito.style.background = esFavorito ? '#f59e0b' : '#ffffff'
+            botonFavorito.style.color = esFavorito ? '#ffffff' : '#b45309'
+          } finally {
+            botonFavorito.disabled = false
+          }
+        })
+      }
     }).then((result) => {
       if (result.isConfirmed) {
         router.push({ path: `/editarproductos/${datosProd.id}` })

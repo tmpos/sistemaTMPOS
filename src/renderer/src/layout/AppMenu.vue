@@ -324,7 +324,7 @@ const model = ref([
         "items": [
           {
             "label": "Facturas",
-            "to": "facturas",
+            "to": "/facturas",
             "permiso": "Administrador,Gerente,Soporte",
             "icon": "fas icon-doc"
           },
@@ -369,6 +369,12 @@ const model = ref([
           "to": "/notacredito",
           "permiso": "Administrador,Gerente,Soporte",
           "icon": "fas icon-docs-1"
+          },
+          {
+          "label": "Nota de Crédito Electrónica E34",
+          "to": "/crear-nota-credito-electronica",
+          "permiso": "Administrador,Gerente,Soporte",
+          "icon": "pi pi-bolt"
           },
           {
           "label": "Conduce",
@@ -493,6 +499,84 @@ const model = ref([
               "to": "/transaccionesbancarias",
                "permiso": "Administrador,Gerente,Soporte,Contable",
               "icon": "fas icon-circle-empty"
+              },
+              {
+              "label": "Trazabilidad de Transacciones",
+              "to": "/trazabilidad-transacciones",
+              "permiso": "Administrador,Gerente,Soporte,Contable",
+              "icon": "pi pi-arrow-right-arrow-left"
+              },
+              {
+              "label": "Kardex de Inventario",
+              "to": "/kardex-inventario",
+              "permiso": "Administrador,Gerente,Soporte,Contable",
+              "icon": "pi pi-list-check"
+              },
+              {
+              "label": "Conteo Físico",
+              "to": "/conteo-fisico",
+              "permiso": "Administrador,Gerente,Soporte,Contable",
+              "icon": "pi pi-clipboard"
+              },
+              {
+              "label": "Transferencias entre Almacenes",
+              "to": "/transferencias-almacenes",
+              "permiso": "Administrador,Gerente,Soporte,Contable",
+              "icon": "pi pi-truck"
+              },
+              {
+              "label": "Órdenes de Compra",
+              "to": "/ordenes-compra",
+              "permiso": "Administrador,Gerente,Soporte,Contable",
+              "icon": "pi pi-shopping-cart"
+              },
+              {
+              "label": "Antigüedad de Saldos",
+              "to": "/antiguedad-saldos",
+              "permiso": "Administrador,Gerente,Soporte,Contable",
+              "icon": "pi pi-clock"
+              },
+              {
+              "label": "Flujo de Caja",
+              "to": "/flujo-caja",
+              "permiso": "Administrador,Gerente,Soporte,Contable",
+              "icon": "pi pi-chart-line"
+              },
+              {
+              "label": "Períodos Contables",
+              "to": "/periodos-contables",
+              "permiso": "Administrador,Gerente,Soporte,Contable",
+              "icon": "pi pi-lock"
+              },
+              {
+              "label": "Centro de Aprobaciones",
+              "to": "/centro-aprobaciones",
+              "permiso": "Administrador,Gerente,Soporte,Contable",
+              "icon": "pi pi-check-square"
+              },
+              {
+              "label": "Activos Fijos",
+              "to": "/activos-fijos",
+              "permiso": "Administrador,Gerente,Soporte,Contable",
+              "icon": "pi pi-building"
+              },
+              {
+              "label": "Centros de Costo",
+              "to": "/centros-costo",
+              "permiso": "Administrador,Gerente,Soporte,Contable",
+              "icon": "pi pi-sitemap"
+              },
+              {
+              "label": "Valoración de Inventario",
+              "to": "/valoracion-inventario",
+              "permiso": "Administrador,Gerente,Soporte,Contable",
+              "icon": "pi pi-chart-pie"
+              },
+              {
+              "label": "Integridad del Sistema",
+              "to": "/integridad-sistema",
+              "permiso": "Administrador,Gerente,Soporte,Contable",
+              "icon": "pi pi-shield"
               },
               {
               "label": "Cheques",

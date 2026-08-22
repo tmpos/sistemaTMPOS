@@ -176,13 +176,17 @@ const cargarDatos = async () => {
       .map(gasto => {
         const total = parseFloat(gasto.valor || 0);
         const impuesto = parseFloat(gasto.impuesto || 0);
+        const impuestoSelectivo = parseFloat(gasto.impuesto_selectivo_consumo || 0);
+        const otrosImpuestos = parseFloat(gasto.otros_impuestos_tasas || 0);
         return {
           ...gasto,
           origen_606: 'GASTO_FIJO',
           fecha: gasto.fecha_comprobante || gasto.fecha_pago,
           no_factura: gasto.no_factura || `GF-${gasto.id || ''}`,
-          subtotal: Math.max(total - impuesto, 0),
+          subtotal: Math.max(total - impuesto - impuestoSelectivo - otrosImpuestos, 0),
           impuesto,
+          impuesto_selectivo_consumo: impuestoSelectivo,
+          otros_impuestos_tasas: otrosImpuestos,
           total
         };
       });
@@ -292,6 +296,8 @@ const exportarExcel = () => {
     'ITBIS Percibido': '0.00',
     'Retención Renta': '0.00',
     'ISR Percibido': '0.00',
+    'Impuesto Selectivo al Consumo (ISC)': parseFloat(item.impuesto_selectivo_consumo || 0).toFixed(2),
+    'Otros Impuestos/Tasas (CDT)': parseFloat(item.otros_impuestos_tasas || 0).toFixed(2),
     'Propina Legal': '0.00',
     'Servicios': '0.00',
     'Bienes': parseFloat(item.subtotal || 0).toFixed(2)
@@ -316,6 +322,8 @@ const exportarExcel = () => {
     { wch: 15 }, // ITBIS Perc
     { wch: 15 }, // Ret Renta
     { wch: 15 }, // ISR Perc
+    { wch: 22 }, // ISC
+    { wch: 24 }, // Otros impuestos/CDT
     { wch: 12 }, // Propina
     { wch: 15 }, // Servicios
     { wch: 15 }  // Bienes
@@ -359,6 +367,8 @@ const exportarTXT = () => {
       formatearMonto(0),                                   // ITBIS Percibido
       formatearMonto(0),                                   // Retención Renta
       formatearMonto(0),                                   // ISR Percibido
+      formatearMonto(item.impuesto_selectivo_consumo || 0), // Impuesto Selectivo al Consumo
+      formatearMonto(item.otros_impuestos_tasas || 0),      // Otros Impuestos/Tasas (CDT)
       formatearMonto(0),                                   // Propina Legal
       formatearMonto(0),                                   // Servicios
       formatearMonto(item.subtotal || 0)                  // Bienes
@@ -511,12 +521,16 @@ const cargarTodasLasCompras = async () => {
     const gastos = (Array.isArray(responseGastos) ? responseGastos : []).map(gasto => {
       const total = parseFloat(gasto.valor || 0);
       const impuesto = parseFloat(gasto.impuesto || 0);
+      const impuestoSelectivo = parseFloat(gasto.impuesto_selectivo_consumo || 0);
+      const otrosImpuestos = parseFloat(gasto.otros_impuestos_tasas || 0);
       return {
         ...gasto,
         fecha: gasto.fecha_comprobante || gasto.fecha_pago,
         no_factura: gasto.no_factura || `GF-${gasto.id || ''}`,
-        subtotal: Math.max(total - impuesto, 0),
+        subtotal: Math.max(total - impuesto - impuestoSelectivo - otrosImpuestos, 0),
         impuesto,
+        impuesto_selectivo_consumo: impuestoSelectivo,
+        otros_impuestos_tasas: otrosImpuestos,
         total
       };
     });
@@ -609,6 +623,12 @@ const formatearMonto = (monto) => {
             <p class="text-gray-600 mt-1">Informe de Compras según normativa DGII</p>
           </div>
           <div class="flex gap-2">
+            <Button
+              label="Retenciones"
+              icon="pi pi-percentage"
+              severity="warning"
+              @click="router.push('/impuestos-retenciones')"
+            />
             <Button
               label="Nueva Compra"
               icon="pi pi-plus"

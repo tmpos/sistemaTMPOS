@@ -173,6 +173,18 @@ const pinia = createPinia()
 
 const app = createApp(App)
 
+// El menu nativo de Electron vive fuera de Vue. Registrar su evento durante
+// el arranque evita perder clics mientras AppTopbar aun esta cargando datos.
+if (window.electron?.ipcRenderer) {
+  window.electron.ipcRenderer.on('navigate-to', (path) => {
+    if (typeof path === 'string' && path.length > 0) {
+      router.push(path).catch((error) => {
+        console.error(`No se pudo navegar a la ruta "${path}" desde el menu de Electron:`, error)
+      })
+    }
+  })
+}
+
 app.use(router)
 app.use(i18n)
 app.use(PrimeVue, {

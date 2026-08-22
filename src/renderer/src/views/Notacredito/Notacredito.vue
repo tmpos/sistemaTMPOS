@@ -311,6 +311,12 @@ const handleSelectComplete = async(selected)=>{
         <div class="actions-grid">
           <Button icon="pi pi-refresh" label="Recargar" severity="info" outlined @click="fetchAndSetupData" />
           <Button icon="pi pi-plus" label="Nueva nota" severity="success" @click="router.push('/crearnotacredito')" />
+          <Button
+            icon="pi pi-bolt"
+            label="Nota electrónica E34"
+            severity="help"
+            @click="router.push('/crear-nota-credito-electronica')"
+          />
           <Button icon="pi pi-trash" label="Borrar seleccion" severity="danger" outlined @click="borrarSeleccionados" />
           <Button
             v-if="usuarioLocal.usuario =='Soporte'"

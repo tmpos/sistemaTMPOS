@@ -1,6 +1,27 @@
 import { describe, it, expect } from 'vitest'
+import { esRespuestaOperacionExitosa } from '../funciones.js'
 
 // Pure functions from funciones.js
+
+describe('esRespuestaOperacionExitosa', () => {
+  it.each([
+    ['ok'],
+    { success: true },
+    { ok: true },
+    { status: 200 },
+    { data: ['ok'] },
+    { result: { success: true } }
+  ])('reconoce respuestas exitosas del servidor', (respuesta) => {
+    expect(esRespuestaOperacionExitosa(respuesta)).toBe(true)
+  })
+
+  it.each([null, false, ['error'], { success: false }, { status: 400 }])(
+    'rechaza respuestas fallidas del servidor',
+    (respuesta) => {
+      expect(esRespuestaOperacionExitosa(respuesta)).toBe(false)
+    }
+  )
+})
 
 const rellenodecero = (number, width) => {
   if (number === '') number = 0

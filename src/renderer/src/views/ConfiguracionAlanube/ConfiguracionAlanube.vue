@@ -77,6 +77,8 @@ const loading = ref(false);
 const probandoConexion = ref(false);
 const resultadoPrueba = ref(null);
 const guardandoConfigGlobal = ref(false);
+const configuracionesGlobales = ref([]);
+const configGlobalEditandoId = ref(null);
 
 // Configuracion global Alanube (se guarda por ambiente: sandbox | production)
 const configGlobal = ref({
@@ -96,36 +98,55 @@ const persistirConfigGlobal = () => {
   window.localStorage.setItem(getStorageKey(), JSON.stringify(configGlobal.value));
 };
 
+const respuestaExitosa = (respuesta) => {
+  if (Array.isArray(respuesta)) return respuesta[0] === 'ok';
+  return respuesta?.success === true || respuesta?.ok === true;
+};
+
+const mensajeRespuesta = (respuesta) => {
+  if (Array.isArray(respuesta)) {
+    return respuesta[1]?.message || respuesta[1]?.error || respuesta[1] || '';
+  }
+  return respuesta?.message || respuesta?.error || '';
+};
+
+const asignarConfigGlobal = (registro = {}, ambiente = 'sandbox') => {
+  configGlobal.value = {
+    id_compania: registro.id_compania || '',
+    rnc_emisor: registro.rnc_emisor || '',
+    nombre_empresa: registro.nombre_empresa || '',
+    ambiente: registro.ambiente || ambiente,
+    token_api: registro.token_api || ''
+  };
+  configGlobalEditandoId.value = registro.id || null;
+};
+
+const cargarConfiguracionesGlobales = async () => {
+  const rows = await peticionesFetchOffline('getDataAsArray', tablaConfig);
+  configuracionesGlobales.value = Array.isArray(rows) ? rows : [];
+  return configuracionesGlobales.value;
+};
+
 const cargarConfigGlobal = async () => {
   try {
     // Intentar cargar del ambiente actual desde la DB primero
-    const rows = await peticionesFetchOffline('getDataAsArray', tablaConfig);
-    const rowsArray = Array.isArray(rows) ? rows : [];
+    const rowsArray = await cargarConfiguracionesGlobales();
     console.log('🗄️ configuracion_alanube DB rows:', rowsArray.map(r => ({ id: r.id, ambiente: r.ambiente, id_compania: r.id_compania, rnc_emisor: r.rnc_emisor, nombre_empresa: r.nombre_empresa, token_api: r.token_api ? r.token_api.slice(0, 30) + '...' : '' })));
     const ambienteActual = configGlobal.value.ambiente || 'sandbox';
     const dbRow = rowsArray.find(r => r.ambiente === ambienteActual);
     if (dbRow) {
-      configGlobal.value = {
-        ...configGlobal.value,
-        id_compania: dbRow.id_compania || '',
-        rnc_emisor: dbRow.rnc_emisor || '',
-        nombre_empresa: dbRow.nombre_empresa || '',
-        ambiente: dbRow.ambiente || ambienteActual,
-        token_api: dbRow.token_api || ''
-      };
+      asignarConfigGlobal(dbRow, ambienteActual);
       // Sync to localStorage
       persistirConfigGlobal();
       return;
     }
 
     // Fallback: cargar de localStorage
+    asignarConfigGlobal({}, ambienteActual);
     const key = ambienteActual === 'production' ? 'alanube_config_production' : 'alanube_config_sandbox';
     const saved = JSON.parse(window.localStorage.getItem(key) || '{}');
     if (saved && (saved.id_compania || saved.rnc_emisor)) {
-      configGlobal.value = {
-        ...configGlobal.value,
-        ...saved
-      };
+      asignarConfigGlobal(saved, ambienteActual);
     }
   } catch {
     // usar defaults
@@ -137,6 +158,39 @@ const cambiarAmbiente = async () => {
   window.localStorage.setItem('alanube_last_ambiente', configGlobal.value.ambiente);
   // Al cambiar ambiente, cargar la config guardada para ese ambiente
   await cargarConfigGlobal();
+};
+
+const nuevaConfigGlobal = () => {
+  const ambiente = window.localStorage.getItem('alanube_last_ambiente') || 'sandbox';
+  asignarConfigGlobal({}, ambiente);
+};
+
+const editarConfigGlobal = (registro) => {
+  asignarConfigGlobal(registro, registro.ambiente || 'sandbox');
+  window.localStorage.setItem('alanube_last_ambiente', configGlobal.value.ambiente);
+};
+
+const eliminarConfigGlobal = async (registro) => {
+  if (!registro?.id) return;
+  const confirmado = window.confirm(`Eliminar la configuracion ${registro.ambiente || ''} de Alanube?`);
+  if (!confirmado) return;
+
+  guardandoConfigGlobal.value = true;
+  try {
+    const resultado = await peticionesFetchOffline('deleteEntry', tablaConfig, registro.id);
+    if (!respuestaExitosa(resultado)) {
+      throw new Error(mensajeRespuesta(resultado) || 'No se pudo eliminar la configuracion');
+    }
+
+    window.localStorage.removeItem(`alanube_config_${registro.ambiente || 'sandbox'}`);
+    await cargarConfiguracionesGlobales();
+    if (String(configGlobalEditandoId.value) === String(registro.id)) nuevaConfigGlobal();
+    toast.add({ severity: 'success', summary: 'Eliminado', detail: 'Configuracion eliminada de la nube', life: 3000 });
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 });
+  } finally {
+    guardandoConfigGlobal.value = false;
+  }
 };
 
 const guardarConfigGlobal = async () => {
@@ -157,12 +211,27 @@ const guardarConfigGlobal = async () => {
       usuario: usuarioLocal.value.usuario || '',
       almacen: datosEmpresa?.empresa?.nombre || ''
     };
-    if (dbRow) {
-      await peticionesFetchOffline('updateData', tablaConfig, JSON.stringify(payload));
-    } else {
-      await peticionesFetchOffline('insertData', tablaConfig, JSON.stringify(payload));
+    const resultadoGuardado = dbRow
+      ? await peticionesFetchOffline('updateData', tablaConfig, JSON.stringify(payload))
+      : await peticionesFetchOffline('insertData', tablaConfig, JSON.stringify(payload));
+
+    if (!respuestaExitosa(resultadoGuardado)) {
+      const detalle = mensajeRespuesta(resultadoGuardado);
+      throw new Error(detalle || 'El servidor no pudo guardar la configuracion de Alanube');
     }
-    // Sync to localStorage
+
+    // Confirmar con una lectura nueva que el registro quedo persistido en la nube.
+    const filasConfirmacion = await peticionesFetchOffline('getDataAsArray', tablaConfig);
+    const registroConfirmado = Array.isArray(filasConfirmacion)
+      ? filasConfirmacion.find((fila) => fila.ambiente === ambienteActual)
+      : null;
+    if (!registroConfirmado) {
+      throw new Error('El servidor respondio, pero no devolvio la configuracion guardada');
+    }
+    configuracionesGlobales.value = filasConfirmacion;
+    configGlobalEditandoId.value = registroConfirmado.id || null;
+
+    // Mantener una copia local solo despues de confirmar la persistencia remota.
     persistirConfigGlobal();
 
     // Actualizar todos los registros existentes con los datos globales
@@ -182,7 +251,7 @@ const guardarConfigGlobal = async () => {
       }
     }
 
-    toast.add({ severity: 'success', summary: 'Guardado', detail: 'Configuración global actualizada', life: 3000 });
+    toast.add({ severity: 'success', summary: 'Guardado', detail: 'Configuración guardada en la nube', life: 3000 });
     await fetchData();
   } catch (error) {
     toast.add({ severity: 'error', summary: 'Error', detail: error.message, life: 3000 });
@@ -504,7 +573,7 @@ onMounted(async () => {
       <div class="flex items-center gap-2 mb-4">
         <i class="pi pi-cog text-indigo-600 text-xl"></i>
         <h3 class="text-lg font-bold text-indigo-700 dark:text-indigo-400">Datos de la Compañía (Alanube)</h3>
-        <Tag value="Global" severity="info" />
+        <Tag :value="configGlobalEditandoId ? 'Editando' : 'Nuevo'" :severity="configGlobalEditandoId ? 'warn' : 'success'" />
       </div>
       <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
         <div class="field">
@@ -529,9 +598,51 @@ onMounted(async () => {
         </div>
       </div>
       <div class="mt-3 flex items-center gap-2">
-        <Button label="Guardar Configuración" icon="pi pi-save" severity="indigo" :loading="guardandoConfigGlobal" @click="guardarConfigGlobal" />
+        <Button :label="configGlobalEditandoId ? 'Actualizar Configuración' : 'Guardar Configuración'" icon="pi pi-save" severity="indigo" :loading="guardandoConfigGlobal" @click="guardarConfigGlobal" />
+        <Button label="Nueva" icon="pi pi-plus" severity="secondary" outlined @click="nuevaConfigGlobal" />
         <Button label="Buscar por ID en Alanube" icon="pi pi-cloud-download" severity="info" outlined :loading="guardandoConfigGlobal" @click="consultarCompaniaAlanube" />
         <small class="text-slate-400">Consulta el ID indicado y completa el RNC y nombre de esa empresa</small>
+      </div>
+
+      <div class="mt-5 overflow-hidden rounded-lg border border-indigo-200 bg-white dark:border-indigo-800 dark:bg-slate-900">
+        <DataTable
+          :value="configuracionesGlobales"
+          dataKey="id"
+          size="small"
+          stripedRows
+          responsiveLayout="scroll"
+          :loading="guardandoConfigGlobal"
+        >
+          <Column field="id_compania" header="ID COMPAÑÍA" style="min-width: 210px">
+            <template #body="slotProps">
+              <span class="font-mono text-xs">{{ slotProps.data.id_compania || '—' }}</span>
+            </template>
+          </Column>
+          <Column field="rnc_emisor" header="RNC" style="min-width: 120px" />
+          <Column field="nombre_empresa" header="EMPRESA" style="min-width: 180px" />
+          <Column field="ambiente" header="AMBIENTE" style="min-width: 120px">
+            <template #body="slotProps">
+              <Tag :value="slotProps.data.ambiente" :severity="getAmbienteSeverity(slotProps.data.ambiente)" />
+            </template>
+          </Column>
+          <Column header="TOKEN API" style="min-width: 150px">
+            <template #body="slotProps">
+              <span class="font-mono text-xs">{{ slotProps.data.token_api ? `${slotProps.data.token_api.slice(0, 12)}...` : '—' }}</span>
+            </template>
+          </Column>
+          <Column field="usuario" header="USUARIO" style="min-width: 110px" />
+          <Column header="ACCIONES" style="width: 110px">
+            <template #body="slotProps">
+              <div class="flex gap-1">
+                <Button icon="pi pi-pencil" size="small" text rounded severity="info" @click="editarConfigGlobal(slotProps.data)" v-tooltip.top="'Editar'" />
+                <Button icon="pi pi-trash" size="small" text rounded severity="danger" @click="eliminarConfigGlobal(slotProps.data)" v-tooltip.top="'Eliminar'" />
+              </div>
+            </template>
+          </Column>
+          <template #empty>
+            <div class="py-5 text-center text-slate-500">No hay configuraciones de Alanube guardadas en la nube.</div>
+          </template>
+        </DataTable>
       </div>
     </div>
 
@@ -690,6 +801,10 @@ onMounted(async () => {
           <InputText v-model="datoscamposCrear.secuencia_actual" placeholder="00000001" fluid />
         </div>
         <div class="field">
+          <label>Vencimiento de Secuencia</label>
+          <InputText v-model="datoscamposCrear.expiracion" placeholder="DD/MM/AAAA" fluid />
+        </div>
+        <div class="field">
           <label>Aprobados</label>
           <InputNumber v-model="datoscamposCrear.aprobados" :useGrouping="false" fluid />
         </div>
@@ -754,6 +869,10 @@ onMounted(async () => {
         <div class="field">
           <label>Secuencia Actual</label>
           <InputText v-model="datoscampos.secuencia_actual" placeholder="00000001" fluid />
+        </div>
+        <div class="field">
+          <label>Vencimiento de Secuencia</label>
+          <InputText v-model="datoscampos.expiracion" placeholder="DD/MM/AAAA" fluid />
         </div>
         <div class="field">
           <label>Aprobados</label>

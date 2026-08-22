@@ -28,7 +28,7 @@ const basic = ref({
   dateFormat: 'd/m/Y',
 });
 
-const camposArray = ['descripcion', 'valor', 'fecha_pago', 'alerta', 'dias_alerta', 'tipo', 'cuentaporpagar', 'ultimo_pago','almacen','estado','categoria','proveedor','rnc_proveedor','ncf_proveedor','fecha_comprobante','tipo_bienes_servicios','impuesto','notas','historial_pagos'];
+const camposArray = ['descripcion', 'valor', 'fecha_pago', 'alerta', 'dias_alerta', 'tipo', 'cuentaporpagar', 'ultimo_pago','almacen','estado','categoria','proveedor','rnc_proveedor','ncf_proveedor','fecha_comprobante','tipo_bienes_servicios','impuesto','impuesto_selectivo_consumo','otros_impuestos_tasas','notas','historial_pagos'];
 
 /************************************************************************/
 // VARIABLES DE ESTADO
@@ -293,6 +293,8 @@ async function limpiarCamposCrear() {
   datoscamposGastosfijos.value.fecha_comprobante = nfecha('fecha');
   datoscamposGastosfijos.value.tipo_bienes_servicios = '02';
   datoscamposGastosfijos.value.impuesto = '0.00';
+  datoscamposGastosfijos.value.impuesto_selectivo_consumo = '0.00';
+  datoscamposGastosfijos.value.otros_impuestos_tasas = '0.00';
 }
 
 const fetchProveedores = async () => {
@@ -332,6 +334,12 @@ async function funcionCrear() {
   datoscamposGastosfijos.value.almacen = datosEmpresa.empresa.nombre;
   datoscamposGastosfijos.value.estado = datoscamposGastosfijos.value.estado || 'PENDIENTE';
   datoscamposGastosfijos.value.historial_pagos = '[]';
+  datoscamposGastosfijos.value.impuesto_selectivo_consumo = Number(
+    datoscamposGastosfijos.value.impuesto_selectivo_consumo || 0
+  ).toFixed(2);
+  datoscamposGastosfijos.value.otros_impuestos_tasas = Number(
+    datoscamposGastosfijos.value.otros_impuestos_tasas || 0
+  ).toFixed(2);
   datoscamposGastosfijos.value.ncf_proveedor = String(
     datoscamposGastosfijos.value.ncf_proveedor || ''
   ).trim().toUpperCase();
@@ -371,6 +379,12 @@ async function funcionActualizar() {
   datoscampos.value.ncf_proveedor = String(datoscampos.value.ncf_proveedor || '')
     .trim()
     .toUpperCase();
+  datoscampos.value.impuesto_selectivo_consumo = Number(
+    datoscampos.value.impuesto_selectivo_consumo || 0
+  ).toFixed(2);
+  datoscampos.value.otros_impuestos_tasas = Number(
+    datoscampos.value.otros_impuestos_tasas || 0
+  ).toFixed(2);
   if (
     datoscampos.value.ncf_proveedor &&
     !/^[A-Z0-9]{11}$|^[A-Z0-9]{13}$/.test(datoscampos.value.ncf_proveedor)
@@ -1357,6 +1371,30 @@ const historialPagosData = computed(() => {
       </div>
 
       <div class="col-span-6">
+        <label class="block text-sm font-medium mb-2">Impuesto Selectivo al Consumo (ISC)</label>
+        <InputText
+          v-model="datoscamposGastosfijos.impuesto_selectivo_consumo"
+          placeholder="0.00"
+          v-decimales
+          v-numeroFocusinOut
+          v-solonumeros
+          fluid
+        />
+      </div>
+
+      <div class="col-span-6">
+        <label class="block text-sm font-medium mb-2">Otros impuestos/tasas (CDT)</label>
+        <InputText
+          v-model="datoscamposGastosfijos.otros_impuestos_tasas"
+          placeholder="0.00"
+          v-decimales
+          v-numeroFocusinOut
+          v-solonumeros
+          fluid
+        />
+      </div>
+
+      <div class="col-span-6">
         <label class="block text-sm font-medium mb-2">Fecha de Pago</label>
         <flat-pickr
           v-model="datoscamposGastosfijos.fecha_pago"
@@ -1541,6 +1579,30 @@ const historialPagosData = computed(() => {
         <label class="block text-sm font-medium mb-2">ITBIS facturado</label>
         <InputText
           v-model="datoscampos.impuesto"
+          placeholder="0.00"
+          v-decimales
+          v-numeroFocusinOut
+          v-solonumeros
+          fluid
+        />
+      </div>
+
+      <div class="col-span-6">
+        <label class="block text-sm font-medium mb-2">Impuesto Selectivo al Consumo (ISC)</label>
+        <InputText
+          v-model="datoscampos.impuesto_selectivo_consumo"
+          placeholder="0.00"
+          v-decimales
+          v-numeroFocusinOut
+          v-solonumeros
+          fluid
+        />
+      </div>
+
+      <div class="col-span-6">
+        <label class="block text-sm font-medium mb-2">Otros impuestos/tasas (CDT)</label>
+        <InputText
+          v-model="datoscampos.otros_impuestos_tasas"
           placeholder="0.00"
           v-decimales
           v-numeroFocusinOut

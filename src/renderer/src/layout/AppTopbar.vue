@@ -27,6 +27,7 @@ peticionesFetch,
 generarCodigoUnicoN,
 codificarBase64,
 arrayToObjetoFromTablaOffline,
+crearTablaSiNoExiste,
 crearTablaSiNoExisteOffline,
 arrayToObjetoFromTabla,
 peticionesFetchOffline,
@@ -725,13 +726,6 @@ intervalId = startVerificationInterval();
   tokenCifrado.value = await encryptarPassword(token.value, 10);
 
 
-/*------------------------------------------------------------------*/
-  if(window.electron){
-      window.electron.ipcRenderer.on('navigate-to', (path) => {
-       router.push(path)
-    })
-    }
-/*------------------------------------------------------------------*/
       const permissions = []; 
        permissions.push(datosEmpresa.usuario.usuario)
        if(window.electron){
