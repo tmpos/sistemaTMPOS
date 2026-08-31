@@ -227,13 +227,13 @@ export async function imprimirFacturaCredito(credito, factura, datosEmpresa) {
 
     const printerConfig =
       typeof datosJSON.impresora === 'string'
-        ? JSON.parse(datosJSON.impresora)
-        : datosJSON.impresora
+        ? parseSeguro(datosJSON.impresora, {})
+        : (datosJSON.impresora || {})
 
     const datosDefault =
       typeof datosJSON.datosDefault === 'string'
-        ? JSON.parse(datosJSON.datosDefault)
-        : datosJSON.datosDefault
+        ? parseSeguro(datosJSON.datosDefault, {})
+        : (datosJSON.datosDefault || {})
 
     const cantidadCopias = printerConfig.copies || 1
 
@@ -257,10 +257,10 @@ export async function imprimirFacturaCredito(credito, factura, datosEmpresa) {
 
     const barcodeData = await generateBarcode(datosFactura.no_factura)
     const productosHTML = generateProductsHTML(
-      JSON.parse(datosFacturaoriginal.productos),
+      parseSeguro(datosFacturaoriginal.productos, []),
       datosConfiguracion
     )
-    const pagosHTML = generatePaymentsHTML(JSON.parse(datosFactura.pagos), datosConfiguracion)
+    const pagosHTML = generatePaymentsHTML(parseSeguro(datosFactura.pagos, []), datosConfiguracion)
 
     const htmlContent = `
       <!DOCTYPE html>

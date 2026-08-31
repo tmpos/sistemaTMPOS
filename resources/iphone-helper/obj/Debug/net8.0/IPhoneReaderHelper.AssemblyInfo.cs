@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("IPhoneReaderHelper")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3f7d7da3220b9aba419b49ee8e00abd64d355676")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c698cc8f3773815fc7ac1b43b842cea5a4ed4d0f")]
 [assembly: System.Reflection.AssemblyProductAttribute("IPhoneReaderHelper")]
 [assembly: System.Reflection.AssemblyTitleAttribute("IPhoneReaderHelper")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

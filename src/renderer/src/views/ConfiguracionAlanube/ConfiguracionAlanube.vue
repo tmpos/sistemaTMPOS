@@ -89,15 +89,6 @@ const configGlobal = ref({
   token_api: ''
 });
 
-const getStorageKey = () => {
-  const amb = configGlobal.value.ambiente || 'sandbox';
-  return `alanube_config_${amb}`;
-};
-
-const persistirConfigGlobal = () => {
-  window.localStorage.setItem(getStorageKey(), JSON.stringify(configGlobal.value));
-};
-
 const respuestaExitosa = (respuesta) => {
   if (Array.isArray(respuesta)) return respuesta[0] === 'ok';
   return respuesta?.success === true || respuesta?.ok === true;
@@ -129,45 +120,34 @@ const cargarConfiguracionesGlobales = async () => {
 
 const cargarConfigGlobal = async () => {
   try {
-    // Intentar cargar del ambiente actual desde la DB primero
+    // La tabla configuracion_alanube es la unica fuente de estas credenciales.
     const rowsArray = await cargarConfiguracionesGlobales();
     console.log('🗄️ configuracion_alanube DB rows:', rowsArray.map(r => ({ id: r.id, ambiente: r.ambiente, id_compania: r.id_compania, rnc_emisor: r.rnc_emisor, nombre_empresa: r.nombre_empresa, token_api: r.token_api ? r.token_api.slice(0, 30) + '...' : '' })));
     const ambienteActual = configGlobal.value.ambiente || 'sandbox';
-    const dbRow = rowsArray.find(r => r.ambiente === ambienteActual);
+    const dbRow = rowsArray.find(
+      r => String(r.ambiente || 'sandbox').trim().toLowerCase() === ambienteActual
+    );
     if (dbRow) {
       asignarConfigGlobal(dbRow, ambienteActual);
-      // Sync to localStorage
-      persistirConfigGlobal();
       return;
     }
 
-    // Fallback: cargar de localStorage
     asignarConfigGlobal({}, ambienteActual);
-    const key = ambienteActual === 'production' ? 'alanube_config_production' : 'alanube_config_sandbox';
-    const saved = JSON.parse(window.localStorage.getItem(key) || '{}');
-    if (saved && (saved.id_compania || saved.rnc_emisor)) {
-      asignarConfigGlobal(saved, ambienteActual);
-    }
   } catch {
     // usar defaults
   }
 };
 
 const cambiarAmbiente = async () => {
-  // Guardar la preferencia de ambiente
-  window.localStorage.setItem('alanube_last_ambiente', configGlobal.value.ambiente);
-  // Al cambiar ambiente, cargar la config guardada para ese ambiente
   await cargarConfigGlobal();
 };
 
 const nuevaConfigGlobal = () => {
-  const ambiente = window.localStorage.getItem('alanube_last_ambiente') || 'sandbox';
-  asignarConfigGlobal({}, ambiente);
+  asignarConfigGlobal({}, 'sandbox');
 };
 
 const editarConfigGlobal = (registro) => {
   asignarConfigGlobal(registro, registro.ambiente || 'sandbox');
-  window.localStorage.setItem('alanube_last_ambiente', configGlobal.value.ambiente);
 };
 
 const eliminarConfigGlobal = async (registro) => {
@@ -182,7 +162,6 @@ const eliminarConfigGlobal = async (registro) => {
       throw new Error(mensajeRespuesta(resultado) || 'No se pudo eliminar la configuracion');
     }
 
-    window.localStorage.removeItem(`alanube_config_${registro.ambiente || 'sandbox'}`);
     await cargarConfiguracionesGlobales();
     if (String(configGlobalEditandoId.value) === String(registro.id)) nuevaConfigGlobal();
     toast.add({ severity: 'success', summary: 'Eliminado', detail: 'Configuracion eliminada de la nube', life: 3000 });
@@ -200,7 +179,9 @@ const guardarConfigGlobal = async () => {
     const rows = await peticionesFetchOffline('getDataAsArray', tablaConfig);
     const rowsArray = Array.isArray(rows) ? rows : [];
     const ambienteActual = configGlobal.value.ambiente || 'sandbox';
-    const dbRow = rowsArray.find(r => r.ambiente === ambienteActual);
+    const dbRow = rowsArray.find(
+      r => String(r.ambiente || 'sandbox').trim().toLowerCase() === ambienteActual
+    );
     const payload = {
       ...(dbRow || {}),
       id_compania: configGlobal.value.id_compania || '',
@@ -223,16 +204,15 @@ const guardarConfigGlobal = async () => {
     // Confirmar con una lectura nueva que el registro quedo persistido en la nube.
     const filasConfirmacion = await peticionesFetchOffline('getDataAsArray', tablaConfig);
     const registroConfirmado = Array.isArray(filasConfirmacion)
-      ? filasConfirmacion.find((fila) => fila.ambiente === ambienteActual)
+      ? filasConfirmacion.find(
+          (fila) => String(fila.ambiente || 'sandbox').trim().toLowerCase() === ambienteActual
+        )
       : null;
     if (!registroConfirmado) {
       throw new Error('El servidor respondio, pero no devolvio la configuracion guardada');
     }
     configuracionesGlobales.value = filasConfirmacion;
     configGlobalEditandoId.value = registroConfirmado.id || null;
-
-    // Mantener una copia local solo despues de confirmar la persistencia remota.
-    persistirConfigGlobal();
 
     // Actualizar todos los registros existentes con los datos globales
     if (configGlobal.value.id_compania || configGlobal.value.rnc_emisor) {
@@ -487,8 +467,6 @@ const consultarCompaniaAlanube = async () => {
         company.companyIdentification || company.identification || company.rnc || ''
       ).replace(/\D/g, '');
     }
-    persistirConfigGlobal();
-
     toast.add({ severity: 'success', summary: 'Compañía Encontrada', detail: `ID: ${company.id} | ${company.companyName || company.name}`, life: 5000 });
   } catch (error) {
     resultadoPrueba.value = { exito: false, error: error.response?.data || error.message };
@@ -532,15 +510,11 @@ const getAmbienteSeverity = (ambiente) => {
 onMounted(async () => {
   usuarioLocal.value = datosEmpresa?.usuario || {};
 
-  // Cargar el ultimo ambiente usado, o sandbox por defecto
-  const lastAmbiente = window.localStorage.getItem('alanube_last_ambiente') || 'sandbox';
-  configGlobal.value.ambiente = lastAmbiente;
-
   const datosJSON = await envioElectron('datosarchivo');
 
   await crearTablaSiNoExisteOffline(tabla, camposArray, toast);
   await crearTablaSiNoExisteOffline(tablaConfig, camposConfigArray, toast);
-  // Cargar config desde DB, con fallback a localStorage
+  // Cargar la configuracion directamente desde la tabla.
   await cargarConfigGlobal();
   await fetchData();
 });

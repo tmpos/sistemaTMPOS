@@ -1,0 +1,250 @@
+html.theme-glass {
+  --glass-surface: rgba(255, 255, 255, 0.66);
+  --glass-surface-strong: rgba(255, 255, 255, 0.82);
+  --glass-surface-soft: rgba(255, 255, 255, 0.48);
+  --glass-border: rgba(255, 255, 255, 0.72);
+  --glass-line: rgba(99, 102, 241, 0.16);
+  --glass-shadow: 0 20px 55px rgba(76, 81, 150, 0.16);
+  --glass-shadow-soft: 0 10px 30px rgba(76, 81, 150, 0.11);
+  --glass-blur: blur(22px) saturate(145%);
+  --glass-input: rgba(255, 255, 255, 0.58);
+}
+
+html.theme-glass body {
+  background:
+    radial-gradient(circle at 10% 10%, rgba(56, 189, 248, 0.24), transparent 32%),
+    radial-gradient(circle at 88% 8%, rgba(139, 92, 246, 0.22), transparent 34%),
+    radial-gradient(circle at 72% 88%, rgba(99, 102, 241, 0.18), transparent 38%),
+    linear-gradient(145deg, #edf7ff 0%, #f5f3ff 48%, #eef2ff 100%) fixed !important;
+  color: var(--app-text-color);
+}
+
+html.theme-glass .layout-wrapper,
+html.theme-glass .layout-main-container,
+html.theme-glass .layout-main,
+html.theme-glass .content-wrapper {
+  background: transparent !important;
+}
+
+html.theme-glass .layout-topbar,
+html.theme-glass .layout-sidebar,
+html.theme-glass .p-card,
+html.theme-glass .p-panel,
+html.theme-glass .p-dialog,
+html.theme-glass .p-drawer,
+html.theme-glass .p-popover,
+html.theme-glass .p-menu,
+html.theme-glass .p-tieredmenu,
+html.theme-glass .p-contextmenu {
+  background: var(--glass-surface) !important;
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: var(--glass-shadow) !important;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+
+html.theme-glass .layout-topbar {
+  background: color-mix(in srgb, var(--app-topbar-bg) 72%, transparent) !important;
+}
+
+html.theme-glass .p-card,
+html.theme-glass .p-panel,
+html.theme-glass .p-dialog {
+  border-radius: 18px;
+}
+
+html.theme-glass .p-card .p-card,
+html.theme-glass .p-panel .p-card,
+html.theme-glass .p-dialog .p-card {
+  background: var(--glass-surface-soft) !important;
+  box-shadow: var(--glass-shadow-soft) !important;
+}
+
+html.theme-glass .p-datatable,
+html.theme-glass .p-datatable-table-container,
+html.theme-glass .p-datatable-header,
+html.theme-glass .p-datatable-footer,
+html.theme-glass .p-datatable-thead > tr > th,
+html.theme-glass .p-datatable-tbody > tr,
+html.theme-glass .p-paginator {
+  background: transparent !important;
+}
+
+html.theme-glass .p-datatable-thead > tr > th {
+  border-color: var(--glass-line) !important;
+}
+
+html.theme-glass .p-datatable-tbody > tr > td {
+  border-color: rgba(148, 163, 184, 0.16) !important;
+}
+
+html.theme-glass .p-datatable-tbody > tr:hover {
+  background: rgba(99, 102, 241, 0.08) !important;
+}
+
+html.theme-glass .p-inputtext,
+html.theme-glass .p-inputnumber-input,
+html.theme-glass .p-select,
+html.theme-glass .p-multiselect,
+html.theme-glass .p-datepicker,
+html.theme-glass .p-textarea,
+html.theme-glass .p-autocomplete-input,
+html.theme-glass .p-password-input {
+  background: var(--glass-input) !important;
+  border-color: rgba(99, 102, 241, 0.2) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+html.theme-glass .p-inputtext:focus,
+html.theme-glass .p-inputnumber-input:focus,
+html.theme-glass .p-select.p-focus,
+html.theme-glass .p-multiselect.p-focus {
+  border-color: var(--app-primary-color) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-primary-color) 18%, transparent) !important;
+}
+
+html.theme-glass .p-dialog-mask,
+html.theme-glass .p-drawer-mask {
+  background: rgba(30, 41, 59, 0.22) !important;
+  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(7px);
+}
+
+html.theme-glass .p-button {
+  --glass-button-color: var(--app-primary-color);
+  background: color-mix(in srgb, var(--glass-button-color) 76%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--glass-button-color) 58%, white 42%) !important;
+  color: #ffffff !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    0 8px 22px color-mix(in srgb, var(--glass-button-color) 24%, transparent) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(155%);
+  backdrop-filter: blur(14px) saturate(155%);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+html.theme-glass .p-button:not(:disabled):hover {
+  background: color-mix(in srgb, var(--glass-button-color) 86%, transparent) !important;
+  border-color: color-mix(in srgb, var(--glass-button-color) 44%, white 56%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    0 11px 27px color-mix(in srgb, var(--glass-button-color) 32%, transparent) !important;
+  transform: translateY(-1px);
+}
+
+html.theme-glass .p-button:not(:disabled):active {
+  box-shadow:
+    inset 0 1px 4px rgba(15, 23, 42, 0.18),
+    0 4px 12px color-mix(in srgb, var(--glass-button-color) 22%, transparent) !important;
+  transform: translateY(1px) scale(0.99);
+}
+
+html.theme-glass .p-button-success {
+  --glass-button-color: #10b981;
+}
+
+html.theme-glass .p-button-danger {
+  --glass-button-color: #ef4444;
+}
+
+html.theme-glass .p-button-warn,
+html.theme-glass .p-button-warning {
+  --glass-button-color: #f59e0b;
+}
+
+html.theme-glass .p-button-info {
+  --glass-button-color: #0ea5e9;
+}
+
+html.theme-glass .p-button-help {
+  --glass-button-color: #8b5cf6;
+}
+
+html.theme-glass .p-button-secondary {
+  --glass-button-color: #64748b;
+}
+
+html.theme-glass .p-button-contrast {
+  --glass-button-color: #1e293b;
+}
+
+html.theme-glass .p-button-outlined {
+  background: color-mix(in srgb, var(--glass-button-color) 11%, transparent) !important;
+  border-color: color-mix(in srgb, var(--glass-button-color) 42%, transparent) !important;
+  color: var(--glass-button-color) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.38),
+    0 6px 18px color-mix(in srgb, var(--glass-button-color) 12%, transparent) !important;
+}
+
+html.theme-glass .p-button-outlined:not(:disabled):hover {
+  background: color-mix(in srgb, var(--glass-button-color) 20%, transparent) !important;
+  border-color: color-mix(in srgb, var(--glass-button-color) 58%, transparent) !important;
+  color: color-mix(in srgb, var(--glass-button-color) 86%, #0f172a 14%) !important;
+}
+
+html.theme-glass .p-button-text {
+  background: color-mix(in srgb, var(--glass-button-color) 7%, transparent) !important;
+  border-color: transparent !important;
+  color: var(--glass-button-color) !important;
+  box-shadow: none !important;
+}
+
+html.theme-glass .p-button-text:not(:disabled):hover {
+  background: color-mix(in srgb, var(--glass-button-color) 15%, transparent) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.26) !important;
+}
+
+html.theme-glass .p-button:disabled,
+html.theme-glass .p-button.p-disabled {
+  filter: saturate(0.55);
+  opacity: 0.55;
+  transform: none;
+}
+
+html.theme-glass.app-dark {
+  --glass-surface: rgba(15, 23, 42, 0.68);
+  --glass-surface-strong: rgba(15, 23, 42, 0.84);
+  --glass-surface-soft: rgba(30, 41, 59, 0.52);
+  --glass-border: rgba(148, 163, 184, 0.2);
+  --glass-line: rgba(129, 140, 248, 0.2);
+  --glass-shadow: 0 24px 65px rgba(2, 6, 23, 0.46);
+  --glass-shadow-soft: 0 12px 34px rgba(2, 6, 23, 0.3);
+  --glass-input: rgba(15, 23, 42, 0.55);
+}
+
+html.theme-glass.app-dark body {
+  background:
+    radial-gradient(circle at 12% 12%, rgba(14, 165, 233, 0.2), transparent 32%),
+    radial-gradient(circle at 88% 8%, rgba(124, 58, 237, 0.22), transparent 35%),
+    radial-gradient(circle at 70% 90%, rgba(79, 70, 229, 0.2), transparent 38%),
+    linear-gradient(145deg, #08111f 0%, #111329 48%, #0f172a 100%) fixed !important;
+}
+
+html.theme-glass.app-dark .p-button-outlined,
+html.theme-glass.app-dark .p-button-text {
+  color: color-mix(in srgb, var(--glass-button-color) 70%, white 30%) !important;
+}
+
+html.theme-glass.app-dark .p-button-outlined:not(:disabled):hover {
+  color: color-mix(in srgb, var(--glass-button-color) 55%, white 45%) !important;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  html.theme-glass {
+    --glass-surface: rgba(255, 255, 255, 0.94);
+    --glass-surface-soft: rgba(255, 255, 255, 0.9);
+    --glass-blur: none;
+  }
+
+  html.theme-glass.app-dark {
+    --glass-surface: rgba(15, 23, 42, 0.96);
+    --glass-surface-soft: rgba(30, 41, 59, 0.92);
+  }
+}

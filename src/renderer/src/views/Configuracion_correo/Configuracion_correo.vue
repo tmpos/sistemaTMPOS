@@ -26,7 +26,18 @@ import 'flatpickr/dist/flatpickr.css';
 /************************************************************************/
 const usuarioLocal = ref({})
 /************************************************************************/
-const camposArray = ['email', 'password'];
+const camposArray = ['email', 'password', 'notificar_abonos_cxc', 'notificar_abonos_taller'];
+const normalizarBooleano = (valor) => valor === true || valor === 1 || ['1', 'true', 'si', 'sí', 'on'].includes(String(valor || '').trim().toLowerCase());
+const normalizarPreferencias = (registro = {}) => ({
+  ...registro,
+  notificar_abonos_cxc: normalizarBooleano(registro.notificar_abonos_cxc),
+  notificar_abonos_taller: normalizarBooleano(registro.notificar_abonos_taller)
+});
+const prepararPreferencias = (registro = {}) => ({
+  ...registro,
+  notificar_abonos_cxc: registro.notificar_abonos_cxc ? 'true' : 'false',
+  notificar_abonos_taller: registro.notificar_abonos_taller ? 'true' : 'false'
+});
 /************************************************************************/
 import { useDatosEmpresa } from '@/stores'
 const datosEmpresa = useDatosEmpresa();
@@ -72,7 +83,7 @@ watchEffect(() => {
 const fetchAndSetupData = async () => {
 const response = await peticionesFetchOffline('getDataAsArray', 'configuracion_correo');
     const jsonData = response.reverse();
-    data.value = jsonData;
+    data.value = jsonData.map(normalizarPreferencias);
 };
 /************************************************************************/
 async function campos() {
@@ -157,7 +168,7 @@ async function funcionActualizar() {
   if (datoscampos.value.hasOwnProperty('created_at')) {
     datoscampos.value.updated_at = nfecha('timestamp');
   }
-  const datosEnviar = JSON.parse(JSON.stringify(datoscampos.value));
+  const datosEnviar = prepararPreferencias(JSON.parse(JSON.stringify(datoscampos.value)));
   const envioDatos = await peticionesFetchOffline('updateData','configuracion_correo', JSON.stringify(datosEnviar));
   if (envioDatos[0] == 'ok') {
     visible.value = false;
@@ -174,7 +185,7 @@ async function funcionCrear() {
     datoscamposConfiguracion_correo.value.created_at = nfecha('timestamp');
     datoscamposConfiguracion_correo.value.updated_at = nfecha('timestamp');
   }
-  const datosEnviar = JSON.parse(JSON.stringify(datoscamposConfiguracion_correo.value));
+  const datosEnviar = prepararPreferencias(JSON.parse(JSON.stringify(datoscamposConfiguracion_correo.value)));
   const envioDatos = await peticionesFetchOffline('insertData','configuracion_correo', JSON.stringify(datosEnviar));
   if (envioDatos[0] == 'ok') {
     fetchAndSetupData();
@@ -364,6 +375,12 @@ visible.value = true;
             </template>
           </Column>
           <Column field="email" header="Email"></Column>
+          <Column header="Abonos CxC">
+            <template #body="slotProps">{{ slotProps.data.notificar_abonos_cxc ? 'Sí' : 'No' }}</template>
+          </Column>
+          <Column header="Abonos Taller">
+            <template #body="slotProps">{{ slotProps.data.notificar_abonos_taller ? 'Sí' : 'No' }}</template>
+          </Column>
 <!-- <Column field="password" header="Password"></Column> -->
         </DataTable>
       </div>
@@ -395,6 +412,14 @@ visible.value = true;
             <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-400">PASSWORD</label>
                           <InputText v-model="datoscampos.password" fluid type="password"  />
                     </div>
+        <div class="col-span-12 md:col-span-6 flex items-center justify-between rounded-lg border p-4">
+          <div><div class="font-semibold">Avisar abonos de cuentas por cobrar</div><small>Envía un correo a la empresa después de registrar el abono.</small></div>
+          <InputSwitch v-model="datoscampos.notificar_abonos_cxc" />
+        </div>
+        <div class="col-span-12 md:col-span-6 flex items-center justify-between rounded-lg border p-4">
+          <div><div class="font-semibold">Avisar abonos de taller</div><small>Incluye los abonos realizados desde Taller y Caja.</small></div>
+          <InputSwitch v-model="datoscampos.notificar_abonos_taller" />
+        </div>
         <div class="hidden col-span-12">
           <label for="created_at-Actualizador" class="block text-sm font-medium text-gray-700">CREATED_AT</label>
           <InputText v-model="datoscampos.created_at" name="created_at" id="created_at-Actualizador" placeholder="created_at" class="w-full" />
@@ -437,6 +462,14 @@ visible.value = true;
             <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-400">PASSWORD</label>
                           <InputText fluid v-model="datoscamposConfiguracion_correo.password" type="password" class="" />
                     </div>
+        <div class="col-span-12 md:col-span-6 flex items-center justify-between rounded-lg border p-4">
+          <div><div class="font-semibold">Avisar abonos de cuentas por cobrar</div><small>Envía un correo a la empresa después de registrar el abono.</small></div>
+          <InputSwitch v-model="datoscamposConfiguracion_correo.notificar_abonos_cxc" />
+        </div>
+        <div class="col-span-12 md:col-span-6 flex items-center justify-between rounded-lg border p-4">
+          <div><div class="font-semibold">Avisar abonos de taller</div><small>Incluye los abonos realizados desde Taller y Caja.</small></div>
+          <InputSwitch v-model="datoscamposConfiguracion_correo.notificar_abonos_taller" />
+        </div>
 
 
         <div class="hidden col-span-6">
@@ -467,4 +500,3 @@ visible.value = true;
 </template>
 <style scoped>
 </style>
-

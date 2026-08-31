@@ -1438,6 +1438,22 @@
                         />
                       </template>
                     </Column>
+                    <Column
+                      v-if="datosFactCoti.tipo === 'Factura' || datosFactCoti.tipo === 'factura'"
+                      field="comprobante"
+                      header="COMPROBANTE"
+                      style="min-width: 12rem"
+                    >
+                      <template #body="slotProps">
+                        <Badge
+                          :value="obtenerComprobanteListado(slotProps.data) || 'SIN COMPROBANTE'"
+                          :severity="
+                            obtenerComprobanteListado(slotProps.data) ? 'info' : 'secondary'
+                          "
+                          class="px-2 py-1 rounded-md text-xs font-mono"
+                        />
+                      </template>
+                    </Column>
                     <Column field="fecha_emision" header="FECHA" />
                     <Column field="nombre_cliente" header="CLIENTE" />
                     <Column
@@ -1583,6 +1599,16 @@
                     @click="ejecutarAccionDocumentoSeleccionado('editar')"
                   />
                   <Button
+                    v-if="documentoAccionesPuedeCambiarECF"
+                    label="Cambiar comprobante E32"
+                    icon="pi pi-refresh"
+                    severity="help"
+                    outlined
+                    class="justify-center"
+                    :loading="procesandoEnvioADGII"
+                    @click="cambiarComprobanteE32DocumentoSeleccionado"
+                  />
+                  <Button
                     label="Ir al registro"
                     icon="pi pi-external-link"
                     severity="secondary"
@@ -1635,6 +1661,76 @@
                   outlined
                   @click="visibleAccionesDocumento = false"
                 />
+              </template>
+            </Dialog>
+
+            <Dialog
+              v-model:visible="visibleConfirmarCambioE32"
+              modal
+              header="Cambiar comprobante E32"
+              :closable="!procesandoEnvioADGII"
+              :close-on-escape="!procesandoEnvioADGII"
+              :dismissable-mask="false"
+              :style="{ width: '34rem', maxWidth: '95vw' }"
+            >
+              <div
+                v-if="procesandoEnvioADGII"
+                class="flex min-h-56 flex-col items-center justify-center gap-4 text-center"
+              >
+                <i class="pi pi-spinner pi-spin text-5xl text-purple-600"></i>
+                <div>
+                  <p class="m-0 text-lg font-bold text-slate-800 dark:text-slate-100">
+                    Enviando factura a Alanube
+                  </p>
+                  <p class="mt-2 mb-0 text-sm text-slate-500">
+                    Estamos solicitando el nuevo E32. No cierre esta ventana.
+                  </p>
+                </div>
+              </div>
+
+              <div v-else class="space-y-4">
+                <div
+                  class="flex items-start gap-3 rounded-xl border border-purple-200 bg-purple-50 p-4 dark:border-purple-800 dark:bg-purple-950"
+                >
+                  <i class="pi pi-refresh mt-1 text-xl text-purple-600"></i>
+                  <div>
+                    <p class="m-0 font-bold text-slate-800 dark:text-slate-100">
+                      Factura #{{ facturaPendienteCambioE32?.noFactura }}
+                    </p>
+                    <p class="mt-2 mb-0 text-sm text-slate-600 dark:text-slate-300">
+                      Se enviará nuevamente a Alanube para solicitar otro E32.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                  <p class="m-0 text-sm text-slate-500">Comprobante E32 actual</p>
+                  <p class="mt-1 mb-0 font-mono text-lg font-bold text-slate-800 dark:text-slate-100">
+                    {{ facturaPendienteCambioE32?.comprobanteAnterior }}
+                  </p>
+                  <p class="mt-3 mb-0 text-sm text-slate-500">
+                    Se conservará en el historial. La factura solo cambiará si Alanube devuelve
+                    otro E32 válido.
+                  </p>
+                </div>
+              </div>
+
+              <template #footer>
+                <template v-if="!procesandoEnvioADGII">
+                  <Button
+                    label="Cancelar"
+                    icon="pi pi-times"
+                    severity="secondary"
+                    outlined
+                    @click="cancelarCambioComprobanteE32"
+                  />
+                  <Button
+                    label="Solicitar nuevo E32"
+                    icon="pi pi-refresh"
+                    severity="help"
+                    @click="confirmarCambioComprobanteE32"
+                  />
+                </template>
               </template>
             </Dialog>
           </div>
@@ -2568,7 +2664,7 @@
               <template #content>
                 <div class="grid grid-cols-12 gap-4">
                   <!-- Comprobante -->
-                  <div v-show="!modoSimple" class="col-span-12">
+                  <div class="col-span-12">
                     <label
                       class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2"
                       >{{ $t('RECEIPT') }}</label
@@ -2600,7 +2696,7 @@
                   </div>
 
                   <!-- Impuestos -->
-                  <div v-show="!modoSimple" class="col-span-12 md:col-span-5">
+                  <div class="col-span-12 md:col-span-5">
                     <label
                       class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2"
                       >{{ $t('TAXES') }}</label
@@ -2614,7 +2710,7 @@
                   </div>
 
                   <!-- Método de Pago -->
-                  <div v-show="!modoSimple" class="col-span-12 md:col-span-7">
+                  <div class="col-span-12 md:col-span-7">
                     <label
                       class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2"
                       >{{ $t('Payment Method').toUpperCase() }}</label
@@ -7864,6 +7960,21 @@
               </template>
             </Column>
 
+            <Column
+              v-if="datosFactCoti.tipo === 'Factura' || datosFactCoti.tipo === 'factura'"
+              field="comprobante"
+              header="COMPROBANTE"
+              style="min-width: 12rem"
+            >
+              <template #body="slotProps">
+                <Badge
+                  :value="obtenerComprobanteListado(slotProps.data) || 'SIN COMPROBANTE'"
+                  :severity="obtenerComprobanteListado(slotProps.data) ? 'info' : 'secondary'"
+                  class="px-2 py-1 rounded-md text-xs font-mono"
+                />
+              </template>
+            </Column>
+
             <!-- Fecha -->
             <Column field="fecha_emision" header="FECHA" />
 
@@ -9063,15 +9174,32 @@
     v-model:visible="visibleBuscarClienteVenta"
     modal
     :style="{ width: '70rem' }"
-    header="Buscar Cliente"
+    :header="seleccionClienteFiscalE31Pendiente ? 'Cliente requerido para E31' : 'Buscar Cliente'"
+    @hide="manejarCierreBuscarClienteVenta"
   >
     <template #header>
       <div class="inline-flex align-items-center justify-content-center gap-2">
-        <span class="font-bold white-space-nowrap">Buscar Cliente</span>
+        <i
+          v-if="seleccionClienteFiscalE31Pendiente"
+          class="pi pi-id-card text-orange-500"
+        ></i>
+        <span class="font-bold white-space-nowrap">
+          {{ seleccionClienteFiscalE31Pendiente ? 'Cliente requerido para E31' : 'Buscar Cliente' }}
+        </span>
       </div>
     </template>
 
     <div class="grid grid-cols-12 gap-4">
+      <div v-if="seleccionClienteFiscalE31Pendiente" class="col-span-12">
+        <div
+          class="rounded-xl border border-orange-200 bg-orange-50 p-4 text-orange-900 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-100"
+        >
+          <p class="m-0 font-bold">El crédito fiscal E31 requiere un cliente con RNC válido.</p>
+          <p class="mt-1 mb-0 text-sm">
+            El cliente genérico no puede utilizarse. Seleccione un cliente registrado con su RNC.
+          </p>
+        </div>
+      </div>
       <div class="col-span-12">
         <InputGroup>
           <InputText
@@ -9124,7 +9252,7 @@
         label="Cerrar"
         outlined
         severity="secondary"
-        @click="visibleBuscarClienteVenta = false"
+        @click="cerrarModalBuscarClienteVenta"
       />
     </template>
   </Dialog>
@@ -9588,11 +9716,12 @@
           :min="parseInt(rangoENCFInicio)"
           :max="parseInt(rangoENCFFin)"
           :use-grouping="false"
+          readonly
           class="w-full"
-          placeholder="Ingrese el número de secuencia"
+          placeholder="Secuencia asignada por el servidor"
         />
         <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-          El número debe estar entre {{ rangoENCFInicio }} y {{ rangoENCFFin }}
+          La secuencia se consulta nuevamente en la tabla al confirmar la factura.
         </p>
       </div>
 
@@ -9848,6 +9977,7 @@
   <CotizacionPdfPrint ref="cotizacionPdfPrintRef" />
   <TicketFacturaPdf ref="ticketFacturaPdfRef" />
   <TicketFacturaPrint ref="ticketFacturaPrintRef" />
+  <ControlSecuenciaECF ref="controlSecuenciaECFRef" />
 
   <!-- Componente de impresión Taller -->
   <ImpresoraTaller
@@ -9967,10 +10097,12 @@ import {
   getAlanubeSecurityCode,
   getCartProductQuantity,
   getDgiiStampUrl,
+  getElectronicReceiptPrefix,
   getProductSalePrice,
   getProductStock,
   isInvoiceStateLocked,
   mergeRecordsByCode,
+  normalizeTaxpayerLookupResponse,
   parseStoredProducts,
   productHasImei,
   roundDownToInterval,
@@ -9981,6 +10113,7 @@ import {
 //import config from '../../../../resources/config.json';
 import LoadingOverlay from '../Loading/LoadingOverlay.vue'
 import TabDelivery from '@/components/vender/TabDelivery.vue'
+import ControlSecuenciaECF from '@/components/vender/ControlSecuenciaECF.vue'
 import AiAsistente from '@/views/AiAsistente/AiAsistente.vue'
 import PruebasVender from '@/components/vender/PruebasVender.vue'
 import noIMG from '@/assets/img/noimagen.jpg'
@@ -9993,6 +10126,8 @@ const facturaPdfPrintRef = ref(null)
 const cotizacionPdfPrintRef = ref(null)
 const ticketFacturaPdfRef = ref(null)
 const ticketFacturaPrintRef = ref(null)
+const controlSecuenciaECFRef = ref(null)
+const reservaECFActual = ref(null)
 /****************************************************/
 // Variables para conversión de cotización
 const visibleConvertirCotizacion = ref(false)
@@ -10293,6 +10428,21 @@ const handleClienteSelect = async (cliente) => {
 
 const busquedaClienteModal = ref('')
 const clienteSeleccionadoModal = ref(null)
+const seleccionClienteFiscalE31Pendiente = ref(false)
+const requiereRncClienteFiscalPendiente = ref(false)
+
+const obtenerRNCClienteFiscal = (cliente = {}) => String(cliente?.rnc || '').replace(/\D/g, '')
+
+const clienteValidoParaE31 = (cliente = {}) => {
+  const codigo = String(cliente?.codigo || '').trim()
+  const rncCliente = obtenerRNCClienteFiscal(cliente)
+  return (
+    codigo !== '0000000' &&
+    Boolean(String(cliente?.nombre || '').trim()) &&
+    (rncCliente.length === 9 || rncCliente.length === 11) &&
+    !/^0+$/.test(rncCliente)
+  )
+}
 
 const clientesFiltradosModal = computed(() => {
   const termino = String(busquedaClienteModal.value || '')
@@ -10327,6 +10477,24 @@ const abrirModalBuscarCliente = async () => {
   await cargarClientesLazy({ search: '', limit: 100 })
 }
 
+const abrirModalClienteFiscalE31 = async (requiereRnc = true) => {
+  seleccionClienteFiscalE31Pendiente.value = true
+  requiereRncClienteFiscalPendiente.value = requiereRnc
+  visiblecobrar.value = false
+  await abrirModalBuscarCliente()
+}
+
+const cerrarModalBuscarClienteVenta = () => {
+  visibleBuscarClienteVenta.value = false
+}
+
+const manejarCierreBuscarClienteVenta = () => {
+  if (!seleccionClienteFiscalE31Pendiente.value) return
+  seleccionClienteFiscalE31Pendiente.value = false
+  requiereRncClienteFiscalPendiente.value = false
+  visiblecobrar.value = true
+}
+
 const buscarClientesModal = async () => {
   await cargarClientesLazy({
     search: String(busquedaClienteModal.value || '').trim(),
@@ -10339,9 +10507,31 @@ const seleccionarClienteDesdeModal = async (cliente) => {
     return
   }
 
+  const esClienteGenerico = String(cliente?.codigo || '').trim() === '0000000'
+  const clienteFiscalInvalido =
+    esClienteGenerico ||
+    (requiereRncClienteFiscalPendiente.value && !clienteValidoParaE31(cliente))
+
+  if (seleccionClienteFiscalE31Pendiente.value && clienteFiscalInvalido) {
+    clienteSeleccionadoModal.value = null
+    toast.add({
+      severity: 'warn',
+      summary: 'Cliente fiscal no válido',
+      detail: requiereRncClienteFiscalPendiente.value
+        ? 'Seleccione un cliente diferente al genérico y que tenga un RNC válido.'
+        : 'Seleccione un cliente diferente al cliente por defecto.',
+      life: 5000
+    })
+    return
+  }
+
+  const debeVolverACobro = seleccionClienteFiscalE31Pendiente.value
+  seleccionClienteFiscalE31Pendiente.value = false
+  requiereRncClienteFiscalPendiente.value = false
   clienteSelected.value = cliente
   await fnCambiarClientes({ value: cliente })
   visibleBuscarClienteVenta.value = false
+  if (debeVolverACobro) visiblecobrar.value = true
 }
 
 const crearClienteDesdeModal = async () => {
@@ -10385,6 +10575,20 @@ const colorEstado = (data) => {
     default:
       return 'contrast' // Gris neutro
   }
+}
+
+const obtenerComprobanteListado = (documento = {}) => {
+  const comprobante = String(
+    documento.comprobante || documento.encf || documento.ecf || documento.ncf || ''
+  )
+    .trim()
+    .toUpperCase()
+
+  if (!comprobante || ['NORMAL', 'SIN COMPROBANTE', 'N/A', 'NA'].includes(comprobante)) {
+    return ''
+  }
+
+  return comprobante
 }
 
 /****************************************************/
@@ -13017,7 +13221,7 @@ const quienPagaCotizacion = ref('INSTITUCION')
 const montoInstitucionCotizacion = ref(0)
 const montoClienteCotizacion = ref(0)
 const MODO_SIMPLE_STORAGE_KEY = 'vender_modo_simple'
-const modoSimple = ref(true)
+const modoSimple = ref(false)
 
 const cargarModoVentaGuardado = () => {
   const valorGuardado = window.localStorage.getItem(MODO_SIMPLE_STORAGE_KEY)
@@ -13044,6 +13248,7 @@ const pendingFacturaData = ref(null)
 const resolverEnvioADGII = ref(null)
 const rechazarEnvioADGII = ref(null)
 const procesandoEnvioADGII = ref(false)
+const reemplazoECFActual = ref(null)
 const showWhatsapp = ref(false)
 const productoSeleccionado = ref({})
 const montosRapidosCliente = [100, 200, 250, 300, 400, 500, 750, 1000]
@@ -14615,6 +14820,7 @@ const nombreFacturaSelectedNombre = (event) => {
 }
 /****************************************************/
 const rnc = ref('')
+const RNC_SERVICE_BASE_URL = 'https://demo.tmposrd.com/api2'
 /****************************************************/
 const productosDocumentoFiltrados = computed(() => {
   const termino = String(busquedaProductosDocumento.value || '')
@@ -14649,17 +14855,24 @@ const toggleCamposVisibles = () => {
 /****************************************************/
 const buscarRNC = async () => {
   loading.value = true
-  visiblecliente.value = false
+  const documento = String(rnc.value || '').replace(/\D/g, '')
+  const campoDocumento = switchbuscarRNC.value === 'RNC' ? 'rnc' : 'cedula'
 
-  clienteSelected.value.nombre = ''
-  clienteSelected.value.rnc = ''
-  clienteSelected.value.cedula = ''
-  clienteSelected.value.direccion = ''
-  clienteSelected.value.n_comercial = ''
-  clienteSelected.value.codigo = generarCodigoUnico()
+  if (!documento) {
+    loading.value = false
+    toast.add({
+      severity: 'warn',
+      summary: 'Documento requerido',
+      detail: 'Ingrese un RNC o cédula.',
+      life: 3000
+    })
+    return
+  }
 
-  // Comprobar si el RNC ya está en `allClientes`
-  const encontrar = obtenerClienteEnCache('rnc', rnc.value)
+  // Consultar también la tabla cuando el cliente no esté en la carga lazy.
+  const encontrar =
+    (await buscarClientePorCampo(campoDocumento, documento)) ||
+    (await buscarClientePorCampo(campoDocumento === 'rnc' ? 'cedula' : 'rnc', documento))
 
   if (encontrar) {
     toast.removeAllGroups()
@@ -14669,47 +14882,41 @@ const buscarRNC = async () => {
       detail: 'Datos Encontrados',
       life: 3000
     })
-    clienteSelected.value = encontrar
-    clienteSelected.value = encontrar
+    clienteSelected.value = { ...encontrar }
     guardarActualizar.value = 'Actualizar'
     loading.value = false
-    //visiblecliente.value = true;
+    visiblecliente.value = true
     return
   }
 
   try {
-    // Solicitud al proceso principal de Electron
     let response
     if (switchbuscarRNC.value === 'RNC') {
-      if (window.electron) {
-        response = await window.electron.ipcRenderer.invoke('consultarRNC', rnc.value)
-      } else {
-        toast.add({
-          severity: 'error',
-          summary: 'Upps',
-          detail: 'Esta funcion es solo para la aplicacion Desktop',
-          life: 3000
-        })
-      }
+      response = await peticionesFetch(
+        RNC_SERVICE_BASE_URL,
+        `consultarrnc/${documento}`,
+        {},
+        tokenCifrado.value,
+        'GET'
+      )
     } else {
       if (window.electron) {
-        response = await window.electron.ipcRenderer.invoke('consultarPasaporte', rnc.value)
-        response.nombrerazon_social = response.nombre + ' ' + response.apellido
-        response.cedularnc = rnc.value
+        response = await window.electron.ipcRenderer.invoke('consultarPasaporte', documento)
       } else {
-        toast.add({
-          severity: 'error',
-          summary: 'Upps',
-          detail: 'Esta funcion es solo para la aplicacion Desktop',
-          life: 3000
-        })
+        response = await peticionesFetch(
+          `${link.value}${api.value}`,
+          'buscarcedula',
+          { cedula: documento },
+          tokenCifrado.value,
+          'POST'
+        )
       }
     }
 
-    // Verificar si la respuesta tiene datos
-    if (response && Object.keys(response).length > 0 && !response.error) {
+    const datosContribuyente = normalizeTaxpayerLookupResponse(response, documento)
+    if (datosContribuyente) {
       loading.value = false
-      const formattedData = Object.entries(response)
+      const formattedData = Object.entries(datosContribuyente)
         .map(([key, value]) => `<li><strong>${key}:</strong> ${value}</li>`)
         .join('')
 
@@ -14727,19 +14934,23 @@ const buscarRNC = async () => {
         detail: 'Datos Encontrados',
         life: 3000
       })
-      resultado.value = response
+      resultado.value = datosContribuyente
 
       // Mapear la respuesta a los campos del cliente
-      clienteSelected.value.nombre = response.nombrerazon_social
-      clienteSelected.value.rnc = response.cedularnc
-      clienteSelected.value.cedula = response.cedularnc
-      clienteSelected.value.direccion = response.administracion_local
-      clienteSelected.value.n_comercial = response.nombrerazon_social
-      clienteSelected.value.precio_fijado = 'Normal'
-      clienteSelected.value.codigo = rnc.value
+      clienteSelected.value = {
+        ...clienteSelected.value,
+        nombre: datosContribuyente.nombrerazon_social,
+        rnc: datosContribuyente.cedularnc,
+        cedula: datosContribuyente.cedularnc,
+        direccion: datosContribuyente.direccion || datosContribuyente.administracion_local || '',
+        n_comercial:
+          datosContribuyente.nombre_comercial || datosContribuyente.nombrerazon_social,
+        precio_fijado: 'Normal',
+        codigo: datosContribuyente.cedularnc
+      }
 
       guardarActualizar.value = 'Guardar'
-      //visiblecliente.value = true;
+      visiblecliente.value = true
     } else {
       // Manejar caso de datos vacíos o sin resultados
       loading.value = false
@@ -14749,7 +14960,7 @@ const buscarRNC = async () => {
         detail: 'No se encontraron los datos para el RNC proporcionado.',
         life: 3000
       })
-      //visiblecliente.value = true;
+      visiblecliente.value = true
     }
   } catch (error) {
     // Manejo de errores en la solicitud
@@ -14761,7 +14972,7 @@ const buscarRNC = async () => {
       detail: 'Ocurrió un error al consultar los datos.',
       life: 3000
     })
-    //visiblecliente.value = true;
+    visiblecliente.value = true
   }
 }
 
@@ -15287,41 +15498,25 @@ const fetchCombos = async () => {
 /****************************************************/
 const fetchBanco = async () => {
   try {
-    const verificaLocalStorage = JSON.parse(window.localStorage.getItem('bancos')) || []
-    if (verificaLocalStorage.length > 0) {
-      cuentaBancaria.value = verificaLocalStorage[verificaLocalStorage.length - 1]
-      bancoArray.value = verificaLocalStorage
-    } else {
-      // const response = await peticionesFetch(`${link.value}${api.value}`,'datosarraypost',{'tabla':'banco'},tokenCifrado.value,'POST');
-      const response = await peticionesFetchOffline('getDataAsArray', 'banco')
-      const columnas = await peticionesFetchOffline('getTableColumns', 'banco')
-      if (!columnas.includes('almacen')) {
-        await peticionesFetchOffline('addColumnToTable', { tabla: 'banco', campo: 'almacen' })
-        await peticionesFetchOffline(
-          'updateEntireColumn',
-          'banco',
-          'almacen',
-          datosEmpresa.empresa.nombre
-        )
-      }
-      //const response = await peticionesFetchOffline('getDataArrayByCondition', 'banco','almacen',datosEmpresa.empresa.nombre);
-      /*      const response = await consultarConWorker({
-        tipo: 'consultar',
-        payload: {
-          endpoint: '/datosarraypost',
-          datos: {'tabla':'banco'},
-          metodo: 'POST'
-        }
-      });*/
-      cuentaBancaria.value = response[response.length - 1]
-      bancoArray.value = response
-      localStorage.setItem('bancos', JSON.stringify(response))
+    // Vender solo consume la tabla remota. Las migraciones de esquema no deben
+    // ejecutarse durante la carga de la pantalla ni ocultarse con datos locales.
+    const response = await peticionesFetchOffline('getDataAsArray', 'banco')
+    if (!Array.isArray(response)) {
+      throw new Error(response?.error || 'La API no devolvió la lista de bancos.')
     }
-
-    /*********************************************/
+    bancoArray.value = response
+    cuentaBancaria.value = response.at(-1) || null
   } catch (error) {
-    console.error('Error fetching data', error)
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to fetch data', life: 3000 })
+    bancoArray.value = []
+    cuentaBancaria.value = null
+    console.error('No se pudo consultar banco: la API o MySQL no está disponible.')
+    toast.add({
+      severity: 'error',
+      summary: 'Servidor no disponible',
+      detail: 'No se pudo consultar la tabla banco. Verifique la conexión MySQL de la API.',
+      life: 5000
+    })
+    return { error: true, nombre: 'Banco', detail: error.message }
   }
 }
 /****************************************************/
@@ -15445,30 +15640,8 @@ const fetchClientes = async () => {
     }
   });*/
     /*   const responseclientes = await peticionesFetch(`${link.value}${api.value}`,'datosarraypost',{'tabla':'clientes'},tokenCifrado.value,'POST');*/
-    const columnas = await peticionesFetchOffline('getTableColumns', 'clientes')
-    if (!columnas.includes('almacen')) {
-      await peticionesFetchOffline('addColumnToTable', { tabla: 'clientes', campo: 'almacen' })
-      await peticionesFetchOffline(
-        'updateEntireColumn',
-        'clientes',
-        'almacen',
-        datosEmpresa.empresa.nombre
-      )
-    }
-    if (!columnas.includes('tipo_cliente')) {
-      await peticionesFetchOffline('addColumnToTable', { tabla: 'clientes', campo: 'tipo_cliente' })
-      await peticionesFetchOffline('updateEntireColumn', 'clientes', 'tipo_cliente', 'normal')
-    }
-    if (!columnas.includes('precios_productos')) {
-      await peticionesFetchOffline('addColumnToTable', {
-        tabla: 'clientes',
-        campo: 'precios_productos'
-      })
-    }
-    if (!columnas.includes('imagen')) {
-      await peticionesFetchOffline('addColumnToTable', { tabla: 'clientes', campo: 'imagen' })
-    }
-
+    // La estructura de clientes pertenece a las migraciones del servidor. Al
+    // entrar a Vender solo se consultan datos; nunca se altera el esquema.
     allClientes.value = []
     itemsclientes.value = []
     clientesSugeridos.value = []
@@ -15513,7 +15686,7 @@ const fetchClientes = async () => {
 
     /***************************************/
   } catch (error) {
-    console.error('Error fetching clients data:', error)
+    console.error('No se pudieron consultar clientes: la API o MySQL no está disponible.')
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -16577,9 +16750,53 @@ const fetchConfiscal = async () => {
   }
 }
 /************************************************************/
+const consultarTablaFiscalCompartida = async (tabla) => {
+  return await peticionesFetch(
+    `${link.value}${api.value}`,
+    `datosarray/${tabla}`,
+    {},
+    tokenCifrado.value,
+    'GET'
+  )
+}
+
+const actualizarRegistroFiscalCompartido = async (tabla, registro) => {
+  return await peticionesFetch(
+    `${link.value}${api.value}`,
+    `actualizarcampos/${tabla}`,
+    registro,
+    tokenCifrado.value,
+    'POST'
+  )
+}
+
+const consultarTablaFiscalLazy = async (
+  tabla,
+  { search = '', searchFields = [], limit = 50 } = {}
+) => {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: '0',
+    search,
+    searchFields: searchFields.join(','),
+    orderBy: 'id',
+    orderDir: 'DESC'
+  })
+  return await peticionesFetch(
+    `${link.value}${api.value}`,
+    `datoslazy/${tabla}?${params.toString()}`,
+    {},
+    tokenCifrado.value,
+    'GET'
+  )
+}
+
 const fetchComprobantesElectronicos = async (tipoComprobante = null) => {
   try {
-    const response = await peticionesFetchOffline('getDataAsArray', 'comprobantes_electronicos')
+    // Las secuencias fiscales siempre se consultan en la tabla central.
+    // No usar caché, localStorage ni la base SQLite local: todos los vendedores
+    // deben observar la misma secuencia.
+    const response = await consultarTablaFiscalCompartida('comprobantes_electronicos')
     const registros = Array.isArray(response) ? response : []
     const almacenActual = String(datosEmpresa?.empresa?.nombre || '').trim()
     const prefijoRequerido = obtenerPrefijoECFPorComprobante(tipoComprobante || comprobante.value)
@@ -17242,6 +17459,31 @@ onMounted(async () => {
     })
   }
 
+  // En modo exclusivamente online se valida una sola conexión antes de lanzar
+  // todas las cargas paralelas. Si MySQL está caído, evitar una cascada de
+  // peticiones 500 y mostrar un único mensaje comprensible.
+  const estadoServidor = await peticionesFetch(
+    `${link.value}${api.value}`,
+    'datoscampo/tabladefault/id/1',
+    {},
+    tokenCifrado.value,
+    'GET'
+  )
+  if (estadoServidor?.error) {
+    console.error('No se cargó Vender: la API no pudo conectarse con MySQL.')
+    toast.removeAllGroups()
+    toast.add({
+      severity: 'error',
+      summary: 'Servidor de datos no disponible',
+      detail:
+        'La API no puede conectarse con MySQL. Contacte al administrador del servidor e intente nuevamente.',
+      life: 10000
+    })
+    loading.value = false
+    generandoFactura.value = false
+    return
+  }
+
   // Preparar funciones base que siempre se ejecutan
   const funcionesBase = [
     { fn: fetchGarantias, nombre: 'Garantías' },
@@ -17607,58 +17849,58 @@ const handleOptionSelection = async (option) => {
     })
 
     if (!rncValue) return
+    const documento = String(rncValue).replace(/\D/g, '')
+    if (!documento) return
 
     const loader = $loading.show({ canCancel: true, loader: 'bars' })
     try {
-      // 🔹 Buscar en la base local primero
-      const verificaLocal = await peticionesFetchOffline(
-        'getDataByField',
-        'clientes',
-        'cedula',
-        rncValue
-      )
+      // Buscar en caché y en la tabla usando el campo correcto.
+      const campoDocumento = option === 'rnc' ? 'rnc' : 'cedula'
+      const verificaLocal =
+        (await buscarClientePorCampo(campoDocumento, documento)) ||
+        (await buscarClientePorCampo(campoDocumento === 'rnc' ? 'cedula' : 'rnc', documento))
       if (verificaLocal) {
-        clientData = verificaLocal
-        clienteSelected.value = verificaLocal
-        loader.hide()
+        clienteSelected.value = { ...verificaLocal }
+        toast.add({
+          severity: 'success',
+          summary: 'Encontrado',
+          detail: `Cliente ${verificaLocal.nombre || documento} seleccionado`,
+          life: 3000
+        })
         return
       }
 
       // 🔹 Si no existe, consultar API remota
       if (option === 'rnc') {
         const datosRNC = await peticionesFetch(
-          `${link.value}${api.value}`,
-          `consultarrnc/${rncValue}`,
+          RNC_SERVICE_BASE_URL,
+          `consultarrnc/${documento}`,
           {},
           tokenCifrado.value,
           'GET'
         )
-        if (!datosRNC) {
+        const contribuyente = normalizeTaxpayerLookupResponse(datosRNC, documento)
+        if (!contribuyente) {
           toast.add({
             severity: 'error',
             summary: 'Error',
-            detail: 'No se encuentra este RNC',
+            detail: datosRNC?.error || 'No se encuentra este RNC',
             life: 3000
           })
-          loader.hide()
           return
         }
         toast.add({ severity: 'success', summary: 'OK', detail: 'Datos encontrados', life: 3000 })
-        clientData = {
-          ...datosRNC,
-          nombrerazon_social: datosRNC.razon_social,
-          cedularnc: rncValue
-        }
+        clientData = contribuyente
       } else {
         const consulta = await peticionesFetch(
           `${link.value}${api.value}`,
           'buscarcedula',
-          { cedula: rncValue },
+          { cedula: documento },
           tokenCifrado.value,
           'POST'
         )
 
-        const datosCedula = consulta?.datos
+        const datosCedula = normalizeTaxpayerLookupResponse(consulta, documento)
         if (!datosCedula) {
           toast.add({
             severity: 'error',
@@ -17666,21 +17908,33 @@ const handleOptionSelection = async (option) => {
             detail: 'No se encuentra esta cédula',
             life: 3000
           })
-          loader.hide()
           return
         }
 
         toast.add({ severity: 'success', summary: 'OK', detail: 'Datos encontrados', life: 3000 })
-        clientData = {
-          ...datosCedula,
-          nombrerazon_social: `${datosCedula.nombre} ${datosCedula.apellido}`,
-          cedularnc: rncValue
-        }
+        clientData = datosCedula
       }
     } catch (error) {
       console.error('Error consultando cliente:', error)
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: error?.message || 'No se pudieron consultar los datos',
+        life: 4000
+      })
+      return
     } finally {
       loader.hide()
+    }
+
+    if (!clientData?.nombrerazon_social || clientData.error) {
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'La consulta no devolvió datos válidos del contribuyente',
+        life: 3000
+      })
+      return
     }
 
     // 🔸 Siempre solicitar teléfono y dirección (sin importar Electron)
@@ -17702,9 +17956,8 @@ const handleOptionSelection = async (option) => {
       }
     })
 
-    if (additionalData) {
-      clientData = { ...clientData, ...additionalData }
-    }
+    if (!additionalData) return
+    clientData = { ...clientData, ...additionalData }
   }
   // 🔹 Agregar cliente manualmente
   else if (option === 'manual') {
@@ -17765,8 +18018,6 @@ const handleOptionSelection = async (option) => {
   }
 
   // 🧩 Procesar datos finales y guardar
-  clientData.optionSelected = option
-
   if (!clientData || clientData.error) {
     toast.add({
       severity: 'error',
@@ -17776,8 +18027,8 @@ const handleOptionSelection = async (option) => {
     })
     return
   }
+  clientData.optionSelected = option
 
-  const url = `${link.value}${api.value}/insertar/clientes`
   const jsonDataC = await arrayToObjetoFromTablaOffline('clientes')
 
   // 🔹 Estandarizar datos según el tipo
@@ -18043,7 +18294,7 @@ const fnimpresionFactura = async () => {
       const datosEmpresaB = JSON.stringify(enviarDatosLocalStorage())
 
       if (window.electron) {
-        window.electron.ipcRenderer.invoke('ticket', factura, datosEmpresaB)
+        window.electron.ipcRenderer.invoke('ticket', factura, null, datosEmpresaB)
       } else {
         toast.add({
           severity: 'error',
@@ -20577,42 +20828,7 @@ const generarENCF = (comprobante, noFactura, tipoECF = '31') => {
 }
 
 const obtenerPrefijoECFPorComprobante = (tipoComprobante) => {
-  const mapa = {
-    FISCAL: 'E31',
-    'COMPROBANTE CON VALOR FISCAL': 'E31',
-    B01: 'E31',
-    E31: 'E31',
-    FINAL: 'E32',
-    'CONSUMIDOR FINAL': 'E32',
-    B02: 'E32',
-    E32: 'E32',
-    B03: 'E33',
-    E33: 'E33',
-    B04: 'E34',
-    E34: 'E34',
-    B11: 'E41',
-    E41: 'E41',
-    B13: 'E43',
-    E43: 'E43',
-    'REGIMEN ESPECIAL': 'E44',
-    B14: 'E44',
-    E44: 'E44',
-    GUBERNAMENTAL: 'E45',
-    B15: 'E45',
-    E45: 'E45',
-    B16: 'E46',
-    E46: 'E46',
-    B17: 'E47',
-    E47: 'E47'
-  }
-
-  return (
-    mapa[
-      String(tipoComprobante || '')
-        .trim()
-        .toUpperCase()
-    ] || 'E31'
-  )
+  return getElectronicReceiptPrefix(tipoComprobante)
 }
 
 const obtenerLongitudSecuenciaECF = (prefijo = 'E31') => {
@@ -20649,6 +20865,44 @@ const esNumeroECFValido = (numeroECF = '') => {
   return /^E(?:31|32|33|34|41|43|44|45|46|47)\d{10}$/.test(
     String(numeroECF || '').trim().toUpperCase()
   )
+}
+
+const obtenerSiguienteSecuenciaDisponibleECF = async (registro = {}) => {
+  const prefijo = String(registro.prefijo || registro.tipo_ecf || 'E31')
+    .trim()
+    .toUpperCase()
+  const secuenciaConfigurada = Number(
+    registro.secuencia_actual || registro.secuencia || registro.secuencia_inicial || 1
+  )
+  let ultimaSecuenciaEmitida = 0
+
+  const acumularSecuencias = (filas, campos) => {
+    for (const fila of filas) {
+      for (const campo of campos) {
+        const numeroECF = String(fila?.[campo] || '')
+          .trim()
+          .toUpperCase()
+        if (!numeroECF.startsWith(prefijo)) continue
+        const secuencia = Number(numeroECF.slice(prefijo.length))
+        if (Number.isFinite(secuencia)) {
+          ultimaSecuenciaEmitida = Math.max(ultimaSecuenciaEmitida, secuencia)
+        }
+      }
+    }
+  }
+
+  // El log es la primera evidencia que se guarda después de que Alanube acepta
+  // un documento. La consulta es paginada y solo trae las filas del prefijo.
+  const logs = await consultarTablaFiscalLazy('facturacion_electronica_log', {
+    search: prefijo,
+    searchFields: ['document_number', 'encf'],
+    limit: 50
+  })
+  acumularSecuencias(Array.isArray(logs?.data) ? logs.data : [], ['document_number', 'encf'])
+
+  const siguienteConfigurado =
+    Number.isFinite(secuenciaConfigurada) && secuenciaConfigurada > 0 ? secuenciaConfigurada : 1
+  return Math.max(siguienteConfigurado, ultimaSecuenciaEmitida + 1)
 }
 
 const obtenerRespuestaElectronicaGuardada = (factura = null) => {
@@ -20732,7 +20986,9 @@ const cancelarEnvioADGII = () => {
   procesandoEnvioADGII.value = false
   visibleSeleccionarENCF.value = false
   if (typeof rechazarEnvioADGII.value === 'function') {
-    rechazarEnvioADGII.value(new Error('Envío a DGII cancelado por el usuario'))
+    const errorCancelacion = new Error('Envío a DGII cancelado por el usuario')
+    errorCancelacion.code = 'DGII_ENVIO_CANCELADO'
+    rechazarEnvioADGII.value(errorCancelacion)
   }
   limpiarPromesaEnvioADGII()
 }
@@ -20807,12 +21063,23 @@ const mostrarModalSeleccionENCF = async (datosFactura) => {
     return null
   }
 
-  secuenciaENCF.value = String(
+  const siguienteSecuencia = await obtenerSiguienteSecuenciaDisponibleECF(
+    comprobanteElectronicoActivo.value
+  )
+  secuenciaENCF.value = String(siguienteSecuencia)
+
+  const secuenciaGuardada = Number(
     comprobanteElectronicoActivo.value.secuencia_actual ||
       comprobanteElectronicoActivo.value.secuencia ||
       comprobanteElectronicoActivo.value.secuencia_inicial ||
-      '1'
+      1
   )
+  if (siguienteSecuencia > secuenciaGuardada) {
+    await establecerSecuenciaComprobanteElectronico(
+      comprobanteElectronicoActivo.value,
+      siguienteSecuencia
+    )
+  }
   rangoENCFInicio.value = String(comprobanteElectronicoActivo.value.secuencia_inicial || '1')
   rangoENCFFin.value = String(
     comprobanteElectronicoActivo.value.secuencia_final ||
@@ -20827,7 +21094,11 @@ const mostrarModalSeleccionENCF = async (datosFactura) => {
   })
 }
 
-const actualizarFacturaConRespuestaDGII = async (noFactura, respuestaDGIIData) => {
+const actualizarFacturaConRespuestaDGII = async (
+  noFactura,
+  respuestaDGIIData,
+  { conservarComprobanteAnterior = false, motivo = '' } = {}
+) => {
   if (!noFactura || !respuestaDGIIData) return
 
   const facturaGuardada = await peticionesFetchOffline(
@@ -20846,10 +21117,31 @@ const actualizarFacturaConRespuestaDGII = async (noFactura, respuestaDGIIData) =
     otroData = []
   }
 
+  if (!Array.isArray(otroData)) otroData = otroData ? [otroData] : []
+
   if (otroData.length > 0) {
+    const datosAnteriores = otroData[0] && typeof otroData[0] === 'object' ? otroData[0] : {}
+    const historialExistente = Array.isArray(datosAnteriores.historialComprobantes)
+      ? datosAnteriores.historialComprobantes
+      : []
+    const { historialComprobantes: historialIgnorado, ...respuestaAnterior } = datosAnteriores
+    const historialComprobantes = conservarComprobanteAnterior
+      ? [
+          ...historialExistente,
+          {
+            comprobante: facturaGuardada.comprobante || obtenerNumeroECFRespuesta(respuestaAnterior),
+            fechaReemplazo: nfecha('timestamp'),
+            motivo: motivo || 'REEMPLAZO_ECF',
+            usuario: datosEmpresa?.usuario?.nombre || datosEmpresa?.usuario?.usuario || 'Sistema',
+            respuesta: respuestaAnterior
+          }
+        ]
+      : historialExistente
+
     otroData[0] = {
-      ...otroData[0],
+      ...datosAnteriores,
       ...respuestaDGIIData,
+      ...(historialComprobantes.length > 0 ? { historialComprobantes } : {}),
       fechaEnvioDGII: nfecha('timestamp')
     }
   } else {
@@ -20912,21 +21204,51 @@ const actualizarSecuenciaComprobanteElectronico = async (registro, secuenciaUsad
   if (!registro) return
 
   const secuenciaNumerica = Number(secuenciaUsada || 0)
+  let siguienteSecuencia = secuenciaNumerica + 1
+  let registroVigente = registro
+
+  try {
+    await fetchComprobantesElectronicos(registro.prefijo || registro.tipo_ecf)
+    if (comprobanteElectronicoActivo.value) {
+      registroVigente = comprobanteElectronicoActivo.value
+      siguienteSecuencia = Math.max(
+        siguienteSecuencia,
+        Number(registroVigente.secuencia_actual || registroVigente.secuencia || 0)
+      )
+    }
+
+    if (controlSecuenciaECFRef.value) {
+      siguienteSecuencia = Math.max(
+        siguienteSecuencia,
+        await controlSecuenciaECFRef.value.obtenerSiguienteDisponible({
+          prefijo: registroVigente.prefijo || registroVigente.tipo_ecf,
+          ambiente: registroVigente.ambiente || 'sandbox',
+          rncEmisor:
+            registroVigente.rnc_emisor ||
+            datosConfiguracion.value.rnc ||
+            '',
+          secuenciaMinima: siguienteSecuencia
+        })
+      )
+    }
+  } catch (errorSecuencia) {
+    console.warn('No se pudo conciliar la secuencia con las reservas centrales:', errorSecuencia)
+  }
+
   const actualizado = {
-    ...registro,
-    secuencia_actual: String(secuenciaNumerica + 1),
-    secuencia: String(secuenciaNumerica + 1),
-    contador: Number(registro.contador || 0) + 1
+    ...registroVigente,
+    secuencia_actual: String(siguienteSecuencia),
+    secuencia: String(siguienteSecuencia),
+    contador: Number(registroVigente.contador || 0) + 1
   }
 
   if (actualizado.hasOwnProperty('created_at')) {
     actualizado.updated_at = nfecha('timestamp')
   }
 
-  const resultado = await peticionesFetchOffline(
-    'updateData',
+  const resultado = await actualizarRegistroFiscalCompartido(
     'comprobantes_electronicos',
-    JSON.stringify(actualizado)
+    actualizado
   )
   if (esRespuestaOperacionExitosa(resultado)) {
     comprobanteElectronicoActivo.value = actualizado
@@ -20952,10 +21274,9 @@ const establecerSecuenciaComprobanteElectronico = async (registro, nuevaSecuenci
     actualizado.updated_at = nfecha('timestamp')
   }
 
-  const resultado = await peticionesFetchOffline(
-    'updateData',
+  const resultado = await actualizarRegistroFiscalCompartido(
     'comprobantes_electronicos',
-    JSON.stringify(actualizado)
+    actualizado
   )
   if (!esRespuestaOperacionExitosa(resultado)) return false
 
@@ -20965,7 +21286,7 @@ const establecerSecuenciaComprobanteElectronico = async (registro, nuevaSecuenci
 }
 
 // Función para enviar la factura a DGII con el e-NCF confirmado
-const confirmarYEnviarADGII = async () => {
+const confirmarYEnviarADGII = async ({ reemplazarComprobante = false } = {}) => {
   if (procesandoEnvioADGII.value) {
     console.warn('Se ignoró una confirmación duplicada de facturación electrónica.')
     return null
@@ -20979,6 +21300,8 @@ const confirmarYEnviarADGII = async () => {
     visibleSeleccionarENCF.value = false
 
     const datosFactura = pendingFacturaData.value || {}
+    const contextoReemplazo = reemplazarComprobante ? reemplazoECFActual.value : null
+    reservaECFActual.value = null
 
     // Validar y limpiar RNC/Cedula (debe ser 9-11 digitos). No se usan
     // identificaciones de prueba como reemplazo de datos fiscales faltantes.
@@ -21053,7 +21376,7 @@ const confirmarYEnviarADGII = async () => {
 
     const respuestaElectronicaExistente =
       obtenerRespuestaElectronicaGuardada(facturaGuardada)
-    if (respuestaElectronicaExistente) {
+    if (respuestaElectronicaExistente && !contextoReemplazo) {
       comprobanteFN.value = respuestaElectronicaExistente.documentNumber
       respuestaDGII.value = respuestaElectronicaExistente
       visibleModalDGII.value = true
@@ -21074,6 +21397,7 @@ const confirmarYEnviarADGII = async () => {
     }
 
     const tipoComprobanteFactura =
+      contextoReemplazo?.tipoComprobante ||
       facturaGuardada?.tipo_factura ||
       datosFactura?.tipoComprobante ||
       datosFactura?.tipo_factura ||
@@ -21091,34 +21415,35 @@ const confirmarYEnviarADGII = async () => {
       registroECF.prefijo || registroECF.tipo_ecf || prefijoFactura
     ).toUpperCase()
 
-    // Seleccionar exactamente la configuracion del ambiente activo.
-    let configProd = {},
-      configSand = {}
-    try {
-      configProd = JSON.parse(window.localStorage.getItem('alanube_config_production') || '{}')
-    } catch {}
-    try {
-      configSand = JSON.parse(window.localStorage.getItem('alanube_config_sandbox') || '{}')
-    } catch {}
-    const ambientePreferido = String(
-      window.localStorage.getItem('alanube_last_ambiente') || registroECF.ambiente || 'sandbox'
-    ).toLowerCase()
-    const ambienteECF = ambientePreferido === 'production' ? 'production' : 'sandbox'
-    console.log('🔍 DGII debug - config:', {
-      productionConfigured: !!configProd.token_api,
-      sandboxConfigured: !!configSand.token_api,
-      registroECF_ambiente: registroECF.ambiente,
-      ambienteECF,
-      selectedEnvironmentConfigured:
-        ambienteECF === 'production' ? !!configProd.token_api : !!configSand.token_api
-    })
-    let configGlobalAlanube = {}
-    try {
-      const key =
-        ambienteECF === 'production' ? 'alanube_config_production' : 'alanube_config_sandbox'
-      configGlobalAlanube = JSON.parse(window.localStorage.getItem(key) || '{}')
-    } catch {
-      /* usar vacio */
+    // El modal puede permanecer abierto mientras otro vendedor factura. El
+    // registro se acaba de releer de la tabla central, por lo que se usa su valor
+    // vigente sin descargar el historial completo de facturas.
+    const secuenciaVigente = await obtenerSiguienteSecuenciaDisponibleECF(registroECF)
+    secuenciaENCF.value = String(secuenciaVigente)
+
+    // El comprobante activo define el ambiente y las credenciales se consultan
+    // directamente en la tabla. No se usa localStorage para datos de Alanube.
+    const ambienteRegistro = String(registroECF.ambiente || 'sandbox')
+      .trim()
+      .toLowerCase()
+    const ambienteECF = ambienteRegistro === 'production' ? 'production' : 'sandbox'
+    const configuracionesAlanube = await consultarTablaFiscalCompartida(
+      'configuracion_alanube'
+    )
+    const configGlobalAlanube = (Array.isArray(configuracionesAlanube)
+      ? configuracionesAlanube
+      : []
+    ).find(
+      (configuracion) =>
+        String(configuracion?.ambiente || 'sandbox')
+          .trim()
+          .toLowerCase() === ambienteECF
+    )
+
+    if (!configGlobalAlanube) {
+      throw new Error(
+        `No existe configuración de Alanube en la tabla para el ambiente ${ambienteECF}.`
+      )
     }
 
     const token = String(configGlobalAlanube.token_api || '').trim()
@@ -21150,10 +21475,10 @@ const confirmarYEnviarADGII = async () => {
       apiUrl,
       ignorando_link: !!registroECF.link
     })
-    const secuenciaSeleccionada = String(
+    const secuenciaSolicitada = String(
       secuenciaENCF.value || registroECF.secuencia_actual || registroECF.secuencia || '1'
     )
-    const secuenciaActual = parseInt(secuenciaSeleccionada, 10)
+    const secuenciaConfigurada = parseInt(secuenciaSolicitada, 10)
     const secuenciaInicial = parseInt(
       String(rangoENCFInicio.value || registroECF.secuencia_inicial || '1'),
       10
@@ -21162,6 +21487,24 @@ const confirmarYEnviarADGII = async () => {
       String(rangoENCFFin.value || registroECF.secuencia_final || '0'),
       10
     )
+
+    if (!controlSecuenciaECFRef.value) {
+      throw new Error('El control central de secuencias e-CF no está disponible.')
+    }
+
+    const reservaECF = await controlSecuenciaECFRef.value.reservarSecuencia({
+      prefijo: prefijoECF,
+      ambiente: ambienteECF,
+      rncEmisor,
+      secuenciaMinima: secuenciaConfigurada,
+      secuenciaFinal,
+      noFactura: noFacturaDocumento,
+      usuario: usuarioLocal.value?.usuario || '',
+      almacen: datosEmpresa?.empresa?.nombre || ''
+    })
+    reservaECFActual.value = reservaECF
+    secuenciaENCF.value = String(reservaECF.secuencia)
+    const secuenciaActual = Number(reservaECF.secuencia)
 
     console.log('📌 Tipo factura guardada para e-CF:', {
       tipoComprobanteFactura,
@@ -21179,7 +21522,7 @@ const confirmarYEnviarADGII = async () => {
       secuenciaActual < secuenciaInicial
     ) {
       throw new Error(
-        `La secuencia ${formatearENCFCompleto(prefijoECF, secuenciaSeleccionada)} está por debajo del rango autorizado. Inicio permitido: ${formatearENCFCompleto(prefijoECF, secuenciaInicial)}`
+        `La secuencia ${formatearENCFCompleto(prefijoECF, secuenciaActual)} está por debajo del rango autorizado. Inicio permitido: ${formatearENCFCompleto(prefijoECF, secuenciaInicial)}`
       )
     }
 
@@ -21192,6 +21535,18 @@ const confirmarYEnviarADGII = async () => {
     // Generar e-NCF con la secuencia seleccionada
     const secuenciaIntento = secuenciaActual
     const eNCF = formatearENCFCompleto(prefijoECF, secuenciaIntento)
+    const secuenciaReservadaEnTabla = await establecerSecuenciaComprobanteElectronico(
+      registroECF,
+      secuenciaIntento + 1
+    )
+    if (!secuenciaReservadaEnTabla) {
+      await controlSecuenciaECFRef.value.marcarIncidencia(
+        reservaECF,
+        'ERROR_RESERVA',
+        'No se pudo adelantar la secuencia en comprobantes_electronicos.'
+      )
+      throw new Error(`No se pudo confirmar la reserva central de ${eNCF}.`)
+    }
 
     let productosFactura = []
     try {
@@ -21207,6 +21562,14 @@ const confirmarYEnviarADGII = async () => {
       console.warn('No se pudieron parsear los productos de la factura guardada:', errorProductos)
     }
 
+    if (
+      contextoReemplazo &&
+      (!Array.isArray(productosFactura) || productosFactura.length === 0)
+    ) {
+      throw new Error(
+        `La factura ${noFacturaDocumento} no tiene sus productos guardados. No se puede reenviar sin alterar los datos fiscales originales.`
+      )
+    }
     if (!Array.isArray(productosFactura) || productosFactura.length === 0) {
       productosFactura = Array.isArray(productosVenta.value) ? productosVenta.value : []
     }
@@ -21317,7 +21680,7 @@ const confirmarYEnviarADGII = async () => {
       )
     }
 
-    let clienteFactura = clienteSelected.value || {}
+    let clienteFactura = contextoReemplazo ? {} : clienteSelected.value || {}
     const codigoClienteFactura = facturaGuardada?.cod_cliente || datosFactura?.cliente?.codigo
     if (codigoClienteFactura) {
       try {
@@ -21346,7 +21709,10 @@ const confirmarYEnviarADGII = async () => {
     )
 
     const metodoPagoFactura = String(
-      facturaGuardada?.metodo_pago || datosFactura?.metodoPagoFN || metodoPago.value || ''
+      facturaGuardada?.metodo_pago ||
+        datosFactura?.metodoPagoFN ||
+        (contextoReemplazo ? '' : metodoPago.value) ||
+        ''
     ).toUpperCase()
     const tipoPagoAlanube =
       metodoPagoFactura.includes('CREDITO') || metodoPagoFactura.includes('APARTADO') ? 2 : 1
@@ -21560,9 +21926,17 @@ const confirmarYEnviarADGII = async () => {
         /id:\s*([A-Z0-9]+)/i
       )?.[1]
 
-      // AP3001 puede ser la respuesta de un segundo intento del mismo documento.
-      // Recuperar el documento ya registrado evita emitir otro e-NCF o reabrir el modal.
-      if (idDocumentoUtilizado) {
+      // Solo se puede recuperar un documento usado cuando todas las reservas de
+      // ese e-NCF pertenecen a esta misma factura. Si existe otra factura, usar
+      // la respuesta anterior duplicaría el comprobante en el sistema local.
+      const puedeRecuperarDocumento =
+        idDocumentoUtilizado &&
+        (await controlSecuenciaECFRef.value.puedeRecuperarDocumento({
+          encf: eNCF,
+          noFactura: noFacturaDocumento
+        }))
+
+      if (puedeRecuperarDocumento) {
         try {
           response = await axios.get(
             `${apiUrl}/${encodeURIComponent(idDocumentoUtilizado)}`,
@@ -21583,18 +21957,13 @@ const confirmarYEnviarADGII = async () => {
       }
 
       if (!response) {
-        const siguienteSecuencia = secuenciaIntento + 1
-        if (
-          Number.isFinite(secuenciaFinal) &&
-          secuenciaFinal > 0 &&
-          siguienteSecuencia > secuenciaFinal
-        ) {
-          throw new Error('No quedan secuencias electrónicas disponibles en el rango configurado.')
-        }
-
-        await establecerSecuenciaComprobanteElectronico(registroECF, siguienteSecuencia)
+        await controlSecuenciaECFRef.value.marcarIncidencia(
+          reservaECFActual.value,
+          'COLISION',
+          `${eNCF} ya pertenece a otro documento en Alanube.`
+        )
         throw new Error(
-          `${eNCF} ya fue utilizado en Alanube. No se realizó otro envío ni se abrió nuevamente el selector.`
+          `${eNCF} ya fue utilizado por otra factura. No se vinculó a la factura actual; la próxima emisión utilizará una secuencia nueva.`
         )
       }
     }
@@ -21641,6 +22010,12 @@ const confirmarYEnviarADGII = async () => {
         `Alanube devolvió ${numeroECFOficial}, pero la factura fue enviada como ${prefijoECF}`
       )
     }
+    if (
+      contextoReemplazo?.comprobanteAnterior &&
+      numeroECFOficial === String(contextoReemplazo.comprobanteAnterior).trim().toUpperCase()
+    ) {
+      throw new Error(`Alanube devolvió el mismo comprobante ${numeroECFOficial}; no se actualizó la factura.`)
+    }
 
     console.log('✅ Respuesta de A La Nube:', respuestaAlanube)
 
@@ -21662,9 +22037,10 @@ const confirmarYEnviarADGII = async () => {
       const valor = govResponse?.value?.[0]?.valor || ''
       const motivoRechazo = `DGII rechazó la factura (${codigo}): ${valor}`
 
-      // Eliminar la factura que ya se guardó
+      // Una factura recién creada puede eliminarse si DGII la rechaza. Durante
+      // un reemplazo se conserva siempre el registro histórico y su E32 anterior.
       const noFacturaRechazada = datosFactura.noFactura || datosFactura.no_factura
-      if (noFacturaRechazada) {
+      if (noFacturaRechazada && !contextoReemplazo) {
         try {
           const facturaGuardada = await peticionesFetchOffline(
             'getDataByField',
@@ -21716,25 +22092,53 @@ const confirmarYEnviarADGII = async () => {
       alanubeResponse: { ...respuestaAlanube }
     }
 
+    const facturaConMismoECF = await peticionesFetchOffline(
+      'getDataByField',
+      'facturas',
+      'comprobante',
+      numeroECFOficial
+    )
+    if (
+      facturaConMismoECF?.id &&
+      String(facturaConMismoECF.no_factura || '') !== noFacturaDocumento
+    ) {
+      await controlSecuenciaECFRef.value.marcarIncidencia(
+        reservaECFActual.value,
+        'COLISION_LOCAL',
+        `${numeroECFOficial} ya está vinculado a ${facturaConMismoECF.no_factura}.`
+      )
+      throw new Error(
+        `${numeroECFOficial} ya pertenece a la factura ${facturaConMismoECF.no_factura}. No se modificó la factura actual.`
+      )
+    }
+
     comprobanteFN.value = numeroECFOficial
     const resultadoGuardadoDGII = await actualizarFacturaConRespuestaDGII(
       datosFactura.noFactura || datosFactura.no_factura,
-      respuesta
-    )
-    if (respuesta.sequenceConsumed) {
-      const secuenciaConsumida = numeroECFOficial.slice(prefijoECF.length)
-      const secuenciaActualizada = await actualizarSecuenciaComprobanteElectronico(
-        registroECF,
-        secuenciaConsumida
-      )
-      if (!secuenciaActualizada) {
-        toast.add({
-          severity: 'warn',
-          summary: 'Secuencia electrónica',
-          detail: `El e-NCF ${numeroECFOficial} fue registrado, pero no se pudo guardar la próxima secuencia.`,
-          life: 6000
-        })
+      respuesta,
+      {
+        conservarComprobanteAnterior: Boolean(contextoReemplazo),
+        motivo: contextoReemplazo?.motivo || ''
       }
+    )
+    await controlSecuenciaECFRef.value.marcarEmitida(reservaECFActual.value, {
+      encf: numeroECFOficial,
+      alanubeId: respuestaAlanube.id
+    })
+    // Un e-NCF oficial ya guardado nunca debe volver a proponerse, aunque Alanube
+    // devuelva sequenceConsumed=false al recuperar un documento previamente emitido.
+    const secuenciaConsumida = numeroECFOficial.slice(prefijoECF.length)
+    const secuenciaActualizada = await actualizarSecuenciaComprobanteElectronico(
+      registroECF,
+      secuenciaConsumida
+    )
+    if (!secuenciaActualizada) {
+      toast.add({
+        severity: 'warn',
+        summary: 'Secuencia electrónica',
+        detail: `El e-NCF ${numeroECFOficial} fue registrado, pero no se pudo guardar la próxima secuencia.`,
+        life: 6000
+      })
     }
 
     if (
@@ -21753,10 +22157,32 @@ const confirmarYEnviarADGII = async () => {
     respuestaDGII.value = respuesta
     visibleModalDGII.value = true
 
+    if (contextoReemplazo) {
+      await registrarBitacoraVender({
+        tabla: 'facturas',
+        accion: 'CAMBIAR_COMPROBANTE_E32',
+        referencia: noFacturaDocumento,
+        descripcion: `Reemplazo de comprobante E32 de la factura ${noFacturaDocumento}`,
+        antes: {
+          id: facturaGuardada?.id,
+          no_factura: noFacturaDocumento,
+          comprobante: contextoReemplazo.comprobanteAnterior
+        },
+        despues: {
+          id: facturaGuardada?.id,
+          no_factura: noFacturaDocumento,
+          comprobante: numeroECFOficial,
+          alanube_id: respuestaAlanube.id || ''
+        }
+      })
+    }
+
     toast.add({
       severity: 'success',
       summary: 'Facturación Electrónica',
-      detail: `Factura enviada exitosamente (e-NCF: ${numeroECFOficial})`,
+      detail: contextoReemplazo
+        ? `Comprobante actualizado: ${contextoReemplazo.comprobanteAnterior} → ${numeroECFOficial}`
+        : `Factura enviada exitosamente (e-NCF: ${numeroECFOficial})`,
       life: 4000
     })
 
@@ -21858,10 +22284,56 @@ const enviarADGII = async (datosFactura) => {
   return await mostrarModalSeleccionENCF(datosFactura)
 }
 
+const ofrecerEliminarFacturaTrasCancelarECF = async () => {
+  const noFactura = String(
+    pendingFacturaData.value?.noFactura || pendingFacturaData.value?.no_factura || ''
+  ).trim()
+  if (!noFactura) return false
+
+  // Reutiliza la eliminación normal: solicita confirmación/contraseña,
+  // restaura inventario y elimina las cuentas por cobrar relacionadas.
+  await borrarFacturasSeleccionadas(
+    [
+      {
+        no_factura: noFactura,
+        tipo: 'Factura',
+        nombre_cliente: clienteSelected.value?.nombre || ''
+      }
+    ],
+    {
+      requierePassword: false,
+      titulo: '¿Eliminar también la factura?',
+      confirmButtonText: 'Sí, eliminar factura',
+      cancelButtonText: 'No, conservar factura'
+    }
+  )
+
+  const facturaRestante = await peticionesFetchOffline(
+    'getDataByField',
+    'facturas',
+    'no_factura',
+    noFactura
+  )
+  return !facturaRestante?.id
+}
+
 /************************************************************/
 const guardarFactura = async () => {
   if (generandoFactura.value) {
     console.warn('Se ignoró una solicitud duplicada para guardar la factura.')
+    return
+  }
+
+  const prefijoComprobanteSeleccionado = obtenerPrefijoECFPorComprobante(comprobante.value)
+  const requiereClienteConComprobante =
+    tipoFactura.value === 'factura' && Boolean(prefijoComprobanteSeleccionado)
+  const esClientePorDefecto = String(clienteSelected.value?.codigo || '').trim() === '0000000'
+  const requiereRncFiscal = prefijoComprobanteSeleccionado === 'E31'
+  const clienteNoValidoParaComprobante =
+    esClientePorDefecto || (requiereRncFiscal && !clienteValidoParaE31(clienteSelected.value))
+
+  if (requiereClienteConComprobante && clienteNoValidoParaComprobante) {
+    await abrirModalClienteFiscalE31(requiereRncFiscal)
     return
   }
 
@@ -21956,14 +22428,10 @@ return
       return
     }
 
-    const prefijoECF = String(
-      registroECF.prefijo ||
-        registroECF.tipo_ecf ||
-        obtenerPrefijoECFPorComprobante(comprobante.value)
-    ).toUpperCase()
-    const secuenciaECF =
-      registroECF.secuencia_actual || registroECF.secuencia || registroECF.secuencia_inicial || '1'
-    comprobanteFN.value = formatearENCFCompleto(prefijoECF, secuenciaECF)
+    // El e-NCF mostrado es solo una propuesta hasta que Alanube lo acepte.
+    // La factura debe insertarse sin comprobante y actualizarse después con
+    // el número oficial. Si el usuario cancela, permanece vacío.
+    comprobanteFN.value = ''
   } else if (comprobante.value != 'NORMAL') {
     /*    const comprob = await peticionesFetch(`${link.value}${api.value}`,`datoscampo/confiscal/prefijo/${elComprobante}`,{},tokenCifrado.value,'GET');*/
     const comprob = await peticionesFetchOffline(
@@ -23238,16 +23706,6 @@ const continuarGuardandoFactura = async () => {
         console.error('Operación secundaria de factura falló:', resultado.reason)
       )
 
-    // Limpiar valores
-    efetivoFN.value = 0.0
-    tarjetaFN.value = 0.0
-    transferenciaFN.value = 0.0
-    pagaCon.value = 0.0
-    suCambio.value = 0.0
-    descuentoEntero.value = '0.00'
-    descuentoPorcentaje.value = '0.00'
-    tipoImpuestoFactura.value = datosConfiguracion.value.tipo_papel
-
     // Optimización CRÍTICA: Ejecutar fetchAndSetupData en segundo plano (no bloquea la UI)
     // Esta operación actualiza la lista de productos pero NO es necesaria para completar la factura
     fetchAndSetupData().catch((err) => console.error('Error al actualizar datos:', err))
@@ -23278,8 +23736,9 @@ const continuarGuardandoFactura = async () => {
       comprobanteElectronicoActivo: comprobanteElectronicoActivo.value
     })
 
-    if (shouldWaitDGII && !impresionRapida.value) {
-      // Solo esperamos DGII si NO está en modo impresión rápida
+    if (shouldWaitDGII) {
+      // La facturación electrónica siempre espera la decisión del modal,
+      // incluso con impresión rápida, para poder conservar la venta al cancelar.
       try {
         respuestaFacturacionElectronica = await enviarADGII({
           comprobante: comprobanteFN.value,
@@ -23288,28 +23747,53 @@ const continuarGuardandoFactura = async () => {
           fecha_limite_pago: agregarDiasalaFechaActual(30)
         })
       } catch (errorDGII) {
-        console.error('Error al enviar a DGII:', errorDGII)
-        const mensaje = errorDGII?.message || 'Error desconocido en facturación electrónica'
-        toast.removeAllGroups()
-        toast.add({
-          severity: 'error',
-          summary: 'DGII Rechazó',
-          detail: `No se completó la facturación electrónica: ${mensaje}`,
-          life: 8000
-        })
-        loading.value = false
-        generandoFactura.value = false
-        return
+        if (errorDGII?.code === 'DGII_ENVIO_CANCELADO') {
+          comprobanteFN.value = ''
+          const facturaEliminada = await ofrecerEliminarFacturaTrasCancelarECF()
+          if (facturaEliminada) {
+            // La venta continúa abierta para poder intentarla otra vez. No
+            // limpiar carrito, cliente, pagos ni ejecutar el cierre post-factura.
+            loading.value = false
+            generandoFactura.value = false
+            visibleSeleccionarENCF.value = false
+            visiblePostFacturaModal.value = false
+            return
+          } else {
+            toast.removeAllGroups()
+            toast.add({
+              severity: 'info',
+              summary: 'Envío electrónico cancelado',
+              detail: 'La factura fue conservada sin comprobante electrónico.',
+              life: 5000
+            })
+          }
+        } else {
+          console.error('Error al enviar a DGII:', errorDGII)
+          const mensaje = errorDGII?.message || 'Error desconocido en facturación electrónica'
+          toast.removeAllGroups()
+          toast.add({
+            severity: 'error',
+            summary: 'DGII Rechazó',
+            detail: `No se completó la facturación electrónica: ${mensaje}`,
+            life: 8000
+          })
+          loading.value = false
+          generandoFactura.value = false
+          return
+        }
       }
-    } else if (shouldWaitDGII && impresionRapida.value) {
-      // En impresión rápida, enviar a DGII en segundo plano
-      enviarADGII({
-        comprobante: comprobanteFN.value,
-        tipoComprobante: comprobante.value,
-        noFactura: noFacturaFN.value,
-        fecha_limite_pago: agregarDiasalaFechaActual(30)
-      }).catch((errorDGII) => console.error('Error al enviar a DGII:', errorDGII))
     }
+
+    // Limpiar valores solo cuando la factura se conserva o el e-NCF se emitió.
+    // Si se eliminó tras cancelar, el retorno anterior preserva toda la venta.
+    efetivoFN.value = 0.0
+    tarjetaFN.value = 0.0
+    transferenciaFN.value = 0.0
+    pagaCon.value = 0.0
+    suCambio.value = 0.0
+    descuentoEntero.value = '0.00'
+    descuentoPorcentaje.value = '0.00'
+    tipoImpuestoFactura.value = datosConfiguracion.value.tipo_papel
 
     //const impresionpagina = `${link.value}/receipt/ticket?factura=${noFacturaFN.value}`;
     var impresionpagina = link.value + '/vista/impresoratermica.php?factura=' + noFacturaFN.value
@@ -25113,7 +25597,7 @@ const eliminarFactura = () => {
   })
 }
 /************************************************************/
-const borrarFacturasSeleccionadas = async (facturasSeleccionadas) => {
+const borrarFacturasSeleccionadas = async (facturasSeleccionadas, opciones = {}) => {
   if (!facturasSeleccionadas || facturasSeleccionadas.length === 0) {
     toast.add({
       severity: 'warn',
@@ -25136,9 +25620,9 @@ const borrarFacturasSeleccionadas = async (facturasSeleccionadas) => {
     cotizacion: 'no_cotizacion'
   }
 
-  // Mostrar confirmación con contraseña
-  const result = await Swal.fire({
-    title: `¿Eliminar ${facturasSeleccionadas.length} registro(s)?`,
+  const requierePassword = opciones.requierePassword !== false
+  const configuracionConfirmacion = {
+    title: opciones.titulo || `¿Eliminar ${facturasSeleccionadas.length} registro(s)?`,
     html: `
       <div style="text-align: left; margin-bottom: 15px;">
         <p style="color: #dc2626; font-weight: bold;">Esta acción eliminará los siguientes documentos:</p>
@@ -25147,27 +25631,33 @@ const borrarFacturasSeleccionadas = async (facturasSeleccionadas) => {
         </ul>
       </div>
     `,
-    input: 'password',
-    inputPlaceholder: 'Introduce la contraseña',
     showCancelButton: true,
-    confirmButtonText: 'Eliminar',
-    cancelButtonText: 'Cancelar',
+    confirmButtonText: opciones.confirmButtonText || 'Eliminar',
+    cancelButtonText: opciones.cancelButtonText || 'Cancelar',
     confirmButtonColor: '#dc2626',
     cancelButtonColor: '#6b7280',
     customClass: { popup: 'rounded-xl' }
-  })
+  }
+  if (requierePassword) {
+    configuracionConfirmacion.input = 'password'
+    configuracionConfirmacion.inputPlaceholder = 'Introduce la contraseña'
+  }
+
+  const result = await Swal.fire(configuracionConfirmacion)
 
   if (!result.isConfirmed) return
 
-  const contrasenaIngresada = result.value
-  if (
-    contrasenaIngresada !== token.value &&
-    contrasenaIngresada !== tokenCorto.value &&
-    contrasenaIngresada !== tokenSoloUso.value &&
-    contrasenaIngresada !== token24H.value
-  ) {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 })
-    return
+  if (requierePassword) {
+    const contrasenaIngresada = result.value
+    if (
+      contrasenaIngresada !== token.value &&
+      contrasenaIngresada !== tokenCorto.value &&
+      contrasenaIngresada !== tokenSoloUso.value &&
+      contrasenaIngresada !== token24H.value
+    ) {
+      toast.add({ severity: 'error', summary: 'Error', detail: 'Contraseña incorrecta', life: 3000 })
+      return
+    }
   }
 
   // Procesar eliminación de cada factura
@@ -32821,6 +33311,17 @@ const docArray = ref([])
 const docVisible = ref(false)
 const visibleAccionesDocumento = ref(false)
 const documentoAccionesSeleccionado = ref(null)
+const visibleConfirmarCambioE32 = ref(false)
+const facturaPendienteCambioE32 = ref(null)
+const documentoAccionesPuedeCambiarECF = computed(() => {
+  const esFactura = String(datosFactCoti.value.tipo || '').toLowerCase() === 'factura'
+  const comprobanteDocumento = String(
+    documentoAccionesSeleccionado.value?.comprobante || ''
+  )
+    .trim()
+    .toUpperCase()
+  return esFactura && /^E32\d{10}$/.test(comprobanteDocumento)
+})
 const searchQueryFactura = ref('')
 const selectedFacturas = ref([])
 const selectedDocArray = ref([])
@@ -32868,6 +33369,7 @@ const fetchFacturasDoc = async (endpoint, { mostrarModal = true, lazyEvent = {} 
     const searchFieldsPorEndpoint = {
       facturas: [
         'no_factura',
+        'comprobante',
         'fecha_emision',
         'cod_cliente',
         'nombre_cliente',
@@ -33297,6 +33799,8 @@ const filteredFacturas = computed(() => {
       '' ||
       factura.nombre_cliente?.toLowerCase().includes(searchTerm) ||
       '' ||
+      obtenerComprobanteListado(factura).toLowerCase().includes(searchTerm) ||
+      '' ||
       factura.total?.toString().includes(searchTerm) ||
       ''
     )
@@ -33374,6 +33878,118 @@ const irAlRegistroDocumentoSeleccionado = async () => {
   }
 
   router.push({ path: rutaTipo.value })
+}
+
+const cambiarComprobanteE32DocumentoSeleccionado = async () => {
+  const documento = documentoAccionesSeleccionado.value
+  const noFactura = String(documento?.no_factura || datosFactCoti.value.numero || '').trim()
+
+  if (!documentoAccionesPuedeCambiarECF.value || !noFactura) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Comprobante no disponible',
+      detail: 'Esta acción solo está disponible para facturas que ya tienen un comprobante E32.',
+      life: 5000
+    })
+    return
+  }
+
+  let facturaGuardada = null
+  try {
+    facturaGuardada = await peticionesFetchOffline(
+      'getDataByField',
+      'facturas',
+      'no_factura',
+      noFactura
+    )
+  } catch (error) {
+    console.error('No se pudo cargar la factura para cambiar su E32:', error)
+  }
+
+  if (!facturaGuardada?.id) {
+    toast.add({
+      severity: 'error',
+      summary: 'Factura no encontrada',
+      detail: `No se encontró la factura ${noFactura}; no se realizó ningún envío.`,
+      life: 5000
+    })
+    return
+  }
+
+  const comprobanteAnterior = String(facturaGuardada.comprobante || '').trim().toUpperCase()
+  if (!/^E32\d{10}$/.test(comprobanteAnterior)) {
+    toast.add({
+      severity: 'warn',
+      summary: 'E32 no válido',
+      detail: 'La factura ya no tiene un E32 válido. Actualice el listado antes de intentarlo.',
+      life: 5000
+    })
+    return
+  }
+
+  facturaPendienteCambioE32.value = {
+    facturaGuardada,
+    noFactura,
+    comprobanteAnterior
+  }
+  visibleAccionesDocumento.value = false
+  visibleConfirmarCambioE32.value = true
+}
+
+const cancelarCambioComprobanteE32 = () => {
+  if (procesandoEnvioADGII.value) return
+  visibleConfirmarCambioE32.value = false
+  facturaPendienteCambioE32.value = null
+  visibleAccionesDocumento.value = true
+}
+
+const confirmarCambioComprobanteE32 = async () => {
+  const pendiente = facturaPendienteCambioE32.value
+  if (!pendiente?.facturaGuardada || !pendiente?.noFactura) return
+
+  const { facturaGuardada, noFactura, comprobanteAnterior } = pendiente
+
+  const pendingAnterior = pendingFacturaData.value
+  limpiarPromesaEnvioADGII()
+  reemplazoECFActual.value = {
+    noFactura,
+    comprobanteAnterior,
+    tipoComprobante: 'FINAL',
+    motivo: 'REEMPLAZO_E32_DUPLICADO'
+  }
+  pendingFacturaData.value = {
+    ...facturaGuardada,
+    noFactura,
+    no_factura: noFactura,
+    tipoComprobante: 'FINAL',
+    tipo_factura: 'FINAL'
+  }
+
+  try {
+    const respuesta = await confirmarYEnviarADGII({ reemplazarComprobante: true })
+    if (!respuesta) return
+
+    const facturaActualizada = await peticionesFetchOffline(
+      'getDataByField',
+      'facturas',
+      'no_factura',
+      noFactura
+    )
+    if (facturaActualizada) {
+      documentoAccionesSeleccionado.value = facturaActualizada
+      const indiceDocumento = docArray.value.findIndex(
+        (item) => String(item?.no_factura || '') === noFactura
+      )
+      if (indiceDocumento >= 0) {
+        docArray.value.splice(indiceDocumento, 1, facturaActualizada)
+      }
+    }
+  } finally {
+    pendingFacturaData.value = pendingAnterior
+    reemplazoECFActual.value = null
+    facturaPendienteCambioE32.value = null
+    visibleConfirmarCambioE32.value = false
+  }
 }
 
 const ejecutarAccionDocumentoSeleccionado = async (accion) => {

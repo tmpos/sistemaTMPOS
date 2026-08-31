@@ -41,7 +41,23 @@ const camposArray = ["nombre","cedula","direccion","telefono","whatsapp","email"
 "beneficio_empresa","manodeobra","abono","saldo","total","imagen","usuario","almacen","historial_pagos","historial_orden","piezas_usadas","firma_entrega","firma_entrega_nombre","firma_entrega_fecha","firma_entrega_documento","firma_entrega_token"];
 /************************************************************************/
 import { useDatosEmpresa } from '@/stores'
+import { notifyCompanyPayment } from '@/funciones/notificacionesAbonos.js';
 const datosEmpresa = useDatosEmpresa();
+const notificarAbonoTaller = (orden, pago) => {
+  void notifyCompanyPayment({
+    type: 'taller',
+    reference: orden?.no_factura,
+    client: orden?.nombre || orden?.cliente,
+    amount: pago?.abono,
+    balance: pago?.saldo ?? orden?.saldo,
+    method: pago?.metodo_pago,
+    cashier: pago?.cajero || usuarioLocal.value?.nombre || usuarioLocal.value?.email,
+    date: pago?.fecha,
+    time: pago?.hora,
+    source: 'Taller - entrega de orden',
+    company: datosEmpresa.empresa
+  });
+};
 const link = ref('');
 const api = ref('');
 const token = ref('');
@@ -860,14 +876,16 @@ const facturaTaller = currentRowData.value;
   const abonoJSON = JSON.parse(facturaTaller.abono);
   
   // Agregar el nuevo abono con el método de pago seleccionado
-  abonoJSON.push({
+  const nuevoAbono = {
     "abono": facturaTaller.saldo,
     "turno": usuarioLocal.value.token,
     "cajero": usuarioLocal.value.email,
     "metodo_pago": metodoPago,  // Método de pago seleccionado
     "hora": nfecha('hora'),
-    "fecha": nfecha('fecha')
-  });
+    "fecha": nfecha('fecha'),
+    "saldo": '0.00'
+  };
+  abonoJSON.push(nuevoAbono);
 
   // Convertir el abono actualizado a una cadena JSON
   facturaTaller.abono = JSON.stringify(abonoJSON);
@@ -883,6 +901,7 @@ const facturaTaller = currentRowData.value;
   const envioDatos = await peticionesFetchOffline('updateData','taller', JSON.stringify(facturaTaller));
   if (envioDatos[0] == 'ok') {
      toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+     notificarAbonoTaller(facturaTaller, nuevoAbono);
      fetchAndSetupData();
   }else{
     toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });

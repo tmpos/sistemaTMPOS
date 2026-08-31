@@ -58,6 +58,8 @@ const cuentaFilter = ref('');
 const visibleNuevaTransaccion = ref(false);
 const visibleNuevoPago = ref(false);
 const visibleNuevaCompra = ref(false);
+const visibleNuevoProveedorCompra = ref(false);
+const guardandoProveedorCompra = ref(false);
 const visibleDetalle = ref(false);
 const detalleTransaccion = ref(null);
 const activeTab = ref(0);
@@ -118,6 +120,16 @@ const nuevaCompra = ref({
   year: new Date().getFullYear(),
   usuario: '',
   estado: 'APROBADO'
+});
+
+const nuevoProveedorCompra = ref({
+  nombre: '',
+  rnc: '',
+  telefono: '',
+  email: '',
+  encargado: '',
+  cuenta_bancaria: '',
+  direccion: ''
 });
 
 const nuevoItem = ref({
@@ -483,6 +495,69 @@ const cargarProveedores = async () => {
     proveedores.value = response || [];
   } catch (error) {
     console.error('Error al cargar proveedores:', error);
+  }
+};
+
+const abrirNuevoProveedorCompra = () => {
+  nuevoProveedorCompra.value = {
+    nombre: '',
+    rnc: '',
+    telefono: '',
+    email: '',
+    encargado: '',
+    cuenta_bancaria: '',
+    direccion: ''
+  };
+  visibleNuevoProveedorCompra.value = true;
+};
+
+const guardarNuevoProveedorCompra = async () => {
+  const nombre = String(nuevoProveedorCompra.value.nombre || '').trim();
+  const rnc = String(nuevoProveedorCompra.value.rnc || '').trim();
+
+  if (!nombre) {
+    toast.add({ severity: 'warn', summary: 'Validación', detail: 'Ingrese el nombre del proveedor', life: 3000 });
+    return;
+  }
+
+  const proveedorDuplicado = proveedores.value.some((proveedor) => {
+    const mismoNombre = String(proveedor.nombre || '').trim().toLocaleUpperCase() === nombre.toLocaleUpperCase();
+    const mismoRnc = rnc && String(proveedor.rnc || '').trim() === rnc;
+    return mismoNombre || mismoRnc;
+  });
+
+  if (proveedorDuplicado) {
+    toast.add({ severity: 'warn', summary: 'Proveedor existente', detail: 'Ya existe un proveedor con ese nombre o RNC', life: 3000 });
+    return;
+  }
+
+  guardandoProveedorCompra.value = true;
+  try {
+    const proveedor = {
+      nombre,
+      rnc,
+      telefono: String(nuevoProveedorCompra.value.telefono || '').trim(),
+      email: String(nuevoProveedorCompra.value.email || '').trim(),
+      encargado: String(nuevoProveedorCompra.value.encargado || '').trim(),
+      cuenta_bancaria: String(nuevoProveedorCompra.value.cuenta_bancaria || '').trim(),
+      direccion: String(nuevoProveedorCompra.value.direccion || '').trim(),
+      usuario: usuarioLocal.value.nombre || usuarioLocal.value.usuario || ''
+    };
+
+    const respuesta = await peticionesFetchOffline('insertData', 'proveedores', JSON.stringify(proveedor));
+    if (!Array.isArray(respuesta) || respuesta[0] !== 'ok') {
+      throw new Error('La base de datos no confirmó el registro del proveedor');
+    }
+
+    await cargarProveedores();
+    nuevaCompra.value.proveedor = nombre;
+    visibleNuevoProveedorCompra.value = false;
+    toast.add({ severity: 'success', summary: 'Proveedor agregado', detail: `${nombre} quedó seleccionado en la compra`, life: 3000 });
+  } catch (error) {
+    console.error('Error al guardar proveedor desde compra menor:', error);
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo registrar el proveedor', life: 3000 });
+  } finally {
+    guardandoProveedorCompra.value = false;
   }
 };
 
@@ -1444,13 +1519,38 @@ watch(() => nuevaTransaccion.value.tipo, (t) => {
       <!-- Dialog: Nueva Compra -->
       <Dialog v-model:visible="visibleNuevaCompra" modal header="Nueva Compra Menor" :style="{ width: '700px' }" :breakpoints="{ '960px':'75vw','640px':'90vw' }">
         <div class="p-4">
-          <div class="flex flex-col gap-2 mb-4"><label class="font-semibold text-sm">Proveedor/Vendedor</label><InputText v-model="nuevaCompra.proveedor" placeholder="Nombre" class="w-full" /></div>
+          <div class="flex flex-col gap-2 mb-4">
+            <label class="font-semibold text-sm">Proveedor/Vendedor</label>
+            <div class="flex gap-2 items-center">
+              <Dropdown
+                v-model="nuevaCompra.proveedor"
+                :options="proveedores"
+                optionLabel="nombre"
+                optionValue="nombre"
+                placeholder="Seleccione un proveedor"
+                filter
+                showClear
+                fluid
+                class="flex-1"
+              >
+                <template #option="slotProps">
+                  <div class="flex flex-col">
+                    <span class="font-semibold">{{ slotProps.option.nombre }}</span>
+                    <span v-if="slotProps.option.rnc" class="text-xs text-gray-500">
+                      RNC: {{ slotProps.option.rnc }}
+                    </span>
+                  </div>
+                </template>
+              </Dropdown>
+              <Button label="Agregar proveedor" icon="pi pi-plus" severity="success" outlined class="shrink-0" @click="abrirNuevoProveedorCompra" />
+            </div>
+          </div>
           <Divider /><h4 class="font-bold text-gray-700 mb-3">Items</h4>
           <div class="grid grid-cols-12 gap-2 mb-3 items-end">
-            <div class="col-span-5"><label class="font-semibold text-xs text-gray-600">Descripción</label><InputText v-model="nuevoItem.descripcion" placeholder="Item" class="w-full" /></div>
-            <div class="col-span-2"><label class="font-semibold text-xs text-gray-600">Cant.</label><InputNumber v-model="nuevoItem.cantidad" :min="1" class="w-full" /></div>
-            <div class="col-span-2"><label class="font-semibold text-xs text-gray-600">Precio U.</label><InputNumber v-model="nuevoItem.precio_unitario" mode="currency" currency="DOP" locale="es-DO" class="w-full" /></div>
-            <div class="col-span-2"><label class="font-semibold text-xs text-gray-600">Total</label><InputNumber :value="nuevoItem.cantidad * nuevoItem.precio_unitario" mode="currency" currency="DOP" locale="es-DO" disabled class="w-full" /></div>
+            <div class="col-span-5"><label class="font-semibold text-xs text-gray-600">Descripción</label><InputText v-model="nuevoItem.descripcion" placeholder="Item" fluid class="w-full" /></div>
+            <div class="col-span-2"><label class="font-semibold text-xs text-gray-600">Cant.</label><InputNumber v-model="nuevoItem.cantidad" :min="1" fluid class="w-full" /></div>
+            <div class="col-span-2"><label class="font-semibold text-xs text-gray-600">Precio U.</label><InputNumber v-model="nuevoItem.precio_unitario" mode="currency" currency="DOP" locale="es-DO" fluid class="w-full" /></div>
+            <div class="col-span-2"><label class="font-semibold text-xs text-gray-600">Total</label><InputNumber :value="nuevoItem.cantidad * nuevoItem.precio_unitario" mode="currency" currency="DOP" locale="es-DO" disabled fluid class="w-full" /></div>
             <div class="col-span-1"><Button icon="pi pi-plus" severity="success" text @click="agregarItemCompra" /></div>
           </div>
           <DataTable :value="nuevaCompra.items" class="mb-4"><template #empty><div class="text-center py-4 text-gray-400 text-sm">Sin items</div></template>
@@ -1461,13 +1561,53 @@ watch(() => nuevaTransaccion.value.tipo, (t) => {
           <div class="flex justify-end mb-4"><div class="text-xl font-bold">Total: RD$ {{ nuevaCompra.total.toLocaleString('es-DO',{minimumFractionDigits:2}) }}</div></div>
           <Divider />
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="flex flex-col gap-2"><label class="font-semibold text-sm">Método *</label><Dropdown v-model="nuevaCompra.metodo_pago" :options="metodosPago" optionLabel="label" optionValue="value" class="w-full" /></div>
-            <div class="flex flex-col gap-2"><label class="font-semibold text-sm">Factura/Recibo</label><InputText v-model="nuevaCompra.factura_ref" placeholder="N° factura" class="w-full" /></div>
-            <div class="flex flex-col gap-2"><label class="font-semibold text-sm">Cuenta Contable</label><InputText :value="cuentaActiva?.nombre" disabled class="w-full" /></div>
-            <div class="flex flex-col gap-2"><label class="font-semibold text-sm">Estado</label><Dropdown v-model="nuevaCompra.estado" :options="estadosTransaccion" optionLabel="label" optionValue="value" class="w-full" /></div>
+            <div class="flex flex-col gap-2"><label class="font-semibold text-sm">Método *</label><Dropdown v-model="nuevaCompra.metodo_pago" :options="metodosPago" optionLabel="label" optionValue="value" fluid class="w-full" /></div>
+            <div class="flex flex-col gap-2"><label class="font-semibold text-sm">Factura/Recibo</label><InputText v-model="nuevaCompra.factura_ref" placeholder="N° factura" fluid class="w-full" /></div>
+            <div class="flex flex-col gap-2"><label class="font-semibold text-sm">Cuenta Contable</label><InputText :value="cuentaActiva?.nombre" disabled fluid class="w-full" /></div>
+            <div class="flex flex-col gap-2"><label class="font-semibold text-sm">Estado</label><Dropdown v-model="nuevaCompra.estado" :options="estadosTransaccion" optionLabel="label" optionValue="value" fluid class="w-full" /></div>
           </div>
         </div>
         <template #footer><Button label="Cancelar" severity="secondary" outlined @click="visibleNuevaCompra=false" /><Button label="Registrar Compra" severity="help" icon="pi pi-shopping-cart" @click="guardarCompra" :loading="loading" /></template>
+      </Dialog>
+
+      <!-- Dialog: Nuevo Proveedor desde Compra Menor -->
+      <Dialog v-model:visible="visibleNuevoProveedorCompra" modal header="Agregar proveedor" :style="{ width: '650px' }" :breakpoints="{ '960px':'75vw','640px':'92vw' }">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+          <div class="flex flex-col gap-2 md:col-span-2">
+            <label class="font-semibold text-sm">Nombre *</label>
+            <InputText v-model="nuevoProveedorCompra.nombre" placeholder="Nombre o razón social" fluid class="w-full" @keyup.enter="guardarNuevoProveedorCompra" />
+          </div>
+          <div class="flex flex-col gap-2">
+            <label class="font-semibold text-sm">RNC</label>
+            <InputText v-model="nuevoProveedorCompra.rnc" placeholder="RNC o cédula" fluid class="w-full" />
+          </div>
+          <div class="flex flex-col gap-2">
+            <label class="font-semibold text-sm">Teléfono</label>
+            <InputText v-model="nuevoProveedorCompra.telefono" placeholder="Teléfono" fluid class="w-full" />
+          </div>
+          <div class="flex flex-col gap-2">
+            <label class="font-semibold text-sm">Email</label>
+            <InputText v-model="nuevoProveedorCompra.email" type="email" placeholder="correo@ejemplo.com" fluid class="w-full" />
+          </div>
+          <div class="flex flex-col gap-2">
+            <label class="font-semibold text-sm">Encargado</label>
+            <InputText v-model="nuevoProveedorCompra.encargado" placeholder="Persona de contacto" fluid class="w-full" />
+          </div>
+          <div class="flex flex-col gap-2 md:col-span-2">
+            <label class="font-semibold text-sm">Cuenta bancaria</label>
+            <InputText v-model="nuevoProveedorCompra.cuenta_bancaria" placeholder="Número de cuenta" fluid class="w-full" />
+          </div>
+          <div class="flex flex-col gap-2 md:col-span-2">
+            <label class="font-semibold text-sm">Dirección</label>
+            <Textarea v-model="nuevoProveedorCompra.direccion" rows="2" placeholder="Dirección del proveedor" fluid class="w-full" />
+          </div>
+        </div>
+        <template #footer>
+          <div class="flex justify-end gap-2">
+            <Button label="Cancelar" severity="secondary" outlined :disabled="guardandoProveedorCompra" @click="visibleNuevoProveedorCompra=false" />
+            <Button label="Guardar proveedor" icon="pi pi-save" severity="success" :loading="guardandoProveedorCompra" @click="guardarNuevoProveedorCompra" />
+          </div>
+        </template>
       </Dialog>
 
       <!-- Dialog: Pago Gasto Fijo -->

@@ -71,10 +71,111 @@ describe('Vender.vue: contrato estructural del componente completo', () => {
     expect(source).toContain('restarStock')
   })
 
+  it('inicia Vender en modo normal cuando no existe una preferencia guardada', () => {
+    expect(source).toContain('const modoSimple = ref(false)')
+    expect(source).toContain("const MODO_SIMPLE_STORAGE_KEY = 'vender_modo_simple'")
+  })
+
   it('avanza y persiste la secuencia después de registrar un e-NCF oficial', () => {
     expect(source).toContain('const secuenciaConsumida = numeroECFOficial.slice(prefijoECF.length)')
     expect(source).toContain('actualizarSecuenciaComprobanteElectronico(')
-    expect(source).toContain('secuencia_actual: String(secuenciaNumerica + 1)')
+    expect(source).toContain('secuencia_actual: String(siguienteSecuencia)')
     expect(source).toContain('esRespuestaOperacionExitosa(resultado)')
+    expect(source).toContain('obtenerSiguienteSecuenciaDisponibleECF(')
+    expect(source).toContain('controlSecuenciaECFRef.value.reservarSecuencia({')
+    expect(source).toContain('<ControlSecuenciaECF ref="controlSecuenciaECFRef" />')
+    expect(source).not.toContain('if (respuesta.sequenceConsumed)')
+  })
+
+  it('no vincula a una factura un e-NCF utilizado por otra', () => {
+    expect(source).toContain('controlSecuenciaECFRef.value.puedeRecuperarDocumento({')
+    expect(source).toContain("'comprobante',\n      numeroECFOficial")
+    expect(source).toContain("'COLISION_LOCAL'")
+    expect(source).toContain('No se modificó la factura actual.')
+  })
+
+  it('lee la configuración de Alanube desde la tabla y no desde localStorage', () => {
+    expect(source).toContain("'configuracion_alanube'")
+    expect(source).not.toContain("localStorage.getItem('alanube_config_")
+    expect(source).not.toContain("localStorage.getItem('alanube_last_ambiente')")
+  })
+
+  it('asigna la secuencia e-NCF desde las tablas centrales al confirmar', () => {
+    expect(source).toContain("consultarTablaFiscalCompartida('comprobantes_electronicos')")
+    expect(source).toContain("actualizarRegistroFiscalCompartido(\n    'comprobantes_electronicos'")
+    expect(source).toContain("consultarTablaFiscalLazy('facturacion_electronica_log'")
+    expect(source).toContain('const secuenciaVigente = await obtenerSiguienteSecuenciaDisponibleECF(registroECF)')
+    expect(source).toContain('placeholder="Secuencia asignada por el servidor"')
+    expect(source).not.toContain("consultarTablaFiscalCompartida('facturas')")
+    expect(source).not.toContain("'updateData',\n    'comprobantes_electronicos'")
+  })
+
+  it('guarda la factura electrónica sin comprobante hasta que Alanube la acepte', () => {
+    expect(source).toContain("errorCancelacion.code = 'DGII_ENVIO_CANCELADO'")
+    expect(source).toContain("comprobanteFN.value = ''")
+    expect(source).toContain('facturaGuardada.comprobante = numeroECFOficial')
+    expect(source).toContain('ofrecerEliminarFacturaTrasCancelarECF()')
+    expect(source).toContain('borrarFacturasSeleccionadas(')
+    expect(source).toContain('requierePassword: false')
+    expect(source).toContain("titulo: '¿Eliminar también la factura?'")
+    expect(source).toContain("cancelButtonText: 'No, conservar factura'")
+    expect(source).toContain('La factura fue conservada sin comprobante electrónico.')
+    expect(source).toContain('if (facturaEliminada) {')
+    expect(source).toContain('La venta continúa abierta para poder intentarla otra vez.')
+    expect(source).toContain('if (shouldWaitDGII) {')
+    expect(source).not.toContain('shouldWaitDGII && impresionRapida.value')
+  })
+
+  it('consulta los RNC en el servicio central y no en el servidor de cada empresa', () => {
+    expect(source).toContain("const RNC_SERVICE_BASE_URL = 'https://demo.tmposrd.com/api2'")
+    expect(source).toContain("RNC_SERVICE_BASE_URL,\n        `consultarrnc/${documento}`")
+  })
+
+  it('muestra el NCF o e-NCF en el listado de facturas', () => {
+    expect(source).toContain('header="COMPROBANTE"')
+    expect(source).toContain('obtenerComprobanteListado(slotProps.data)')
+    expect(source).toContain("'SIN COMPROBANTE'")
+    expect(source).toContain("'comprobante',\n        'fecha_emision'")
+  })
+
+  it('detiene la carga masiva si la API no puede conectarse con MySQL', () => {
+    expect(source).toContain("'datoscampo/tabladefault/id/1'")
+    expect(source).toContain('if (estadoServidor?.error)')
+    expect(source).toContain("summary: 'Servidor de datos no disponible'")
+    const fetchClientesSource = source.slice(
+      source.indexOf('const fetchClientes = async () => {'),
+      source.indexOf('const cambiarCliente = () => {')
+    )
+    expect(fetchClientesSource).not.toContain("'getTableColumns'")
+    expect(fetchClientesSource).not.toContain("'addColumnToTable'")
+  })
+
+  it('permite reemplazar de forma auditada un E32 duplicado desde la modal de facturas', () => {
+    expect(source).toContain('label="Cambiar comprobante E32"')
+    expect(source).toContain('cambiarComprobanteE32DocumentoSeleccionado')
+    expect(source).toContain('v-model:visible="visibleConfirmarCambioE32"')
+    expect(source).toContain('label="Solicitar nuevo E32"')
+    expect(source).toContain('Enviando factura a Alanube')
+    expect(source).toContain('pi pi-spinner pi-spin')
+    expect(source).toContain("motivo: 'REEMPLAZO_E32_DUPLICADO'")
+    expect(source).toContain('confirmarYEnviarADGII({ reemplazarComprobante: true })')
+    expect(source).toContain('conservarComprobanteAnterior: Boolean(contextoReemplazo)')
+    expect(source).toContain('historialComprobantes')
+    expect(source).toContain("accion: 'CAMBIAR_COMPROBANTE_E32'")
+    expect(source).toContain('if (noFacturaRechazada && !contextoReemplazo)')
+    const flujoCambioE32 = source.slice(
+      source.indexOf('const cambiarComprobanteE32DocumentoSeleccionado'),
+      source.indexOf('const ejecutarAccionDocumentoSeleccionado')
+    )
+    expect(flujoCambioE32).not.toContain('Swal.fire')
+  })
+
+  it('exige un cliente registrado con RNC antes de crear una factura E31', () => {
+    expect(source).toContain('El crédito fiscal E31 requiere un cliente con RNC válido.')
+    expect(source).toContain('const clienteValidoParaE31 =')
+    expect(source).toContain("codigo !== '0000000'")
+    expect(source).toContain("const requiereRncFiscal = prefijoComprobanteSeleccionado === 'E31'")
+    expect(source).toContain('await abrirModalClienteFiscalE31(requiereRncFiscal)')
+    expect(source).toContain('requiereRncClienteFiscalPendiente.value && !clienteValidoParaE31(cliente)')
   })
 })

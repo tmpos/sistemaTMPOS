@@ -93,8 +93,11 @@ export async function imprimirTicket(factura, cliente, datosEmpresa) {
   const datosJSON = await loadConfig()
   // const datosLocalStorage = JSON.parse(datosEmpresa)
 
-  const datosFactura = parseSeguro(factura, {})
-  //  const datosFactura = JSON.parse(factura)
+  const facturaParseada = parseSeguro(factura, null)
+  let datosFactura =
+    facturaParseada && typeof facturaParseada === 'object' && !Array.isArray(facturaParseada)
+      ? facturaParseada
+      : {}
   const datosLocalStorage = parseSeguro(datosEmpresa, {
     empresa: {},
     configuracion: {},
@@ -181,6 +184,98 @@ export async function imprimirTicket(factura, cliente, datosEmpresa) {
   }
 
   const tokenCifrado = await encryptarPassword(token, 10)
+
+  // Algunas pantallas antiguas envían solamente el número de factura.
+  // Se obtiene el registro completo del servidor antes de construir el ticket.
+  if (!datosFactura.no_factura) {
+    const numeroFactura = String(factura ?? '').replace(/^"|"$/g, '').trim()
+    if (numeroFactura) {
+      datosFactura =
+        (await peticionesFetch(
+          `${link}${api}`,
+          `datoscampo/facturas/no_factura/${encodeURIComponent(numeroFactura)}`,
+          {},
+          tokenCifrado,
+          'GET'
+        )) || {}
+    }
+  }
+
+  const numeroFacturaTurnoPromise = (async () => {
+    // Solo se respeta un número calculado explícitamente por la pantalla que
+    // envió el objeto. No se usa el valor histórico guardado en la factura.
+    const numeroOrdenEnviado = Number(facturaParseada?.numero_orden_turno)
+    if (Number.isInteger(numeroOrdenEnviado) && numeroOrdenEnviado > 0) {
+      return numeroOrdenEnviado
+    }
+
+    const usuarioGuardado = Array.isArray(datosLocalStorage?.usuarioLocal)
+      ? datosLocalStorage.usuarioLocal[0]
+      : datosLocalStorage?.usuarioLocal || datosLocalStorage?.usuario || {}
+    const turno = String(usuarioGuardado?.token || datosFactura?.token || '').trim()
+    if (!turno) return null
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 3500)
+    const headers = {
+      Authorization: `${tokenCifrado}`,
+      'Content-Type': 'application/json'
+    }
+
+    try {
+      const respuestaTurno = await fetch(
+        `${link}${api}/datoscampo/registrocaja/turno/${encodeURIComponent(turno)}`,
+        { method: 'GET', headers, signal: controller.signal }
+      )
+      if (!respuestaTurno.ok) return null
+      const registroTurno = await respuestaTurno.json()
+      if (!registroTurno || String(registroTurno.turno ?? '').trim() !== turno) return null
+
+      const respuestaFacturas = await fetch(`${link}${api}/datostimestamp`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          tabla: 'facturas',
+          campo: 'created_at',
+          fechainicio: registroTurno.created_at,
+          fechafin: nfecha('timestamp')
+        }),
+        signal: controller.signal
+      })
+      if (!respuestaFacturas.ok) return null
+
+      const respuesta = await respuestaFacturas.json()
+      const facturasTurno = (Array.isArray(respuesta)
+        ? respuesta
+        : Array.isArray(respuesta?.data)
+          ? respuesta.data
+          : []
+      )
+        .filter((item) => {
+          const almacenActual = String(datosLocalStorage?.empresa?.nombre || '').trim()
+          return !almacenActual || String(item?.almacen || '').trim() === almacenActual
+        })
+        .sort((a, b) => {
+          const idA = Number(a?.id)
+          const idB = Number(b?.id)
+          if (Number.isFinite(idA) && Number.isFinite(idB) && idA !== idB) return idA - idB
+          return String(a?.created_at || '').localeCompare(String(b?.created_at || ''))
+        })
+      const idFactura = String(datosFactura?.id || '').trim()
+      const numeroFactura = String(datosFactura?.no_factura || '').trim()
+      const posicionFactura = facturasTurno.findIndex((item) =>
+        (idFactura && String(item?.id || '').trim() === idFactura) ||
+        (numeroFactura && String(item?.no_factura || '').trim() === numeroFactura)
+      )
+
+      return posicionFactura >= 0 ? posicionFactura + 1 : null
+    } catch (error) {
+      console.warn('No se pudo calcular la posición de la factura en el turno:', error?.message || error)
+      return null
+    } finally {
+      clearTimeout(timeout)
+    }
+  })()
 
   // const arrayPrinter = datosLocalStorage.printerconfig
   /**********************************************************************/
@@ -327,6 +422,8 @@ export async function imprimirTicket(factura, cliente, datosEmpresa) {
     })
     .join('')
 
+  const numeroFacturaTurno = await numeroFacturaTurnoPromise
+
   // Generar el contenido HTML para el ticket
   const htmlContent = `
     <!DOCTYPE html>
@@ -403,6 +500,7 @@ export async function imprimirTicket(factura, cliente, datosEmpresa) {
             <p>
                 ${datosDefault.fecha ? `Fecha: ${datosFactura.fecha_emision} ${datosFactura.hora}<br>` : ''}
                 ${datosDefault.no_factura ? `DOC: <b style="font-size:16px">#${datosFactura.no_factura}</b><br>` : ''}
+                ${numeroFacturaTurno ? `NÚMERO DE ORDEN: <b style="font-size:16px">#${numeroFacturaTurno}</b><br>` : ''}
                 ${datosDefault.comprobante ? `NCF: ${datosFactura.comprobante}<br>` : ''}
                 ${datosDefault.nombre_cliente ? `CLIENTE: ${datosFactura.nombre_cliente || 'SIN REGISTRO'}<br>` : ''}
                 ${datosDefault.rnc ? `CEDULA/RNC: ${datosCliente.rnc || 'N/A'}<br>` : ''}

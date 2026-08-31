@@ -41,6 +41,12 @@
                   <span class="user-summary-item__label">Turno</span>
                   <span class="user-summary-item__value">{{ usuarioLocal.token }}</span>
                 </div>
+                <div class="user-summary-item user-summary-item--invoices">
+                  <span class="user-summary-item__label">Facturas del turno</span>
+                  <span class="user-summary-item__value">
+                    <i class="pi pi-file mr-2 text-blue-500"></i>{{ cantidadFacturasTurno }}
+                  </span>
+                </div>
               </div>
             </template>
           </Card>
@@ -556,12 +562,22 @@
             />
             <Button icon="pi pi-times" @click="busquedaFactura = ''" severity="secondary" v-if="busquedaFactura" text />
           </InputGroup>
-          <small class="text-gray-500 mt-1 block">
-            {{ facturasFiltradasComputed.length }} factura(s) encontrada(s)
-          </small>
+          <div class="flex items-center justify-between gap-3 mt-2">
+            <small class="text-gray-500">
+              {{ facturasFiltradasComputed.length }} factura(s) encontrada(s)
+            </small>
+            <label class="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+              <InputSwitch
+                v-model="soloFacturasTurno"
+                inputId="solo-facturas-turno"
+                @update:modelValue="cambiarFiltroFacturasTurno"
+              />
+              <span>Solo este turno</span>
+            </label>
+          </div>
         </div>
         <div class="mt-6">
-          <Button icon="pi pi-refresh" label="Recargar" @click="recargarFacturas" severity="info" outlined />
+          <Button icon="pi pi-refresh" label="Recargar" @click="recargarFacturas" :loading="cargandoFacturasTurno" severity="info" outlined />
         </div>
       </div>
     </div>
@@ -665,30 +681,30 @@
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                   <i class="pi pi-print mr-2"></i>Tipo de Impresora
                 </label>
-                <Select
-                  v-model="impresoraSeleccionada"
-                  :options="[
-                    { label: 'Impresora Normal', value: 'Impresora Normal', icon: 'pi-print' },
-                    { label: 'Impresora Térmica', value: 'Impresora Ticket', icon: 'pi-ticket' },
-                    { label: 'Impresora Térmica 2', value: 'Offline', icon: 'pi-ticket' }
-                  ]"
-                  optionLabel="label"
-                  optionValue="value"
-                  placeholder="Seleccione una Impresora"
-                  fluid
-                >
-                  <template #option="slotProps">
-                    <div class="flex items-center gap-2">
-                      <i :class="['pi', slotProps.option.icon]"></i>
-                      <span>{{ slotProps.option.label }}</span>
-                    </div>
-                  </template>
-                </Select>
+                <div class="grid grid-cols-2 gap-3" role="group" aria-label="Formato de impresión">
+                  <Button
+                    label="Carta"
+                    icon="pi pi-file"
+                    class="w-full"
+                    :outlined="impresoraSeleccionada !== 'Impresora Normal'"
+                    :severity="impresoraSeleccionada === 'Impresora Normal' ? 'primary' : 'secondary'"
+                    @click="impresoraSeleccionada = 'Impresora Normal'"
+                  />
+                  <Button
+                    label="Ticket"
+                    icon="pi pi-receipt"
+                    class="w-full"
+                    :outlined="impresoraSeleccionada !== 'Impresora Ticket'"
+                    :severity="impresoraSeleccionada === 'Impresora Ticket' ? 'primary' : 'secondary'"
+                    @click="impresoraSeleccionada = 'Impresora Ticket'"
+                  />
+                </div>
               </div>
 
               <!-- Botón de Imprimir -->
               <Button
-                :disabled="!campoFactura || !impresoraSeleccionada"
+                :disabled="!campoFactura || !impresoraSeleccionada || imprimiendoFacturaSeleccionada"
+                :loading="imprimiendoFacturaSeleccionada"
                 @click="imprimirFactura"
                 label="Imprimir Factura"
                 icon="pi pi-print"
@@ -707,6 +723,56 @@
     <div class="flex justify-end gap-2">
       <Button label="Cerrar" icon="pi pi-times" @click="visibleimprimirfactura = false" severity="secondary" outlined />
     </div>
+  </template>
+</Dialog>
+
+<!-- Selección moderna del formato para la impresión rápida -->
+<Dialog
+  v-model:visible="visibleSeleccionTipoImpresion"
+  modal
+  header="Imprimir factura"
+  :style="{ width: '32rem' }"
+  @hide="cancelarSeleccionImpresion"
+>
+  <div class="pb-2">
+    <p class="text-gray-500 mt-0 mb-5">Selecciona el formato que deseas utilizar.</p>
+
+    <div class="grid grid-cols-2 gap-4">
+      <Button
+        class="print-format-card print-format-card--letter"
+        severity="secondary"
+        outlined
+        @click="confirmarSeleccionImpresion('carta')"
+      >
+        <div class="flex flex-col items-center gap-2 py-3">
+          <span class="print-format-icon"><i class="pi pi-file-pdf"></i></span>
+          <strong class="text-lg">Carta</strong>
+          <small class="font-normal text-gray-500">Documento completo</small>
+        </div>
+      </Button>
+
+      <Button
+        class="print-format-card print-format-card--ticket"
+        severity="primary"
+        @click="confirmarSeleccionImpresion('ticket')"
+      >
+        <div class="flex flex-col items-center gap-2 py-3">
+          <span class="print-format-icon"><i class="pi pi-ticket"></i></span>
+          <strong class="text-lg">Ticket</strong>
+          <small class="font-normal opacity-80">Impresora térmica</small>
+        </div>
+      </Button>
+    </div>
+  </div>
+
+  <template #footer>
+    <Button
+      label="Cancelar"
+      icon="pi pi-times"
+      severity="secondary"
+      text
+      @click="cancelarSeleccionImpresion"
+    />
   </template>
 </Dialog>
 
@@ -1933,6 +1999,8 @@ const cantidadInicial = ref(0)
 //const datosFechaHoy = nfecha('timestampcompleta');
 /************************************************************************/
 const dataFacturas = ref([])
+const cantidadFacturasTurno = ref(0)
+const facturasDelTurnoActual = ref([])
 const gastosArray = ref([])
 const tallerArray = ref([])
 const cxcArray = ref([])
@@ -2000,9 +2068,13 @@ const propinaFactura = ref('0.00');
 const cuadre = ref({})
 const turnosXfecha = ref([])
 const turnoUsuarioSelected = ref('')
+const usuarioEsCajero = () => {
+  const rol = datosEmpresaStore.usuario?.nivel_seguridad || datosEmpresaStore.usuario?.usuario || '';
+  return String(rol).trim().toLowerCase() === 'cajero';
+};
 const opcionesTurnoCuadre = computed(() => {
   const turnos = Array.from(new Set(turnosXfecha.value.filter(Boolean)));
-  return datosEmpresaStore.usuario?.nivel_seguridad === 'Cajero'
+  return usuarioEsCajero()
     ? turnos
     : ['COMPLETO', ...turnos];
 })
@@ -2020,15 +2092,24 @@ const proveedorWhatsappIndividual = ref({});
 /************************************************************************/
 const cambioTurnoSelected = async()=>{
   const cadena = turnoUsuarioSelected.value
-  const datos = turnosHoyArray.value.find(turno=>turno.turno === cadena)
+  let datos = turnosHoyArray.value.find(turno=>turno.turno === cadena)
+
+  if (!datos && cadena && cadena !== 'COMPLETO') {
+    const cajaConsultada = await obtenerCajaActual();
+    datos = cajaConsultada?.turno === cadena ? cajaConsultada : null;
+    if (datos && !turnosHoyArray.value.some(turno => turno.turno === datos.turno)) {
+      turnosHoyArray.value.push(datos);
+    }
+  }
 
   if(datos && cadena !== 'COMPLETO'){
+    cuadre.value = { ...datos }
     cuadre.value.horainicio = datos.hora_inicio || '00:00:01'
     cuadre.value.horafin = datos.hora_cierre || nfecha('horaAmericana')
     contidadInicioCaja.value = Number(datos.cant_inicio || 0).toFixed(2)
     datosDelDia.value.inicioCaja = Number(datos.cant_inicio || 0)
 
-    fechaDeInicioHoy.value = `${nfecha('fechaAmericana')} ${cuadre.value.horainicio}`
+    fechaDeInicioHoy.value = datos.created_at || `${nfecha('fechaAmericana')} ${cuadre.value.horainicio}`
     fechaDeFinHoy.value = `${nfecha('fechaAmericana')} ${cuadre.value.horafin}`
   }else{
     cuadre.value.horainicio = '00:00:01'
@@ -2039,6 +2120,9 @@ const cambioTurnoSelected = async()=>{
   }
 
 await fetchAndSetupDatosdelDia()
+if (usuarioEsCajero()) {
+  await actualizarCantidadFacturasTurno()
+}
 
 }
 /************************************************************************/
@@ -2158,6 +2242,7 @@ const toggleKeyboard = () => {
 };
 /************************************************************************/
 import {useDatosEmpresa} from '@/stores'
+import { notifyCompanyPayment } from '@/funciones/notificacionesAbonos.js'
 const datosEmpresa = useDatosEmpresa();
 const datosEmpresaStore = useDatosEmpresa();
 
@@ -2252,7 +2337,7 @@ visibletaller.value = false
   // Actualizamos el JSON de abonos con el nuevo abono
   const abonoJSON = JSON.parse(facturaTallerSeleccionada.value.abono);
   
-  abonoJSON.push({
+  const nuevoAbono = {
     "abono": cantidadAbono,
     "turno": usuarioLocal.value.token,
     "cajero": usuarioLocal.value.email,
@@ -2260,8 +2345,10 @@ visibletaller.value = false
     "prioridad": 3,
     "metodo_pago": metodoPago,
     "hora": nfecha('hora'),
-    "fecha": nfecha('fecha')
-  });
+    "fecha": nfecha('fecha'),
+    "saldo": Math.max(Number(saldoTotal) - cantidadAbono, 0).toFixed(2)
+  };
+  abonoJSON.push(nuevoAbono);
 
   // Convertir el abono actualizado a cadena JSON
   facturaTallerSeleccionada.value.abono = JSON.stringify(abonoJSON);
@@ -2286,6 +2373,7 @@ visibletaller.value = false
       visibletaller.value = true;
       return;
     }
+     notificarAbonoTaller(facturaTallerSeleccionada.value, nuevoAbono);
      toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
 
   window.electron.ipcRenderer.invoke('open-new-window', link.value+'/vista/tallertermica?factura='+facturaTallerSeleccionada.value.no_factura,'url', true,false)
@@ -2311,6 +2399,8 @@ const visibletaller = ref(false);
 const visiblecrearGastos = ref(false);
 const datosFactCoti = ref({'numero':'','tipo':'Factura','nombre':'','impresora':'Termica'});
 const visibleimprimirfactura = ref(false);
+const visibleSeleccionTipoImpresion = ref(false);
+let resolverSeleccionImpresion = null;
 const visiblegastos = ref(false);
 const totalFactura = ref(0.00);
 const recibidoFactura = ref(0.00);
@@ -2327,14 +2417,32 @@ const cuentaBancaria = ref(null);
 const camposEntrada = ref({});
 /*************************************************************/
 const usuarioLocal = ref({});
+const notificarAbonoTaller = (orden, pago, origen = 'Caja') => {
+  void notifyCompanyPayment({
+    type: 'taller',
+    reference: orden?.no_factura,
+    client: orden?.nombre || orden?.cliente,
+    amount: pago?.abono,
+    balance: pago?.saldo ?? orden?.saldo,
+    method: pago?.metodo_pago,
+    cashier: pago?.cajero || usuarioLocal.value?.nombre || usuarioLocal.value?.email,
+    date: pago?.fecha,
+    time: pago?.hora,
+    source: origen,
+    company: datosEmpresaStore.empresa
+  });
+};
 const datosConfiguracion = ref({});
 /*************************************************************/
 const campoFactura = ref(null);
 const impresoraSeleccionada = ref(null);
+const imprimiendoFacturaSeleccionada = ref(false);
 const facturas = ref([]);
 const campoNombreFactura = ref(null)
 const busquedaFactura = ref('');
 const facturasFiltradasImprimir = ref([]);
+const soloFacturasTurno = ref(false);
+const cargandoFacturasTurno = ref(false);
 /*************************************************************/
 const clienteTaller = ref('');
 const facturaTallerSeleccionada = ref(null);
@@ -2554,7 +2662,7 @@ const funcionActualizarTaller = async ()=> {
   const url = link.value+api.value+"/actualizarcampos/taller";
   if (!facturaTallerSeleccionada.value) {
     console.error("Datos incompletos, no se puede actualizar.");
-    return;
+    return false;
   }
   if (facturaTallerSeleccionada.value.hasOwnProperty('created_at')) {
       facturaTallerSeleccionada.value.updated_at = nfecha('timestamp')
@@ -2562,8 +2670,10 @@ const funcionActualizarTaller = async ()=> {
   const envioDatos = await peticionesFetchOffline('updateData', 'taller',JSON.stringify(facturaTallerSeleccionada.value));
   if (envioDatos[0] == 'ok') {
      toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+     return true;
   }else{
     toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+    return false;
   }
 }
 /*************************************************************/
@@ -2658,7 +2768,7 @@ visibletaller.value = false
     const montoPendiente = Number(facturaTallerSeleccionada.value.saldo || 0);
     facturaTallerSeleccionada.value.estado = 'Entregado';
     const abonoJSON = JSON.parse(facturaTallerSeleccionada.value.abono);
-    abonoJSON.push({
+    const nuevoAbono = {
       "abono": facturaTallerSeleccionada.value.saldo,
       "prioridad": 3,
       "turno": usuarioLocal.value.token,
@@ -2666,12 +2776,15 @@ visibletaller.value = false
       "entregado_por": usuarioLocal.value.nombre,
       "metodo_pago": facturaTallerSeleccionada.value.metodopago,
       "hora": nfecha('hora'),
-      "fecha": nfecha('fecha')
-    });
+      "fecha": nfecha('fecha'),
+      "saldo": '0.00'
+    };
+    abonoJSON.push(nuevoAbono);
     facturaTallerSeleccionada.value.abono = JSON.stringify(abonoJSON);
     facturaTallerSeleccionada.value.saldo = '0.00';
     facturaTallerSeleccionada.value.fecha_entrega = nfecha('fecha');
-    await funcionActualizarTaller();
+    const tallerActualizado = await funcionActualizarTaller();
+    if (!tallerActualizado) return;
     const bancoOk = await registrarEntradaBancoTaller(
       montoPendiente,
       `COBRO TALLER POR TRANSFERENCIA (${facturaTallerSeleccionada.value.no_factura})`
@@ -2680,6 +2793,7 @@ visibletaller.value = false
       visibletaller.value = true;
       return;
     }
+    notificarAbonoTaller(facturaTallerSeleccionada.value, nuevoAbono, 'Caja - entrega de taller');
     imprimirTaller();
   } else if (result.dismiss === Swal.DismissReason.cancel) {
     visibletaller.value = true
@@ -2789,6 +2903,8 @@ const response = await peticionesFetchOffline('getLastXRows', 'facturas','100');
 const recargarFacturasFull = async()=>{
   facturasSinCobrar.value = []
   await fetchDataFactura();
+  await fetchAndSetupDatosdelDia();
+  await actualizarCantidadFacturasTurno();
 }
 /************************************************************/
 const fetchDataTaller = async () => {
@@ -2815,7 +2931,8 @@ const datosDelDia = ref({
     "inicioCaja": 0.00,
     "abono": 0.00,
     "cuentasXcobrar": 0.00,
-    "taller": 0.00
+    "taller": 0.00,
+    "tallerEfectivo": 0.00
 });
 /************************************************************/
 const fetchAndSetupDatosdelDia = async () => {
@@ -2843,10 +2960,74 @@ const response = await peticionesFetchOffline('datosVentasPorRango2', fechaInici
     datosDelDia.value.data = jsonData;
     datosEnvio.value = JSON.parse(JSON.stringify(jsonData));
 
-    const copiaResponse = JSON.parse(JSON.stringify(response))
+    const copiaResponse = JSON.parse(JSON.stringify(response));
+    // Una cuenta por cobrar puede haberse creado en una fecha anterior y
+    // recibir un abono hoy. Consultar todas las cuentas evita que el filtro
+    // por updated_at del reporte omita ese pago; los pagos se filtran abajo
+    // por token y por la hora exacta del turno.
+    const [cuentasCobrarCompletas, tallerCompleto] = await Promise.all([
+      peticionesFetchOffline('getDataAsArray', 'cuentas_cobrar'),
+      peticionesFetchOffline('getDataAsArray', 'taller')
+    ]);
+    if (Array.isArray(cuentasCobrarCompletas)) {
+      copiaResponse.cuentas_cobrar = cuentasCobrarCompletas;
+    }
+    if (Array.isArray(tallerCompleto)) {
+      copiaResponse.taller = tallerCompleto;
+    }
+    const asArray = valor => Array.isArray(valor) ? valor : [];
+    const normalizar = valor => String(valor || '').trim().toLowerCase();
+    const almacenActual = normalizar(datosEmpresaStore.empresa?.nombre);
+    const turnoActual = turnoUsuarioSelected.value && turnoUsuarioSelected.value !== 'COMPLETO'
+      ? turnoUsuarioSelected.value
+      : '';
+
+    // Las fechas devueltas por el servidor pueden venir convertidas a UTC.
+    // Para el turno individual, consultar por token evita perder facturas por
+    // diferencias de zona horaria.
+    if (turnoActual) {
+      const facturasPorToken = await peticionesFetchOffline(
+        'getDataArrayByCondition',
+        'facturas',
+        'token',
+        turnoActual
+      );
+      if (Array.isArray(facturasPorToken)) {
+        copiaResponse.facturas = facturasPorToken;
+      } else if (Array.isArray(facturasPorToken?.data)) {
+        copiaResponse.facturas = facturasPorToken.data;
+      }
+    }
+    const obtenerTurnoMovimiento = registro => {
+      if (registro?.turno || registro?.token) return registro.turno || registro.token;
+      try {
+        const otro = Array.isArray(registro?.otro) ? registro.otro : JSON.parse(registro?.otro || '[]');
+        return otro?.[0]?.turno || otro?.[0]?.token || '';
+      } catch (error) {
+        return '';
+      }
+    };
+    // Las órdenes creadas por versiones anteriores guardaban este turno fijo
+    // en el abono inicial. Se trata como un movimiento sin turno y se asigna
+    // por la fecha/hora real de apertura de caja.
+    const esTurnoTallerLegacy = registro =>
+      normalizar(obtenerTurnoMovimiento(registro)) === '280420241514073';
+    const perteneceAlTurno = registro => !turnoActual ||
+      normalizar(obtenerTurnoMovimiento(registro)) === normalizar(turnoActual);
+    const perteneceAlAlmacen = registro => !almacenActual || !normalizar(registro?.almacen) ||
+      normalizar(registro?.almacen) === almacenActual;
+    const filtrarMovimientos = registros => asArray(registros)
+      .filter(perteneceAlAlmacen)
+      .filter(perteneceAlTurno);
+
+    const facturasTurno = filtrarMovimientos(copiaResponse.facturas);
+    const gastosTurno = filtrarMovimientos(copiaResponse.gastos);
+    const entradasTurno = filtrarMovimientos(copiaResponse.entradas);
+    const devolucionesTurno = filtrarMovimientos(copiaResponse.devoluciones);
+    const registrosCajaTurno = filtrarMovimientos(copiaResponse.registrocaja);
 
     const totalEfectivoFactura = (factura) => {
-      const metodoPago = String(factura.metodo_pago || '').toUpperCase();
+      const metodoPago = String(factura.metodo_pago || '').trim().toUpperCase();
       const efectivoRegistrado = Number(factura.efectivo || 0);
       const totalFactura = Number(factura.total || 0);
       const totalCliente = Number(factura.total_cliente || 0);
@@ -2862,45 +3043,36 @@ const response = await peticionesFetchOffline('datosVentasPorRango2', fechaInici
       return 0;
     };
 
-    const totalVentas = copiaResponse['facturas']
-    .filter(fact=>fact.almacen === datosEmpresaStore.empresa.nombre)
-    .filter(fact=>fact.estado_factura === 'Cobrado')
-    .filter(fact=>fact.metodo_pago != 'CREDITO')
-    .map(factura => totalEfectivoFactura(factura)) 
-    .reduce((acc, total) => acc + total, 0) || 0;
+    const estadosNoValidos = ['devolucion', 'anulada', 'anulado', 'cancelada', 'cancelado'];
+    const facturasValidas = facturasTurno
+      .filter(factura => !estadosNoValidos.includes(normalizar(factura.estado_factura)))
+      .filter(factura => normalizar(factura.metodo_pago) !== 'credito');
+    const totalVentasEfectivo = facturasValidas
+      .map(totalEfectivoFactura)
+      .reduce((acc, total) => acc + total, 0) || 0;
 
-   dataFacturas.value = copiaResponse['facturas'].filter(fact=>fact.almacen === datosEmpresaStore.empresa.nombre)
-   gastosArray.value = copiaResponse['gastos'].filter(fact=>fact.almacen === datosEmpresaStore.empresa.nombre)
-   tallerArray.value = copiaResponse['taller'].filter(fact=>fact.almacen === datosEmpresaStore.empresa.nombre)
-   cxcArray.value = copiaResponse['cuentas_cobrar'].filter(fact=>fact.almacen === datosEmpresaStore.empresa.nombre)
-  let cantidadGastoEfectivo = 0;
+    dataFacturas.value = facturasTurno;
+    gastosArray.value = gastosTurno;
+    tallerArray.value = asArray(copiaResponse.taller).filter(perteneceAlAlmacen);
+    cxcArray.value = asArray(copiaResponse.cuentas_cobrar).filter(perteneceAlAlmacen);
 
-    const totalGastos = copiaResponse['gastos']
-    .filter(fact=>fact.almacen === datosEmpresaStore.empresa.nombre)
-    .map(gasto => {
-       if(gasto.metodo === 'EFECTIVO'){
-         cantidadGastoEfectivo += parseFloat(gasto.cantidad)
-         datosDelDia.value.efectivo += parseFloat(gasto.cantidad)
-       }
+    const cantidadGastoEfectivo = gastosTurno
+      .filter(gasto => !gasto.metodo || normalizar(gasto.metodo) === 'efectivo')
+      .reduce((total, gasto) => total + Number(gasto.cantidad || 0), 0);
+    const cantidadEntradas = entradasTurno
+      .reduce((total, entrada) => total + Number(entrada.cantidad || 0), 0);
+    const cantidadDevoluciones = devolucionesTurno
+      .reduce((total, devolucion) => total + Number(devolucion.cantidad || 0), 0);
 
-       return Number(gasto.cantidad)
+    const turnoSeleccionado = turnosHoyArray.value.find(
+      turno => normalizar(turno.turno) === normalizar(turnoUsuarioSelected.value)
+    );
+    const cantidadInicio = turnoActual
+      ? Number(turnoSeleccionado?.cant_inicio ?? registrosCajaTurno[0]?.cant_inicio ?? 0)
+      : registrosCajaTurno.reduce((total, caja) => total + Number(caja.cant_inicio || 0), 0);
 
-    }) 
-    .reduce((acc, total) => acc + total, 0) || 0;
-
-
-    const turnoSeleccionado = turnosHoyArray.value.find(turno => turno.turno === turnoUsuarioSelected.value);
-    const cantidadInicio = turnoUsuarioSelected.value && turnoUsuarioSelected.value !== 'COMPLETO'
-      ? Number(turnoSeleccionado?.cant_inicio || 0)
-      : (copiaResponse['registrocaja']
-        .filter(fact=>fact.almacen === datosEmpresaStore.empresa.nombre)
-        .map(factura => Number(factura.cant_inicio))
-        .reduce((acc, total) => acc + total, 0) || 0); 
-
-   datosDelDia.value.inicioCaja = cantidadInicio;
-
-const abonado = copiaResponse['cuentas_cobrar']
-.filter(fact=>fact.almacen === datosEmpresaStore.empresa.nombre)
+const abonado = asArray(copiaResponse.cuentas_cobrar)
+.filter(perteneceAlAlmacen)
   .map(factura => {
     let totalAbono = 0;
     let abonos = [];
@@ -2913,12 +3085,15 @@ const abonado = copiaResponse['cuentas_cobrar']
     }
 
     for (let pago of abonos) {
-        const fechaBuscar = convertirAFechaTimestamp(pago.fecha, pago.hora);
+        const fechaBuscar = pago.timestamp || convertirAFechaTimestamp(pago.fecha, pago.hora);
         const estaFecha = esFechaEnRango(fechaBuscar, fechaInicioN, fechaFinN);
-        if (estaFecha) {
-            if (pago.metodo === 'EFECTIVO') {
+        // Compatibilidad con abonos creados antes de guardar el token:
+        // si no tienen turno, el rango exacto de apertura los identifica.
+        const tieneTurno = Boolean(normalizar(obtenerTurnoMovimiento(pago)));
+        const esDelTurno = perteneceAlTurno(pago) || (turnoActual && !tieneTurno);
+        if (estaFecha && esDelTurno) {
+            if (normalizar(pago.metodo) === 'efectivo') {
             totalAbono += Number(pago.cantidad); 
-            datosDelDia.value.efectivo += Number(pago.cantidad); 
             }
 
         }
@@ -2927,16 +3102,10 @@ const abonado = copiaResponse['cuentas_cobrar']
     return totalAbono; 
   })
   .reduce((acc, total) => acc + total, 0) || 0; 
-
-
-
-    contidadInicioCaja.value = parseFloat(cantidadInicio).toFixed(2);
-
-
 let cantidadTallerEfectivo = 0
 
-const cantidadTaller = copiaResponse['taller']
-.filter(fact=>fact.almacen === datosEmpresaStore.empresa.nombre)
+const cantidadTaller = asArray(copiaResponse.taller)
+.filter(perteneceAlAlmacen)
   .map(factura => {
     let totalAbono = 0;
     let abonos = [];
@@ -2949,22 +3118,16 @@ const cantidadTaller = copiaResponse['taller']
     }
 
     for (let abono of abonos) {
-        const fechaBuscar = convertirAFechaTimestamp(abono.fecha, abono.hora);
+        const fechaBuscar = abono.timestamp || convertirAFechaTimestamp(abono.fecha, abono.hora);
         const estaFecha = esFechaEnRango(fechaBuscar, fechaInicioN, fechaFinN);
-        if (estaFecha) {
+        const tieneTurno = Boolean(normalizar(obtenerTurnoMovimiento(abono))) && !esTurnoTallerLegacy(abono);
+        const esDelTurno = perteneceAlTurno(abono) || (turnoActual && !tieneTurno);
+        if (estaFecha && esDelTurno) {
   
             totalAbono += Number(abono.abono); 
-            if (abono.metodo_pago === 'EFECTIVO') {
+            if (normalizar(abono.metodo_pago) === 'efectivo') {
                cantidadTallerEfectivo += Number(abono.abono);
-               datosDelDia.value.efectivo += Number(abono.abono);
-
-            }/*else if(abono.metodo_pago === 'TARJETA'){
-              datosDelDia.value.tarjeta += Number(abono.abono);
-
-            }else{
-              datosDelDia.value.transferencia += Number(abono.abono);
-
-            }*/
+            }
         }
     }
 
@@ -2973,7 +3136,32 @@ const cantidadTaller = copiaResponse['taller']
   .reduce((acc, total) => acc + total, 0) || 0; 
 
 
-   totalModalEnCaja.value = (totalVentas + abonado + cantidadTallerEfectivo - cantidadGastoEfectivo + cantidadInicio).toFixed(2);
+    datosDelDia.value = {
+      ...datosDelDia.value,
+      venta: facturasValidas.reduce((total, factura) => total + Number(factura.total || 0), 0),
+      efectivo: totalVentasEfectivo + abonado + cantidadTallerEfectivo,
+      transferencia: facturasValidas.reduce((total, factura) => total + Number(factura.transferencia || 0), 0),
+      tarjeta: facturasValidas.reduce((total, factura) => total + Number(factura.tarjeta || 0), 0),
+      ganancia: facturasValidas.reduce((total, factura) => total + Number(factura.ganancia || 0), 0),
+      gastos: cantidadGastoEfectivo,
+      entradas: cantidadEntradas,
+      devoluciones: cantidadDevoluciones,
+      inicioCaja: cantidadInicio,
+      abono: abonado,
+      taller: cantidadTaller,
+      tallerEfectivo: cantidadTallerEfectivo
+    };
+
+    contidadInicioCaja.value = Number(cantidadInicio).toFixed(2);
+    totalModalEnCaja.value = (
+      cantidadInicio +
+      totalVentasEfectivo +
+      abonado +
+      cantidadTallerEfectivo +
+      cantidadEntradas -
+      cantidadGastoEfectivo -
+      cantidadDevoluciones
+    ).toFixed(2);
     transaccionesCantidad.value = jsonData.efectivo
 
 };
@@ -3000,11 +3188,11 @@ const turnosAbiertos = async()=>{
       const response = await peticionesFetchOffline('getDataArrayByCondition', 'registrocaja','estado','ABIERTO');
       turnosHoyArray.value = response;
      const turnosAbiertosA = response
-     fechaDeInicioHoy.value = turnosAbiertosA[0]?.created_at || fecha.fechainicio
     cajaAbiertaArray.value = turnosAbiertosA
     if(turnosAbiertosA.length > 0){
       const turnoActual = datosEmpresaStore.usuario?.token || usuarioLocal.value?.token || '';
       const cajaActual = turnosAbiertosA.find(caja => caja.turno === turnoActual) || turnosAbiertosA[0];
+      fechaDeInicioHoy.value = cajaActual?.created_at || fecha.fechainicio
       cuadre.value = cajaActual
       contidadInicioCaja.value = Number(cajaActual?.cant_inicio || 0).toFixed(2);
     }else{
@@ -3027,12 +3215,152 @@ const obtenerCajaActual = async () => {
   if (!datosCaja && emailActual) {
     const sesionesAbiertas = await peticionesFetchOffline('getDataByDoubleCondition', 'registrocaja', 'estado', 'ABIERTO', 'username', emailActual);
     if (Array.isArray(sesionesAbiertas) && sesionesAbiertas.length > 0) {
-      datosCaja = sesionesAbiertas[0];
+      datosCaja = sesionesAbiertas
+        .slice()
+        .sort((a, b) => Number(b.id || 0) - Number(a.id || 0))[0];
     }
+  }
+
+  if (!datosCaja) {
+    const todasLasCajas = await peticionesFetchOffline('getDataAsArray', 'registrocaja');
+    const almacenActual = String(datosEmpresaStore.empresa?.nombre || '').trim().toLowerCase();
+    const cajasAbiertas = (Array.isArray(todasLasCajas) ? todasLasCajas : [])
+      .filter(caja => ['abierto', 'abierta'].includes(String(caja?.estado || '').trim().toLowerCase()))
+      .filter(caja => !almacenActual || String(caja?.almacen || '').trim().toLowerCase() === almacenActual)
+      .sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+    datosCaja = cajasAbiertas[0] || null;
   }
 
   return datosCaja;
 }
+/************************************************************/
+const actualizarCantidadFacturasTurno = async () => {
+  try {
+    const cajaActual = await obtenerCajaActual();
+    const inicioTurno = cajaActual?.created_at;
+    if (!inicioTurno) {
+      cantidadFacturasTurno.value = 0;
+      facturasDelTurnoActual.value = [];
+      totalModalEnCaja.value = '0.00';
+      return;
+    }
+
+    const response = await peticionesFetchOffline(
+      'getRowsByTimestampRange',
+      'facturas',
+      'created_at',
+      inicioTurno,
+      nfecha('timestamp')
+    );
+    const facturasConsultadas = Array.isArray(response)
+      ? response
+      : Array.isArray(response?.data)
+        ? response.data
+        : [];
+    const almacenActual = String(datosEmpresaStore.empresa?.nombre || '').trim();
+    const convertirTimestamp = (valor) => {
+      const timestamp = Date.parse(String(valor || '').replace(' ', 'T'));
+      return Number.isFinite(timestamp) ? timestamp : null;
+    };
+    const inicioTimestamp = convertirTimestamp(inicioTurno);
+    const finTimestamp = Date.now();
+
+    const facturasTurno = facturasConsultadas.filter((factura) => {
+      if (almacenActual && String(factura.almacen || '').trim() !== almacenActual) return false;
+      const fechaFactura = convertirTimestamp(factura.created_at);
+      return fechaFactura !== null && inicioTimestamp !== null &&
+        fechaFactura >= inicioTimestamp && fechaFactura <= finTimestamp;
+    });
+
+    facturasDelTurnoActual.value = facturasTurno;
+    cantidadFacturasTurno.value = facturasTurno.length;
+
+    // La misma colección que muestra "Facturas del turno" aporta las ventas.
+    // Los demás importes ya fueron filtrados por el token del turno en
+    // fetchAndSetupDatosdelDia.
+    const totalFacturasTurno = facturasTurno.reduce(
+      (total, factura) => {
+        const metodo = String(factura.metodo_pago || '').trim().toUpperCase();
+        const efectivo = Number(factura.efectivo || 0);
+        if (efectivo > 0) return total + efectivo;
+        return metodo === 'EFECTIVO'
+          ? total + Number(factura.total || factura.total_cliente || 0)
+          : total;
+      },
+      0
+    );
+    const turnoCaja = String(cajaActual.turno || '').trim();
+    const movimientoPerteneceAlTurno = (movimiento) => {
+      const turnoMovimiento = String(movimiento?.turno || movimiento?.token || '').trim();
+      // Compatibilidad con el turno fijo usado antiguamente al crear talleres.
+      if (turnoMovimiento && turnoMovimiento !== '280420241514073') {
+        return turnoMovimiento === turnoCaja;
+      }
+
+      const fechaMovimiento = convertirTimestamp(
+        movimiento?.timestamp || convertirAFechaTimestamp(movimiento?.fecha, movimiento?.hora)
+      );
+      return fechaMovimiento !== null && inicioTimestamp !== null &&
+        fechaMovimiento >= inicioTimestamp && fechaMovimiento <= finTimestamp;
+    };
+    const leerMovimientos = (registro, campo) => {
+      try {
+        return Array.isArray(registro?.[campo])
+          ? registro[campo]
+          : JSON.parse(registro?.[campo] || '[]');
+      } catch (error) {
+        return [];
+      }
+    };
+    const [cuentasCobrarTurno, talleresTurno] = await Promise.all([
+      peticionesFetchOffline('getDataAsArray', 'cuentas_cobrar'),
+      peticionesFetchOffline('getDataAsArray', 'taller')
+    ]);
+    const perteneceAlAlmacen = registro => !almacenActual ||
+      !String(registro?.almacen || '').trim() ||
+      String(registro.almacen).trim() === almacenActual;
+    const abonosCuentasCobrar = (Array.isArray(cuentasCobrarTurno) ? cuentasCobrarTurno : [])
+      .filter(perteneceAlAlmacen)
+      .flatMap(cuenta => leerMovimientos(cuenta, 'pagos'))
+      .filter(movimientoPerteneceAlTurno)
+      .filter(pago => String(pago.metodo || '').trim().toUpperCase() === 'EFECTIVO')
+      .reduce((total, pago) => total + Number(pago.cantidad || 0), 0);
+    const abonosTallerEfectivo = (Array.isArray(talleresTurno) ? talleresTurno : [])
+      .filter(perteneceAlAlmacen)
+      .flatMap(taller => leerMovimientos(taller, 'abono'))
+      .filter(movimientoPerteneceAlTurno)
+      .filter(abono => String(abono.metodo_pago || '').trim().toUpperCase() === 'EFECTIVO')
+      .reduce((total, abono) => total + Number(abono.abono || 0), 0);
+    const fondoInicialTurno = Number(cajaActual.cant_inicio || 0);
+    const entradasTurno = Number(datosDelDia.value.entradas || 0);
+    const gastosTurno = Number(datosDelDia.value.gastos || 0);
+    const devolucionesTurno = Number(datosDelDia.value.devoluciones || 0);
+
+    contidadInicioCaja.value = fondoInicialTurno.toFixed(2);
+    datosDelDia.value.inicioCaja = fondoInicialTurno;
+    datosDelDia.value.venta = totalFacturasTurno;
+    datosDelDia.value.abono = abonosCuentasCobrar;
+    datosDelDia.value.tallerEfectivo = abonosTallerEfectivo;
+    datosDelDia.value.efectivo = totalFacturasTurno + abonosCuentasCobrar + abonosTallerEfectivo;
+    totalModalEnCaja.value = (
+      fondoInicialTurno +
+      totalFacturasTurno +
+      abonosCuentasCobrar +
+      abonosTallerEfectivo +
+      entradasTurno -
+      gastosTurno -
+      devolucionesTurno
+    ).toFixed(2);
+  } catch (error) {
+    console.warn('No se pudo actualizar la cantidad de facturas del turno:', error);
+    cantidadFacturasTurno.value = 0;
+    facturasDelTurnoActual.value = [];
+  }
+};
+
+watch(dataFacturas, () => {
+  void actualizarCantidadFacturasTurno();
+});
 /************************************************************/
 
 /************************************************************/
@@ -3630,10 +3958,10 @@ datosConfiguracion.value = JSON.parse(window.localStorage.getItem('configuracion
 datosDefault.value = JSON.parse(window.localStorage.getItem('datosDefault')) || {modo:'FULL'}
 
   await turnosAbiertos();
-  const cajaActualInicial = await obtenerCajaActual();
-  if (datosEmpresaStore.usuario.nivel_seguridad === 'Cajero' && cajaActualInicial?.turno) {
-    turnosXfecha.value = [cajaActualInicial.turno];
-    turnoUsuarioSelected.value = cajaActualInicial.turno;
+  const turnoUsuarioActual = datosEmpresaStore.usuario?.token || usuarioLocal.value?.token || '';
+  if (usuarioEsCajero() && turnoUsuarioActual) {
+    turnosXfecha.value = [turnoUsuarioActual];
+    turnoUsuarioSelected.value = turnoUsuarioActual;
   } else {
     turnosXfecha.value = cajaAbiertaArray.value.map(caja=>caja.turno)
     turnoUsuarioSelected.value = 'COMPLETO';
@@ -3653,7 +3981,7 @@ datosDefault.value = JSON.parse(window.localStorage.getItem('datosDefault')) || 
   console.log("datosDelDia.value", datosDelDia.value);
   const cajaActual = await obtenerCajaActual();
   if (Number(cajaActual?.cant_inicio || 0) <= 0) {
-    if(datosEmpresaStore.usuario.nivel_seguridad === 'Cajero'){
+    if(usuarioEsCajero()){
        visibleInicioCaja.value = true;
     }
   }
@@ -3671,7 +3999,7 @@ cuadre.value.horafin = nfecha('horaAmericana')
 
 window.addEventListener('keydown', handleKeyDown);
   // Solo sondeo automatico para Cajero (busca facturas pendientes)
-  if (datosEmpresaStore.usuario.nivel_seguridad === 'Cajero') {
+  if (usuarioEsCajero()) {
     intervalId = setInterval(fetchAndSetupData, 30000);
   }
 
@@ -3704,9 +4032,13 @@ const alerta = ref('info')
 watch(cuadrarCaja, async (nuevoValor, viejoValor) => {
   if (nuevoValor === true) {
      const cajaActual = await obtenerCajaActual();
-     if (datosEmpresaStore.usuario?.nivel_seguridad === 'Cajero' && cajaActual?.turno) {
-      turnosXfecha.value = [cajaActual.turno];
-      turnoUsuarioSelected.value = cajaActual.turno;
+     const turnoUsuarioActual = cajaActual?.turno || datosEmpresaStore.usuario?.token || usuarioLocal.value?.token || '';
+     if (cajaActual && !turnosHoyArray.value.some(caja => caja.turno === cajaActual.turno)) {
+       turnosHoyArray.value.push(cajaActual);
+     }
+     if (usuarioEsCajero() && turnoUsuarioActual) {
+      turnosXfecha.value = [turnoUsuarioActual];
+      turnoUsuarioSelected.value = turnoUsuarioActual;
      } else {
       turnosXfecha.value = cajaAbiertaArray.value.map(caja=>caja.turno)
       turnoUsuarioSelected.value = turnoUsuarioSelected.value || 'COMPLETO';
@@ -3956,26 +4288,89 @@ const fnProductos = (factura) => {
 };
 
 /******************************************************/
+const prepararFacturaParaTicket = async (factura) => {
+  if (!factura || typeof factura !== 'object') return factura;
+
+  let numeroOrdenTurno = null;
+
+  try {
+    const cajaActual = await obtenerCajaActual();
+    const fechaInicioTurno = cajaActual?.created_at || fechaDeInicioHoy.value;
+
+    if (fechaInicioTurno) {
+      const respuesta = await peticionesFetchOffline(
+        'getRowsByTimestampRange',
+        'facturas',
+        'created_at',
+        fechaInicioTurno,
+        nfecha('timestamp')
+      );
+      const facturasTurno = Array.isArray(respuesta)
+        ? respuesta
+        : Array.isArray(respuesta?.data)
+          ? respuesta.data
+          : [];
+      const almacenActual = String(datosEmpresaStore.empresa?.nombre || '').trim();
+      const facturasOrdenadas = facturasTurno
+        .filter(item => !almacenActual || String(item.almacen || '').trim() === almacenActual)
+        .sort((a, b) => {
+          const idA = Number(a.id);
+          const idB = Number(b.id);
+          if (Number.isFinite(idA) && Number.isFinite(idB) && idA !== idB) return idA - idB;
+          return String(a.created_at || '').localeCompare(String(b.created_at || ''));
+        });
+      const idFactura = String(factura.id || '').trim();
+      const numeroFactura = String(factura.no_factura || '').trim();
+      const posicionFactura = facturasOrdenadas.findIndex(item =>
+        (idFactura && String(item.id || '').trim() === idFactura) ||
+        (numeroFactura && String(item.no_factura || '').trim() === numeroFactura)
+      );
+
+      numeroOrdenTurno = posicionFactura >= 0 ? posicionFactura + 1 : null;
+    }
+  } catch (error) {
+    console.warn('No se pudo obtener la posición de la factura dentro del turno:', error);
+  }
+
+  return {
+    ...factura,
+    numero_orden_turno: numeroOrdenTurno
+  };
+};
+
+/******************************************************/
+const solicitarTipoImpresion = () => new Promise((resolve) => {
+  resolverSeleccionImpresion = resolve;
+  visibleSeleccionTipoImpresion.value = true;
+});
+
+const confirmarSeleccionImpresion = (tipo) => {
+  const resolver = resolverSeleccionImpresion;
+  resolverSeleccionImpresion = null;
+  visibleSeleccionTipoImpresion.value = false;
+  resolver?.(tipo);
+};
+
+const cancelarSeleccionImpresion = () => {
+  const resolver = resolverSeleccionImpresion;
+  resolverSeleccionImpresion = null;
+  visibleSeleccionTipoImpresion.value = false;
+  resolver?.(null);
+};
+
+/******************************************************/
 const fnImprimirFactura = async(fact)=>{
 
- const datosFactura = fact;
+ const datosFactura = await prepararFacturaParaTicket(fact);
     const arrayClientes = await peticionesFetchOffline('getDataAsArray', 'clientes');
 
 if (datosFactura.metodo_pago === 'CREDITO') {
   const datosCredito = await peticionesFetchOffline('getDataByField', 'cuentas_cobrar', 'no_factura', datosFactura.no_factura)
 
-  // Preguntar con SweetAlert si desea imprimir en térmica o tinta
-  const { value: tipoImpresion } = await Swal.fire({
-    title: '¿Cómo deseas imprimir?',
-    text: 'Selecciona el tipo de impresión',
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonText: 'Térmica',
-    cancelButtonText: 'Tinta',
-    reverseButtons: true,
-  });
+  const tipoImpresion = await solicitarTipoImpresion();
+  if (!tipoImpresion) return;
 
-  if (tipoImpresion) {
+  if (tipoImpresion === 'ticket') {
     // Si elige TÉRMICA (confirmado)
   if(window.electron){
        const datosCliente = arrayClientes.find(cl=>cl.codigo === datosCredito.cod_cliente)
@@ -4015,17 +4410,10 @@ if (datosFactura.metodo_pago === 'CREDITO') {
          // window.electron.ipcRenderer.invoke('ticket',datosFactura.no_factura,datosEmpresaA);
 
 
-  const { value: tipoImpresion } = await Swal.fire({
-    title: '¿Cómo deseas imprimir?',
-    text: 'Selecciona el tipo de impresión',
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonText: 'Térmica',
-    cancelButtonText: 'Tinta',
-    reverseButtons: true,
-  });
+  const tipoImpresion = await solicitarTipoImpresion();
+  if (!tipoImpresion) return;
 
-  if (tipoImpresion) {
+  if (tipoImpresion === 'ticket') {
     // Si elige TÉRMICA (confirmado)
       if(window.electron){
            const datosCliente = arrayClientes.find(cl=>cl.codigo === datosFactura.cod_cliente)
@@ -4110,7 +4498,8 @@ facturasSinCobrar.value = facturasSinCobrar.value.filter(factura => factura.no_f
 
         visiblecobrar.value = false
           const datosEmpresa = JSON.stringify(enviarDatosLocalStorage())
-          window.electron.ipcRenderer.invoke('ticket',datosFactura.no_factura,datosEmpresa)
+          const facturaTicket = await prepararFacturaParaTicket(datosFactura)
+          await window.electron.ipcRenderer.invoke('ticket',JSON.stringify(facturaTicket),null,datosEmpresa)
        await fetchAndSetupData();
 }
 
@@ -4150,7 +4539,8 @@ facturasSinCobrar.value = facturasSinCobrar.value.filter(factura => factura.no_f
 
         visiblecobrar.value = false
           const datosEmpresa = JSON.stringify(enviarDatosLocalStorage())
-          window.electron.ipcRenderer.invoke('ticket',datosFactura.no_factura,datosEmpresa)
+          const facturaTicket = await prepararFacturaParaTicket(datosFactura)
+          await window.electron.ipcRenderer.invoke('ticket',JSON.stringify(facturaTicket),null,datosEmpresa)
        await fetchAndSetupData();
 }
 
@@ -4212,7 +4602,8 @@ facturasSinCobrar.value = facturasSinCobrar.value.filter(factura => factura.no_f
           var impresionpagina = link.value+'/vista/impresoratermica.php?factura='+numeroFactura.value;
           //window.electron.ipcRenderer.invoke('open-new-window', impresionpagina, 'url', true,false);
                     const datosEmpresa = JSON.stringify(enviarDatosLocalStorage())
-          window.electron.ipcRenderer.invoke('ticket',datosFactura.no_factura,datosEmpresa)
+          const facturaTicket = await prepararFacturaParaTicket(datosFactura)
+          await window.electron.ipcRenderer.invoke('ticket',JSON.stringify(facturaTicket),null,datosEmpresa)
 
     }
 
@@ -4515,12 +4906,12 @@ ingreso_total = ingreso_efectivo + ingreso_tarjeta + ingreso_transferencia;
     const datoscorreo = await peticionesFetchOffline('getDataByField', 'configuracion_correo','id',1);
     //console.log("datoscorreo", datoscorreo);
 
-    if (!datoscorreo) {
-      console.warn("No hay configuración de correo en configuracion_correo");
+    if (!datoscorreo?.email || !datoscorreo?.password) {
+      console.warn("La configuración de correo está incompleta");
       toast.add({
         severity: "warn",
         summary: "Sin configuración",
-        detail: "No se encontró la configuración de correo. El correo no fue enviado.",
+        detail: "El correo o la contraseña no están configurados. El cuadre continuará sin enviar correo.",
         life: 5000,
       });
       return { ok: false, skipped: true, reason: 'sin-configuracion' };
@@ -4592,6 +4983,7 @@ ingreso_total = ingreso_efectivo + ingreso_tarjeta + ingreso_transferencia;
 
 /******************************************************/
 const imprimirCuadre = async(imprimir = true)=>{
+  try {
   visibleCuadre.value = false
   cuadrarCaja.value = false
   loadingMessage.value = 'Preparando cuadre...'
@@ -4620,6 +5012,55 @@ const laFechaFin = fechas.fechafin;
 
     const jsonData = response || {};
     const asArray = (value) => (Array.isArray(value) ? value : []);
+    if (usuarioEsCajero()) {
+      await actualizarCantidadFacturasTurno();
+      const cajaActualCuadre = await obtenerCajaActual();
+      const turnoCuadre = datosEmpresaStore.usuario?.token || usuarioLocal.value?.token || '';
+      const [cuentasCobrarCompletas, tallerCompleto] = await Promise.all([
+        peticionesFetchOffline('getDataAsArray', 'cuentas_cobrar'),
+        peticionesFetchOffline('getDataAsArray', 'taller')
+      ]);
+      const esDelTurno = registro => String(registro?.turno || registro?.token || '').trim() === String(turnoCuadre).trim();
+      const esPagoDelTurno = pago => {
+        const turnoPago = String(pago?.turno || pago?.token || '').trim();
+        if (turnoPago && turnoPago !== '280420241514073') {
+          return turnoPago === String(turnoCuadre).trim();
+        }
+        const fechaPago = pago?.timestamp || convertirAFechaTimestamp(pago?.fecha, pago?.hora);
+        return esFechaEnRango(
+          fechaPago,
+          cajaActualCuadre?.created_at || fechaInicioN,
+          fechaFinN
+        );
+      };
+      const filtrarPagosTurno = (registros, campo) => asArray(registros).map(registro => {
+        const copia = { ...registro };
+        try {
+          const pagos = Array.isArray(registro?.[campo])
+            ? registro[campo]
+            : JSON.parse(registro?.[campo] || '[]');
+          copia[campo] = JSON.stringify(pagos.filter(esPagoDelTurno));
+        } catch (error) {
+          copia[campo] = '[]';
+        }
+        return copia;
+      });
+
+      jsonData.facturas = [...facturasDelTurnoActual.value];
+      jsonData.gastos = asArray(jsonData.gastos).filter(esDelTurno);
+      jsonData.entradas = asArray(jsonData.entradas).filter(esDelTurno);
+      jsonData.devoluciones = asArray(jsonData.devoluciones).filter(esDelTurno);
+      jsonData.cuentas_cobrar = filtrarPagosTurno(
+        Array.isArray(cuentasCobrarCompletas) ? cuentasCobrarCompletas : jsonData.cuentas_cobrar,
+        'pagos'
+      );
+      jsonData.taller = filtrarPagosTurno(
+        Array.isArray(tallerCompleto) ? tallerCompleto : jsonData.taller,
+        'abono'
+      );
+      jsonData.registrocaja = cajaActualCuadre ? [cajaActualCuadre] : [];
+      jsonData.cuadres = cajaActualCuadre ? [cajaActualCuadre] : [];
+    }
     datosDelDiaArray.value = response;
 
    let facturasFiltradas = asArray(jsonData['facturas'])
@@ -4673,7 +5114,7 @@ const totalDevoluciones = asArray(jsonData['devoluciones'])
 const registroCaja = asArray(jsonData['registrocaja'])
 
   datosDelDia.value.inicioCaja = registroCaja
-  .map(factura => Number(factura.cant_inicio)) 
+  .map(factura => Number(factura.cant_inicio || factura.cantidad_inicio))
   .reduce((acc, total) => acc + total, 0) || 0;
 
 
@@ -4690,7 +5131,7 @@ const registroCaja = asArray(jsonData['registrocaja'])
     }
 
     for (let pago of abonos) {
-        const fechaBuscar = convertirAFechaTimestamp(pago.fecha, pago.hora);
+        const fechaBuscar = pago.timestamp || convertirAFechaTimestamp(pago.fecha, pago.hora);
         const estaFecha = esFechaEnRango(fechaBuscar, laFechaInicio, laFechaFin);
         if (estaFecha) {
             totalAbono += Number(pago.cantidad); 
@@ -4728,9 +5169,9 @@ datosDelDia.value.taller = asArray(jsonData['taller'])
     }
 
     for (let abono of abonos) {
-        const fechaBuscar = convertirAFechaTimestamp(abono.fecha, abono.hora);
+        const fechaBuscar = abono.timestamp || abono.created_at || convertirAFechaTimestamp(abono.fecha, abono.hora);
         const estaFecha = esFechaEnRango(fechaBuscar, laFechaInicio, laFechaFin);
-        if (estaFecha && abono.cajero == datosUsuarioLocal[0].email) {
+        if (estaFecha) {
   
 
 
@@ -4815,8 +5256,20 @@ const monederoFiltrado = Object.fromEntries(
 
 // Asignar solo las denominaciones con dinero
 nDatosEmpresa.monedero = monederoFiltrado;
- datosEnvio.value.devoluciones = jsonData['devoluciones']
-  nDatosEmpresa.datoscaja = datosEnvio.value
+  const datosCajaImpresion = {
+    facturas: facturasFiltradas,
+    gastos: asArray(jsonData.gastos),
+    entradas: asArray(jsonData.entradas),
+    devoluciones: asArray(jsonData.devoluciones),
+    cuentas_cobrar: asArray(jsonData.cuentas_cobrar),
+    taller: asArray(jsonData.taller),
+    registrocaja: asArray(jsonData.registrocaja),
+    cuadres: asArray(jsonData.cuadres).length > 0
+      ? asArray(jsonData.cuadres)
+      : asArray(jsonData.registrocaja)
+  };
+  datosEnvio.value = JSON.parse(JSON.stringify(datosCajaImpresion));
+  nDatosEmpresa.datoscaja = datosCajaImpresion
   nDatosEmpresa.usuario = datosEmpresaStore.usuario
 
   if(imprimir){
@@ -4834,7 +5287,10 @@ const timestampFin = convertirAFechaTimestamp(cuadre.value.fechafin, cuadre.valu
     let  enviarFecha = JSON.stringify(fechasEnviar)
           console.log("nDatosEmpresa", nDatosEmpresa);
 
-          await window.electron.ipcRenderer.invoke(
+          if (!window.electron?.ipcRenderer) {
+            throw new Error('La impresión del cuadre solo está disponible en la aplicación de escritorio.');
+          }
+          const resultadoImpresion = await window.electron.ipcRenderer.invoke(
           'imprimirCuadreCompleto',
           totalContado,
           JSON.stringify(nDatosEmpresa),
@@ -4843,6 +5299,9 @@ const timestampFin = convertirAFechaTimestamp(cuadre.value.fechafin, cuadre.valu
           true,   // ventana = true → habilita preview
           enviarFecha
         )
+          if (!resultadoImpresion?.ok) {
+            throw new Error(resultadoImpresion?.error || 'No se pudo generar la impresión del cuadre.');
+          }
 
 
 
@@ -4899,6 +5358,18 @@ const timestampFin = convertirAFechaTimestamp(cuadre.value.fechafin, cuadre.valu
   }
 
    //window.electron.ipcRenderer.invoke('open-new-window', impresionpagina,'url',true,false)
+  } catch (error) {
+    console.error('Error al imprimir el cuadre:', error);
+    toast.add({
+      severity: 'error',
+      summary: 'No se pudo imprimir el cuadre',
+      detail: error?.message || 'Ocurrió un error preparando la impresión.',
+      life: 6000
+    });
+  } finally {
+    loading.value = false;
+    loadingMessage.value = '';
+  }
 }
 /******************************************************/
 const imprimirUltimoGasto = async ()=>{
@@ -5120,9 +5591,80 @@ const agregarGasto = async()=>{
 
 }
 /******************************************************/
+const cargarFacturasTurnoImpresion = async () => {
+  cargandoFacturasTurno.value = true;
+  facturasFiltradasImprimir.value = [];
+
+  try {
+    const cajaActual = await obtenerCajaActual();
+    const fechaInicioTurno = cajaActual?.created_at || fechaDeInicioHoy.value;
+
+    if (!cajaActual || !fechaInicioTurno) {
+      toast.add({
+        severity: 'warn',
+        summary: 'Turno no disponible',
+        detail: 'No se encontró una caja abierta para consultar sus facturas.',
+        life: 3500
+      });
+      return;
+    }
+
+    const response = await peticionesFetchOffline(
+      'getRowsByTimestampRange',
+      'facturas',
+      'created_at',
+      fechaInicioTurno,
+      nfecha('timestamp')
+    );
+    const facturasRango = Array.isArray(response)
+      ? response
+      : Array.isArray(response?.data)
+        ? response.data
+        : [];
+    const normalizar = valor => String(valor || '').trim().toLowerCase();
+    const almacenActual = normalizar(datosEmpresaStore.empresa?.nombre);
+    const facturasAlmacen = facturasRango.filter(
+      factura => !almacenActual || normalizar(factura.almacen) === almacenActual
+    );
+    const turnoActual = normalizar(cajaActual.turno);
+    const facturasMismoTurno = turnoActual
+      ? facturasAlmacen.filter(factura => normalizar(factura.token) === turnoActual)
+      : [];
+
+    // Los registros antiguos pueden no tener el token de caja. En ese caso,
+    // el rango entre apertura y hora actual sigue representando el turno.
+    facturasFiltradasImprimir.value = (
+      facturasMismoTurno.length > 0 ? facturasMismoTurno : facturasAlmacen
+    ).sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+  } catch (error) {
+    console.error('Error al cargar las facturas del turno:', error);
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'No se pudieron cargar las facturas del turno actual.',
+      life: 3500
+    });
+  } finally {
+    cargandoFacturasTurno.value = false;
+  }
+};
+/******************************************************/
+const cambiarFiltroFacturasTurno = async (activo) => {
+  soloFacturasTurno.value = activo;
+  campoFactura.value = null;
+  campoNombreFactura.value = null;
+
+  if (activo) {
+    await cargarFacturasTurnoImpresion();
+  }
+};
+/******************************************************/
 const recargarFacturas = async()=>{
-  await fetchDataFactura();
-  await fetchAndSetupData();
+  if (soloFacturasTurno.value) {
+    await cargarFacturasTurnoImpresion();
+  } else {
+    await fetchDataFactura();
+  }
   toast.add({ severity: 'success', summary: 'Éxito', detail: 'Facturas Recargadas.', life: 3000 });
 }
 /******************************************************/
@@ -5137,12 +5679,16 @@ const facturaSeleccionada = async(factura)=>{
 /******************************************************/
 // Computed para filtrar facturas por número o nombre
 const facturasFiltradasComputed = computed(() => {
+  const facturasDisponibles = soloFacturasTurno.value
+    ? facturasFiltradasImprimir.value
+    : facturas.value;
+
   if (!busquedaFactura.value) {
-    return facturas.value.slice(0, 20); // Mostrar solo las primeras 20 si no hay búsqueda
+    return facturasDisponibles.slice(0, 20); // Mostrar solo las primeras 20 si no hay búsqueda
   }
 
   const busqueda = busquedaFactura.value.toLowerCase().trim();
-  return facturas.value.filter(factura => {
+  return facturasDisponibles.filter(factura => {
     const numeroFactura = factura.no_factura?.toString().toLowerCase() || '';
     const nombreCliente = factura.nombre_cliente?.toLowerCase() || '';
     return numeroFactura.includes(busqueda) || nombreCliente.includes(busqueda);
@@ -5163,40 +5709,70 @@ watch(visibleimprimirfactura, (newVal) => {
     campoFactura.value = null;
     campoNombreFactura.value = null;
     impresoraSeleccionada.value = null;
+    soloFacturasTurno.value = false;
+    facturasFiltradasImprimir.value = [];
   }
 });
 /******************************************************/
 //impresoraSeleccionada
 const imprimirFactura = async()=>{
-
-  const datosFactura = facturas.value.find(fact=>fact.no_factura === campoFactura.value.no_factura);
-  if (datosFactura) {
-
-     if (impresoraSeleccionada.value == 'Impresora Ticket') {
-          var impresionpagina = link.value+'/vista/impresoratermica.php?factura='+datosFactura.no_factura;
-        // window.electron.ipcRenderer.invoke('open-new-window', impresionpagina, 'url', true,false);
-
-              const datosEmpresaA = JSON.stringify(enviarDatosLocalStorage() )
-/*             window.electron.ipcRenderer.invoke('ticket',datosFactura,datosEmpresaA);*/
-
-         const datosCliente = await peticionesFetchOffline('getDataByField', 'clientes','codigo',datosFactura.cod_cliente);
-
-     const envio = await window.electron.ipcRenderer.invoke('ticket', JSON.stringify(datosFactura),JSON.stringify(datosCliente), datosEmpresaA);
-
-
-
-     }else if(datosFactCoti.value == 'Offline'){
-          var impresionpagina = link.value+'/receipt/ticket.php?factura='+datosFactura.no_factura;
-          window.electron.ipcRenderer.invoke('open-new-window', impresionpagina,'url',false,true,false)
-     } else{
-      var impresionpagina = link.value+'/receipt/factura.php?factura='+datosFactura.no_factura;
-      window.electron.ipcRenderer.invoke('open-new-window', impresionpagina,'url',false,true,false)
-     }
-
-  }else{
+  if (!campoFactura.value?.no_factura) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Seleccione una Factura', life: 3000 });
+    return;
   }
 
+  const facturasDisponibles = soloFacturasTurno.value
+    ? facturasFiltradasImprimir.value
+    : facturas.value;
+  const facturaSeleccionada = facturasDisponibles.find(
+    fact => String(fact.no_factura) === String(campoFactura.value.no_factura)
+  );
+  const datosFactura = await prepararFacturaParaTicket(facturaSeleccionada || campoFactura.value);
+  if (!datosFactura) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se encontraron los datos de la factura', life: 3000 });
+    return;
+  }
+
+  if (!window.electron?.ipcRenderer) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'La impresión solo está disponible en la aplicación de escritorio', life: 4000 });
+    return;
+  }
+
+  imprimiendoFacturaSeleccionada.value = true;
+  try {
+    if (impresoraSeleccionada.value === 'Impresora Ticket') {
+      const datosLocal = enviarDatosLocalStorage();
+      datosLocal.empresa = datosEmpresa.empresa || datosEmpresaStore.empresa || datosLocal.empresa || {};
+      const datosCliente = await peticionesFetchOffline(
+        'getDataByField',
+        'clientes',
+        'codigo',
+        datosFactura.cod_cliente
+      );
+
+      const resultado = await window.electron.ipcRenderer.invoke(
+        'ticket',
+        JSON.stringify(datosFactura),
+        JSON.stringify(datosCliente || {}),
+        JSON.stringify(datosLocal)
+      );
+      if (resultado?.error || resultado?.message) {
+        throw new Error(resultado.error || resultado.message);
+      }
+    } else if (impresoraSeleccionada.value === 'Impresora Normal') {
+      const impresionpagina = link.value+'/receipt/factura.php?factura='+encodeURIComponent(datosFactura.no_factura);
+      await window.electron.ipcRenderer.invoke('open-new-window', impresionpagina,'url',false,true,false);
+    } else {
+      throw new Error('Seleccione un tipo de impresora válido');
+    }
+
+    toast.add({ severity: 'success', summary: 'Impresión enviada', detail: `Factura ${datosFactura.no_factura} enviada a imprimir`, life: 3000 });
+  } catch (error) {
+    console.error('Error al imprimir factura desde Caja:', error);
+    toast.add({ severity: 'error', summary: 'Error de impresión', detail: error?.message || 'No se pudo imprimir la factura', life: 5000 });
+  } finally {
+    imprimiendoFacturaSeleccionada.value = false;
+  }
 }
 /******************************************************/
 const imprimirEntrada = async()=>{
@@ -5490,45 +6066,174 @@ const fnAbrirCaja = async () => {
 };
 
 /******************************************************/
+const cargarDatosTurnoParaImpresion = async () => {
+  const normalizar = valor => String(valor || '').trim().toLowerCase();
+  const turnoUsuario = datosEmpresaStore.usuario?.token || usuarioLocal.value?.token || '';
+  const turnoSeleccionado = turnoUsuarioSelected.value && turnoUsuarioSelected.value !== 'COMPLETO'
+    ? turnoUsuarioSelected.value
+    : turnoUsuario;
+
+  if (!turnoSeleccionado) {
+    throw new Error('No se pudo identificar el turno actual.');
+  }
+
+  if (usuarioEsCajero()) {
+    await actualizarCantidadFacturasTurno();
+    const cajaActual = await obtenerCajaActual();
+    const fechaInicioActual = cajaActual?.created_at || usuarioLocal.value?.hora_inicio || fechaDeInicioHoy.value;
+
+    return {
+      caja: cajaActual || {
+        turno: turnoUsuario,
+        cant_inicio: contidadInicioCaja.value,
+        nombre: usuarioLocal.value?.nombre,
+        username: usuarioLocal.value?.email
+      },
+      turno: turnoUsuario,
+      fechaInicio: fechaInicioActual,
+      fechaFin: nfecha('timestamp'),
+      facturas: [...facturasDelTurnoActual.value]
+        .sort((a, b) => Number(a.id || 0) - Number(b.id || 0))
+    };
+  }
+
+  let cajaTurno = turnosHoyArray.value.find(
+    caja => normalizar(caja.turno) === normalizar(turnoSeleccionado)
+  );
+
+  if (!cajaTurno) {
+    cajaTurno = await peticionesFetchOffline(
+      'getDataByField',
+      'registrocaja',
+      'turno',
+      turnoSeleccionado
+    );
+  }
+
+  const fechaInicioTurno = cajaTurno?.created_at;
+  if (!cajaTurno || !fechaInicioTurno) {
+    throw new Error('No se encontró la apertura de la caja para este turno.');
+  }
+
+  const fechaFinTurno = nfecha('timestamp');
+  const response = await peticionesFetchOffline(
+    'getRowsByTimestampRange',
+    'facturas',
+    'created_at',
+    fechaInicioTurno,
+    fechaFinTurno
+  );
+  const facturasRango = Array.isArray(response)
+    ? response
+    : Array.isArray(response?.data)
+      ? response.data
+      : [];
+  const responsePorTurno = await peticionesFetchOffline(
+    'getDataArrayByCondition',
+    'facturas',
+    'token',
+    turnoSeleccionado
+  );
+  const facturasPorTurno = Array.isArray(responsePorTurno)
+    ? responsePorTurno
+    : Array.isArray(responsePorTurno?.data)
+      ? responsePorTurno.data
+      : [];
+  const facturasConsulta = facturasPorTurno.length > 0 ? facturasPorTurno : facturasRango;
+  const almacenActual = normalizar(datosEmpresaStore.empresa?.nombre);
+  const obtenerTurnoFactura = factura => {
+    if (factura?.token || factura?.turno) return factura.token || factura.turno;
+    try {
+      const otro = Array.isArray(factura?.otro) ? factura.otro : JSON.parse(factura?.otro || '[]');
+      return otro?.[0]?.token || otro?.[0]?.turno || '';
+    } catch (error) {
+      return '';
+    }
+  };
+
+  // El rango limita la consulta y el token garantiza que no se mezclen
+  // facturas de otras cajas abiertas al mismo tiempo.
+  const facturas = facturasConsulta
+    .filter(factura => normalizar(obtenerTurnoFactura(factura)) === normalizar(turnoSeleccionado))
+    .filter(factura => !almacenActual || normalizar(factura.almacen) === almacenActual)
+    .sort((a, b) => Number(a.id || 0) - Number(b.id || 0));
+
+  return {
+    caja: cajaTurno,
+    turno: turnoSeleccionado,
+    fechaInicio: fechaInicioTurno,
+    fechaFin: fechaFinTurno,
+    facturas
+  };
+};
+
+const avisarTurnoSinFacturas = () => {
+  toast.add({
+    severity: 'info',
+    summary: 'Turno sin facturas',
+    detail: 'No hay facturas registradas en el turno seleccionado.',
+    life: 3500
+  });
+};
+
+const manejarErrorImpresionTurno = (error) => {
+  console.error('Error al preparar la impresión del turno:', error);
+  toast.add({
+    severity: 'error',
+    summary: 'No se pudo imprimir',
+    detail: error?.message || 'No se pudieron consultar los datos del turno.',
+    life: 4500
+  });
+};
+
 const fnResumenVenta = async()=>{
-const fechaInicioN = usuarioLocal.value.hora_inicio;
+  try {
+    const { facturas } = await cargarDatosTurnoParaImpresion();
+    if (facturas.length === 0) {
+      avisarTurnoSinFacturas();
+      return;
+    }
 
-const facturas = await peticionesFetchOffline('getRowsByTimestampRange','facturas','created_at',fechaDeInicioHoy.value,nfecha('timestamp'));
-
-const datosEmpresa = JSON.stringify(enviarDatosLocalStorage() )
-const impresion = window.electron.ipcRenderer.invoke('resumenfacturas',JSON.stringify(facturas),datosEmpresa,true,false,false);
+    const datosEmpresa = JSON.stringify(enviarDatosLocalStorage());
+    await window.electron.ipcRenderer.invoke('resumenfacturas', JSON.stringify(facturas), datosEmpresa, true, false, false);
+  } catch (error) {
+    manejarErrorImpresionTurno(error);
+  }
 }
 /******************************************************/
 const fnProductosVendidos = async()=>{
-
-
-const response = await peticionesFetchOffline('getRowsByTimestampRange','facturas','created_at',fechaDeInicioHoy.value,nfecha('timestamp'));
-
-    const jsonData = response;
+  try {
+    const datosTurno = await cargarDatosTurnoParaImpresion();
+    const jsonData = datosTurno.facturas;
+    if (jsonData.length === 0) {
+      avisarTurnoSinFacturas();
+      return;
+    }
   
 const productosVendidos = jsonData.reduce((acc, factura) => {
-    const productos = JSON.parse(factura.productos);
+    let productos = [];
+    try {
+      productos = Array.isArray(factura.productos)
+        ? factura.productos
+        : JSON.parse(factura.productos || '[]');
+    } catch (error) {
+      console.warn(`Productos inválidos en la factura ${factura.no_factura || factura.id}:`, error);
+    }
     
     productos.forEach(producto => {
         const nombre = producto.nombre;
         const existente = acc.find(item => item.nombre === nombre);
-        const totalProducto = producto.cantidad * producto.precio;
+        const cantidadProducto = Number(producto.cantidad || 0);
+        const totalProducto = cantidadProducto * Number(producto.precio || 0);
         
         if (existente) {
-            existente.cantidad += producto.cantidad;
+            existente.cantidad += cantidadProducto;
             existente.total += totalProducto;
-            
-            if (existente.categorias[producto.categoria]) {
-                existente.categorias[producto.categoria] += producto.cantidad;
-            } else {
-                existente.categorias[producto.categoria] = producto.cantidad;
-            }
         } else {
             acc.push({ 
                 nombre, 
-                cantidad: producto.cantidad, 
-                total: totalProducto, 
-                categorias: [producto.categoria] 
+                cantidad: cantidadProducto,
+                total: totalProducto
             });
         }
     });
@@ -5536,17 +6241,11 @@ const productosVendidos = jsonData.reduce((acc, factura) => {
     return acc;
 }, []);
 
-
-  const datosUsuarioLocal = JSON.parse(window.localStorage.getItem('usuarioLocal')) 
-
- const datosFechaHoy = usuarioLocal.value.hora_inicio.split(' ')
-
-
   const peticionDatos = {
-    fechainicio:datosFechaHoy[0],
-    horainicio:datosFechaHoy[1],
-    horafin:nfecha('horaAmericana'),
-    fechafin:nfecha('fechaAmericana'),
+    fechainicio:String(datosTurno.fechaInicio).split(' ')[0],
+    horainicio:String(datosTurno.fechaInicio).split(' ')[1] || datosTurno.caja.hora_inicio,
+    horafin:String(datosTurno.fechaFin).split(' ')[1] || nfecha('horaAmericana'),
+    fechafin:String(datosTurno.fechaFin).split(' ')[0] || nfecha('fechaAmericana'),
     taller:datosDelDia.value.taller,
     fondoinicial:datosDelDia.value.inicioCaja,
     efectivo:datosDelDia.value.efectivo,
@@ -5554,13 +6253,13 @@ const productosVendidos = jsonData.reduce((acc, factura) => {
     tarjeta:datosDelDia.value.tarjeta,
     gastos:datosDelDia.value.gastos,
     abono:datosDelDia.value.abono,
-    token:datosUsuarioLocal[0].token,
+    token:datosTurno.turno,
     ganancia:datosDelDia.value.ganancia,
     totalvendido:datosDelDia.value.venta,
     devoluciones:0.00,
     totalcontado:0.00,
     impuestos:datosDelDia.value.impuestos,
-    usuario:datosUsuarioLocal[0].nombre
+    usuario:datosTurno.caja.nombre || datosTurno.caja.username || usuarioLocal.value.nombre
   }
 
 
@@ -5576,7 +6275,10 @@ const losDatos = {
 
 
   const datosEmpresaA = JSON.stringify(enviarDatosLocalStorage() )
-const impresion = window.electron.ipcRenderer.invoke('ticketproductosvendidos',JSON.stringify(losDatos),datosEmpresaA,true,false,false);
+  await window.electron.ipcRenderer.invoke('ticketproductosvendidos',JSON.stringify(losDatos),datosEmpresaA,true,false,false);
+  } catch (error) {
+    manejarErrorImpresionTurno(error);
+  }
 }
 /******************************************************/
 //transaccionesCantidad
@@ -5667,10 +6369,21 @@ const fnRealizarPedido = () => {
 };
 /******************************************************/
 const fnTodasLasFacturas = async () => {
-cuadrarCaja.value = false
-const fechas = nfecha('timestampcompleta');
+let facturas = [];
+try {
+    const datosTurno = await cargarDatosTurnoParaImpresion();
+    facturas = datosTurno.facturas;
+} catch (error) {
+    manejarErrorImpresionTurno(error);
+    return;
+}
 
-const facturas = await peticionesFetchOffline('getRowsByTimestampRange','facturas','created_at',fechaDeInicioHoy.value,fechas.fechafin);
+if (facturas.length === 0) {
+    avisarTurnoSinFacturas();
+    return;
+}
+
+cuadrarCaja.value = false
 
     const datosEmpresaA = JSON.stringify(enviarDatosLocalStorage());
 
@@ -5701,7 +6414,8 @@ const facturas = await peticionesFetchOffline('getRowsByTimestampRange','factura
         const progressPercent = ((i + 1) / facturas.length) * 100;
         progressBar.style.width = `${progressPercent}%`;
 
-        await window.electron.ipcRenderer.invoke('ticket', JSON.stringify(factura),null, datosEmpresaA);
+        const facturaTicket = await prepararFacturaParaTicket(factura);
+        await window.electron.ipcRenderer.invoke('ticket', JSON.stringify(facturaTicket),null, datosEmpresaA);
     }
 
     // Cambiar mensaje al finalizar
@@ -5972,7 +6686,7 @@ padding-bottom: 0 !important;
 
 .user-summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.85rem;
 }
 
@@ -5998,6 +6712,11 @@ padding-bottom: 0 !important;
   font-weight: 700;
   color: #0f172a;
   line-height: 1.25;
+}
+
+.user-summary-item--invoices {
+  border-color: color-mix(in srgb, var(--primary-color) 24%, #e2e8f0);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--primary-color) 7%, white), #ffffff);
 }
 
 /* Action Button Modern */
@@ -6848,6 +7567,44 @@ padding-bottom: 0 !important;
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+:deep(.print-format-card) {
+  width: 100%;
+  min-height: 9.5rem;
+  justify-content: center;
+  border-radius: 1rem;
+  border-width: 1px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+:deep(.print-format-card:hover) {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.13);
+}
+
+:deep(.print-format-card--letter) {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(241, 245, 249, 0.86));
+  border-color: rgba(100, 116, 139, 0.28);
+}
+
+:deep(.print-format-card--ticket) {
+  background: linear-gradient(145deg, var(--primary-color), color-mix(in srgb, var(--primary-color) 76%, #312e81));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--primary-color) 25%, transparent);
+}
+
+.print-format-icon {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.85rem;
+  background: rgba(148, 163, 184, 0.14);
+  font-size: 1.4rem;
+}
+
+:deep(.print-format-card--ticket) .print-format-icon {
+  background: rgba(255, 255, 255, 0.18);
 }
 
 /* Animación para el estado */

@@ -2347,10 +2347,10 @@ ipcMain.handle(
         ventana,
         fecha
       )
-      return result
+      return { ok: true, result }
     } catch (error) {
       console.error(error)
-      return error
+      return { ok: false, error: error?.message || String(error) }
     }
   }
 )

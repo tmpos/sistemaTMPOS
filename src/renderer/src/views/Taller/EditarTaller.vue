@@ -22,6 +22,7 @@ import LoadingOverlay from '../../Loading/LoadingOverlay.vue';
 //import config from '../../../../../resources/config.json';
 /************************************************************************/
 import {useDatosEmpresa} from '@/stores'
+import { notifyCompanyPayment } from '@/funciones/notificacionesAbonos.js';
 const datosEmpresa = useDatosEmpresa();
 //const production = config.VITE_PRODUCTION;
 const link = ref('');
@@ -124,6 +125,21 @@ const formatoImpresion = ref('80mm');
 const ordenParaImprimir = ref({});
 /************************************************************************/
 const datosUsuarioLocal = ref({})
+const notificarAbonoTaller = (orden, pago, origen = 'Taller') => {
+  void notifyCompanyPayment({
+    type: 'taller',
+    reference: orden?.no_factura,
+    client: orden?.nombre || orden?.cliente,
+    amount: pago?.abono,
+    balance: pago?.saldo ?? orden?.saldo,
+    method: pago?.metodo_pago,
+    cashier: pago?.cajero || datosUsuarioLocal.value?.nombre || datosUsuarioLocal.value?.email,
+    date: pago?.fecha,
+    time: pago?.hora,
+    source: origen,
+    company: datosEmpresa.empresa
+  });
+};
 const productosArray = ref([])
 const menuModel = ref('')
 const selectedProduct = ref(null);
@@ -678,7 +694,7 @@ const funcionActualizar = async (evento = null)=> {
   const url = link.value+api.value+"/actualizarcampos/taller";
   if (!datoscampos.value) {
     console.error("Datos incompletos, no se puede actualizar.");
-    return;
+    return false;
   }
   if (datoscampos.value.hasOwnProperty('created_at')) {
       datoscampos.value.updated_at = nfecha('timestamp')
@@ -699,8 +715,10 @@ const funcionActualizar = async (evento = null)=> {
   const envioDatos = await peticionesFetchOffline('updateData','taller', JSON.stringify(datoscampos.value));
   if (envioDatos[0] == 'ok') {
      toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
+     return true;
   }else{
     toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+    return false;
   }
 }
 /************************************************************************/
@@ -764,7 +782,7 @@ const guardarNuevoAbonoTaller = async (pagarCompleto = false) => {
   }
 
   const abonoJSON = JSON.parse(datoscampos.value.abono || '[]');
-  abonoJSON.push({
+  const nuevoAbono = {
     abono: cantidadAbono,
     turno: datosUsuarioLocal.value.token,
     cajero: datosUsuarioLocal.value.email,
@@ -773,18 +791,22 @@ const guardarNuevoAbonoTaller = async (pagarCompleto = false) => {
     metodo_pago: metodoPago,
     hora: nfecha('hora'),
     fecha: nfecha('fecha'),
-    created_at: nfecha('timestamp')
-  });
+    created_at: nfecha('timestamp'),
+    saldo: Math.max(saldoTotal - cantidadAbono, 0).toFixed(2)
+  };
+  abonoJSON.push(nuevoAbono);
 
   datoscampos.value.abono = JSON.stringify(abonoJSON);
   recalcularAbonosTaller();
   visibleAbonarModal.value = false;
 
-  await funcionActualizar({
+  const tallerActualizado = await funcionActualizar({
     tipo: 'abono',
     titulo: pagarCompleto ? 'Pago completo registrado' : 'Abono registrado',
     detalle: `Se registro un ${pagarCompleto ? 'pago completo' : 'abono'} de RD$ ${cantidadAbono.toFixed(2)} con ${metodoPago}.`
   });
+  if (!tallerActualizado) return;
+  notificarAbonoTaller(datoscampos.value, nuevoAbono);
   imrpimirOrden();
 
   toast.add({
@@ -900,15 +922,17 @@ const entregar = async () => {
   const abonoJSON = JSON.parse(datoscampos.value.abono);
   
   // Agregar el nuevo abono con el método de pago seleccionado
-  abonoJSON.push({
+  const nuevoAbono = {
     "abono": datoscampos.value.saldo,
     "turno": datosUsuarioLocal.value.token,
     "cajero": datosUsuarioLocal.value.email,
     "metodo_pago": metodoPago,  // Método de pago seleccionado
     "hora": nfecha('hora'),
     "fecha": nfecha('fecha'),
-    "created_at": nfecha('timestamp')
-  });
+    "created_at": nfecha('timestamp'),
+    "saldo": '0.00'
+  };
+  abonoJSON.push(nuevoAbono);
 
   // Convertir el abono actualizado a una cadena JSON
   datoscampos.value.abono = JSON.stringify(abonoJSON);
@@ -916,11 +940,13 @@ const entregar = async () => {
   datoscampos.value.fecha_entrega = nfecha('fecha');
 
   // Llamar a la función de actualización y luego imprimir la orden
-  await funcionActualizar({
+  const tallerActualizado = await funcionActualizar({
     tipo: 'entrega',
     titulo: 'Orden entregada',
     detalle: `Entrega registrada con pago por ${metodoPago}.`
   });
+  if (!tallerActualizado) return;
+  notificarAbonoTaller(datoscampos.value, nuevoAbono, 'Taller - entrega de orden');
   imrpimirOrden();
   
   // Mostrar confirmación de que se ha realizado la entrega

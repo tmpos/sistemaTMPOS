@@ -3,6 +3,7 @@ import {
   attachAvailableImeis,
   buildProductCategories,
   calculateCardSurcharge,
+  calculateShiftInvoiceNumber,
   calculateDiscountOptions,
   calculateProductDiscount,
   calculateProductProfit,
@@ -17,17 +18,75 @@ import {
   getAlanubeSecurityCode,
   getCartProductQuantity,
   getDgiiStampUrl,
+  getElectronicReceiptPrefix,
+  getInvoiceDocumentLabel,
   getProductSalePrice,
   getProductStock,
   isInvoiceStateLocked,
   mergeRecordsByCode,
   normalizeSearchText,
+  normalizeTaxpayerLookupResponse,
   parseStoredProducts,
   productHasImei,
   roundDownToInterval,
   toFiniteNumber,
   unwrapAlanubeDocumentResponse
 } from '../venderCore.js'
+
+describe('Vender: cliente por defecto y comprobantes', () => {
+  it.each(['NORMAL', 'SIN COMPROBANTE', '', null, undefined])(
+    'no trata %s como crédito fiscal',
+    (receiptType) => {
+      expect(getElectronicReceiptPrefix(receiptType)).toBe('')
+    }
+  )
+
+  it('mantiene la identificación de los comprobantes fiscales', () => {
+    expect(getElectronicReceiptPrefix('FISCAL')).toBe('E31')
+    expect(getElectronicReceiptPrefix('E31')).toBe('E31')
+    expect(getElectronicReceiptPrefix('FINAL')).toBe('E32')
+    expect(getElectronicReceiptPrefix('B02')).toBe('E32')
+  })
+})
+
+describe('Vender: numeración correlativa de facturas por turno', () => {
+  it('enumera por orden de registro sin depender del número fiscal', () => {
+    const invoices = [
+      { id: 32, no_factura: 'F-900', token: 'turno-caja-1' },
+      { id: 30, no_factura: 'F-120', token: 'turno-caja-1' },
+      { id: 31, no_factura: 'F-500', token: 'turno-caja-1' }
+    ]
+
+    expect(calculateShiftInvoiceNumber(invoices[0], invoices)).toBe(3)
+    expect(calculateShiftInvoiceNumber(invoices[1], invoices)).toBe(1)
+    expect(calculateShiftInvoiceNumber(invoices[2], invoices)).toBe(2)
+  })
+
+  it('ignora facturas pertenecientes a otros turnos', () => {
+    const currentInvoice = { id: 12, no_factura: '12', token: 'turno-actual' }
+    const invoices = [
+      { id: 1, no_factura: '1', token: 'turno-anterior' },
+      { id: 10, no_factura: '10', token: 'turno-actual' },
+      currentInvoice
+    ]
+
+    expect(calculateShiftInvoiceNumber(currentInvoice, invoices)).toBe(2)
+  })
+
+  it('incluye la factura recién creada aunque aún no aparezca en la consulta', () => {
+    const currentInvoice = { id: 22, no_factura: '22', token: 'turno-actual' }
+    const invoices = [
+      { id: 20, no_factura: '20', token: 'turno-actual' },
+      { id: 21, no_factura: '21', token: 'turno-actual' }
+    ]
+
+    expect(calculateShiftInvoiceNumber(currentInvoice, invoices)).toBe(3)
+  })
+
+  it('no genera numeración si la factura no está vinculada a un turno', () => {
+    expect(calculateShiftInvoiceNumber({ id: 1 }, [])).toBeNull()
+  })
+})
 
 describe('Vender: URL oficial del timbre DGII', () => {
   const officialUrl =
@@ -68,6 +127,25 @@ describe('Vender: URL oficial del timbre DGII', () => {
   })
 })
 
+describe('Vender: etiqueta de la representación impresa electrónica', () => {
+  it('identifica una factura electrónica con valor fiscal E31', () => {
+    expect(getInvoiceDocumentLabel({}, 'E310000000002')).toBe(
+      'FACTURA ELECTRÓNICA CON VALOR FISCAL'
+    )
+  })
+
+  it('identifica una factura electrónica de consumo E32', () => {
+    expect(getInvoiceDocumentLabel({ comprobante: 'E320000000008' })).toBe(
+      'FACTURA ELECTRÓNICA DE CONSUMO'
+    )
+  })
+
+  it('conserva la etiqueta de las facturas no electrónicas', () => {
+    expect(getInvoiceDocumentLabel({ metodo_pago: 'CREDITO' })).toBe('FACTURA A CRÉDITO')
+    expect(getInvoiceDocumentLabel({ metodo_pago: 'EFECTIVO' })).toBe('FACTURA')
+  })
+})
+
 describe('Vender: normalización y permisos', () => {
   it.each([
     ['12.50', 12.5],
@@ -85,6 +163,23 @@ describe('Vender: normalización y permisos', () => {
 
   it('normaliza espacios, mayúsculas y acentos al buscar', () => {
     expect(normalizeSearchText('  CAFÉ Ácido  ')).toBe('cafe acido')
+  })
+
+  it('normaliza la respuesta del servicio de RNC', () => {
+    expect(
+      normalizeTaxpayerLookupResponse(
+        { rnc: '133-02353-9', razon_social: 'TM POS SRL', administracion_local: 'Santiago' },
+        '133023539'
+      )
+    ).toMatchObject({
+      rnc: '133023539',
+      cedularnc: '133023539',
+      nombrerazon_social: 'TM POS SRL'
+    })
+  })
+
+  it('rechaza respuestas HTTP de error aunque sean objetos verdaderos', () => {
+    expect(normalizeTaxpayerLookupResponse({ error: 'HTTP 500' }, '133023539')).toBeNull()
   })
 
   it.each(['CAJERO', 'cajero', ' VENDEDOR '])('bloquea el estado para %s', (role) => {

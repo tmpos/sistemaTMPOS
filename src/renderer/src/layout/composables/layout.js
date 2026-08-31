@@ -3,6 +3,7 @@ import { computed, reactive, onMounted, readonly, watch } from 'vue'
 const LAYOUT_STORAGE_KEY = 'layout_theme_config'
 
 export const DEFAULT_CUSTOM_THEME = {
+  themeStyle: 'classic',
   primaryColor: '#6366f1',
   secondaryColor: '#8b5cf6',
   accentColor: '#10b981',
@@ -14,6 +15,19 @@ export const DEFAULT_CUSTOM_THEME = {
   appTopbarButtonText: '#6366f1'
 }
 
+export const GLASS_CUSTOM_THEME = {
+  themeStyle: 'glass',
+  primaryColor: '#6366f1',
+  secondaryColor: '#8b5cf6',
+  accentColor: '#06b6d4',
+  surfaceColor: '#eef2ff',
+  textColor: '#172033',
+  appTopbarBg: '#f8faff',
+  appTopbarText: '#334155',
+  appTopbarButtonBg: '#e0e7ff',
+  appTopbarButtonText: '#4f46e5'
+}
+
 export const applyCustomThemeToDocument = (theme = {}) => {
   if (typeof document === 'undefined') return
 
@@ -22,6 +36,9 @@ export const applyCustomThemeToDocument = (theme = {}) => {
     ...(theme || {})
   }
   const root = document.documentElement
+  const themeStyle = String(config.themeStyle || 'classic').trim().toLowerCase()
+  root.classList.toggle('theme-glass', themeStyle === 'glass')
+  root.dataset.appThemeStyle = themeStyle
   root.style.setProperty('--app-primary-color', config.primaryColor)
   root.style.setProperty('--app-secondary-color', config.secondaryColor)
   root.style.setProperty('--app-accent-color', config.accentColor)

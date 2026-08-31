@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import QRCode from 'qrcode'
-import { getDgiiStampUrl } from '@/views/Vender/venderCore.js'
+import { getDgiiStampUrl, getInvoiceDocumentLabel } from '@/views/Vender/venderCore.js'
 import { formatoMonedaRD, peticionesFetch, peticionesFetchOffline, encryptarPassword,envioElectron } from '@/funciones/funciones.js'
 import { jsPDF } from 'jspdf'
 import html2canvas from 'html2canvas'
@@ -134,6 +134,7 @@ const generateFacturaHtml = async ({ factura, cliente, datosEmpresa, creditoData
   } catch (e) {
     console.warn('No se pudieron extraer datos de DGII:', e)
   }
+  const etiquetaDocumento = getInvoiceDocumentLabel(factura, datosDGII?.ecf)
 
   // Generar QR de la factura interna
   let qrCodeData = ''
@@ -339,7 +340,7 @@ const generateFacturaHtml = async ({ factura, cliente, datosEmpresa, creditoData
           }
         </table>
         <h2 class="text-center font-bold mt-4 border-y border-black py-1 bg-gray-8000 text-white rounded-md">
-          ${factura.metodo_pago === 'CREDITO' ? 'FACTURA A CREDITO' : 'FACTURA'}
+          ${etiquetaDocumento}
         </h2>
 
       </div>

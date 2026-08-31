@@ -65,6 +65,89 @@ export const normalizeSearchText = (value) =>
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
 
+export const normalizeTaxpayerLookupResponse = (response, requestedDocument = '') => {
+  if (!response || typeof response !== 'object' || Array.isArray(response) || response.error) {
+    return null
+  }
+
+  const data =
+    response.datos && typeof response.datos === 'object' && !Array.isArray(response.datos)
+      ? response.datos
+      : response
+  const document = String(
+    data.rnc || data.cedularnc || data.document || data.documento || requestedDocument || ''
+  ).replace(/\D/g, '')
+  const fullName = [data.nombre, data.apellido].filter(Boolean).join(' ').trim()
+  const businessName = String(
+    data.razon_social ||
+      data.nombrerazon_social ||
+      data.nombre_razon_social ||
+      data.nombre_comercial ||
+      data.name ||
+      fullName ||
+      ''
+  ).trim()
+
+  if (!businessName || !document) return null
+
+  return {
+    ...data,
+    rnc: document,
+    cedularnc: document,
+    razon_social: data.razon_social || businessName,
+    nombrerazon_social: businessName
+  }
+}
+
+export const getInvoiceDocumentLabel = (invoice = {}, electronicNumber = '') => {
+  const documentNumber = String(
+    electronicNumber || invoice.comprobante || invoice.encf || invoice.ecf || ''
+  )
+    .trim()
+    .toUpperCase()
+
+  if (documentNumber.startsWith('E31')) return 'FACTURA ELECTRÓNICA CON VALOR FISCAL'
+  if (documentNumber.startsWith('E32')) return 'FACTURA ELECTRÓNICA DE CONSUMO'
+
+  return String(invoice.metodo_pago || '').trim().toUpperCase() === 'CREDITO'
+    ? 'FACTURA A CRÉDITO'
+    : 'FACTURA'
+}
+
+export const getElectronicReceiptPrefix = (receiptType) => {
+  const map = {
+    FISCAL: 'E31',
+    'COMPROBANTE CON VALOR FISCAL': 'E31',
+    B01: 'E31',
+    E31: 'E31',
+    FINAL: 'E32',
+    'CONSUMIDOR FINAL': 'E32',
+    B02: 'E32',
+    E32: 'E32',
+    B03: 'E33',
+    E33: 'E33',
+    B04: 'E34',
+    E34: 'E34',
+    B11: 'E41',
+    E41: 'E41',
+    B13: 'E43',
+    E43: 'E43',
+    'REGIMEN ESPECIAL': 'E44',
+    B14: 'E44',
+    E44: 'E44',
+    GUBERNAMENTAL: 'E45',
+    B15: 'E45',
+    E45: 'E45',
+    B16: 'E46',
+    E46: 'E46',
+    B17: 'E47',
+    E47: 'E47'
+  }
+
+  const normalizedType = String(receiptType || '').trim().toUpperCase()
+  return map[normalizedType] || ''
+}
+
 export const isInvoiceStateLocked = (role) =>
   ['CAJERO', 'VENDEDOR'].includes(String(role || '').trim().toUpperCase())
 
@@ -313,4 +396,57 @@ export const distributeSurcharge = (products = [], selectedIndexes = [], surchar
     product.recargo_aplicado = unitSurcharge
   })
   return result
+}
+
+const getInvoiceShiftIdentity = (invoice = {}) => {
+  const id = String(invoice?.id ?? '').trim()
+  if (id) return `id:${id}`
+
+  const invoiceNumber = String(invoice?.no_factura ?? '').trim()
+  return invoiceNumber ? `factura:${invoiceNumber}` : ''
+}
+
+const getInvoiceShiftTimestamp = (invoice = {}) => {
+  const rawValue = invoice?.created_at || invoice?.fecha_emision || invoice?.updated_at || ''
+  const timestamp = Date.parse(String(rawValue).replace(' ', 'T'))
+  return Number.isFinite(timestamp) ? timestamp : 0
+}
+
+/**
+ * Calcula la posición correlativa de una factura dentro del turno que la creó.
+ * El valor se deriva de las facturas existentes y nunca se persiste como parte
+ * del documento fiscal.
+ */
+export const calculateShiftInvoiceNumber = (currentInvoice = {}, shiftInvoices = []) => {
+  const shiftToken = String(currentInvoice?.token ?? '').trim()
+  if (!shiftToken) return null
+
+  const invoicesByIdentity = new Map()
+  ;[...(Array.isArray(shiftInvoices) ? shiftInvoices : []), currentInvoice].forEach((invoice) => {
+    if (!invoice || String(invoice.token ?? '').trim() !== shiftToken) return
+    const identity = getInvoiceShiftIdentity(invoice)
+    if (identity && !invoicesByIdentity.has(identity)) invoicesByIdentity.set(identity, invoice)
+  })
+
+  const orderedInvoices = Array.from(invoicesByIdentity.values()).sort((left, right) => {
+    const leftId = Number(left?.id)
+    const rightId = Number(right?.id)
+    if (Number.isFinite(leftId) && Number.isFinite(rightId) && leftId !== rightId) {
+      return leftId - rightId
+    }
+
+    const timestampDifference = getInvoiceShiftTimestamp(left) - getInvoiceShiftTimestamp(right)
+    if (timestampDifference !== 0) return timestampDifference
+
+    return String(left?.no_factura ?? '').localeCompare(String(right?.no_factura ?? ''), undefined, {
+      numeric: true
+    })
+  })
+
+  const currentIdentity = getInvoiceShiftIdentity(currentInvoice)
+  const currentIndex = orderedInvoices.findIndex(
+    (invoice) => getInvoiceShiftIdentity(invoice) === currentIdentity
+  )
+
+  return currentIndex >= 0 ? currentIndex + 1 : null
 }

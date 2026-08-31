@@ -15,9 +15,7 @@ import {
   nfecha,
   convertirAFechaTimestamp,
   esFechaEnRango,
-  envioElectron,
-  peticionesFetch,
-  encryptarPassword
+  envioElectron
 } from '../funciones/funciones.js'
 
 // Función para imprimir el ticket en formato HTML
@@ -99,20 +97,14 @@ export async function imprimirCuadreCompleto(
   let monedasDD = {}
 
   const datosJSON = await loadConfig()
-  const link = datosJSON.VITE_LINKURL
-  const api = datosJSON.VITE_LINK_API
-  const token = datosJSON.VITE_TOKEN
-  const patronTelefono = datosJSON.VITE_PATRON_TELEFONO
-  const linkImpresora = datosJSON.VITE_IMPRESORA_LOCAL
   const impresoraTermica = datosJSON.VITE_IMPRESORA_TERMICA
-  const tokenCifrado = await encryptarPassword(token, 10)
   const datosImpresoraLocal = datosJSON.impresora
 
   //const jsonData = await peticionesFetch(`${link}${api}`,`datosventasporrango`,
   //  {"fechainicio":fechas.fechainicio,"fechafinal":fechas.fechafin},tokenCifrado,'POST');
   /************************************************************/
   /************************************************************/
-  const datosLocalStorage = JSON.parse(datosEmpresa)
+  const datosLocalStorage = typeof datosEmpresa === 'string' ? JSON.parse(datosEmpresa) : datosEmpresa || {}
   //const arrayPrinter = datosLocalStorage.printerconfig
   /**********************************************************************/
   if (datosLocalStorage.monedero) {
@@ -121,19 +113,52 @@ export async function imprimirCuadreCompleto(
   }
 
   /**********************************************************************/
-  const jsonData = datosLocalStorage.datoscaja
+  const datosCajaRecibidos = datosLocalStorage.datoscaja || {}
+  const asArray = (value) => (Array.isArray(value) ? value : [])
+  const jsonData = {
+    facturas: asArray(datosCajaRecibidos.facturas),
+    gastos: asArray(datosCajaRecibidos.gastos),
+    entradas: asArray(datosCajaRecibidos.entradas),
+    devoluciones: asArray(datosCajaRecibidos.devoluciones),
+    cuentas_cobrar: asArray(datosCajaRecibidos.cuentas_cobrar),
+    taller: asArray(datosCajaRecibidos.taller),
+    registrocaja: asArray(datosCajaRecibidos.registrocaja),
+    cuadres: asArray(datosCajaRecibidos.cuadres).length > 0
+      ? asArray(datosCajaRecibidos.cuadres)
+      : asArray(datosCajaRecibidos.registrocaja)
+  }
   console.log('jsonData', jsonData)
   /**********************************************************************/
   //const datosFactura = await peticionesFetch(`${link}${api}`,`datoscampo/cotizacion/no_cotizacion/${factura}`,{},tokenCifrado,'GET');
   /**********************************************************************/
-  const empresa = datosLocalStorage.empresa
-  const usuario = datosLocalStorage.usuario
+  const empresa = datosLocalStorage.empresa || {}
+  const usuario = datosLocalStorage.usuario || {}
   /**********************************************************************/
 
-  const printerConfig = JSON.parse(datosImpresoraLocal)
+  const printerConfigDefault = {
+    fontSize: 10,
+    fontFamily: 'Arial',
+    pageWidth: 300,
+    bodyWidth: 250,
+    ticketWidth: 240,
+    logoWidth: 100,
+    pageSizeWidth: 80000,
+    pageSizeHeight: 295000,
+    copies: 1,
+    margin: 5
+  }
+  let printerConfig = printerConfigDefault
+  try {
+    const configuracionImpresora = typeof datosImpresoraLocal === 'string'
+      ? JSON.parse(datosImpresoraLocal)
+      : datosImpresoraLocal
+    printerConfig = { ...printerConfigDefault, ...(configuracionImpresora || {}) }
+  } catch (error) {
+    console.warn('Configuración de impresora inválida; se usarán valores predeterminados:', error)
+  }
   /**********************************************************************/
 
-  const datosConfiguracion = datosLocalStorage.configuracion
+  const datosConfiguracion = datosLocalStorage.configuracion || { simbolo: 'RD$' }
   /**********************************************************************/
   const convertToBoolean = (obj) => {
     const newObj = {}
@@ -206,10 +231,25 @@ const fondoInicialFormatted = fondoInicial !== undefined ? fondoInicial : '0.00'
   let transferenciaTaller = 0
   let chqueVentas = 0
   let cheque = 0
+  const normalizar = (valor) => String(valor || '').trim().toUpperCase()
+  const parseMovimientos = (valor) => {
+    try {
+      const movimientos = Array.isArray(valor) ? valor : JSON.parse(valor || '[]')
+      return Array.isArray(movimientos) ? movimientos : []
+    } catch (error) {
+      return []
+    }
+  }
+  const fechaMovimiento = (movimiento) =>
+    movimiento?.timestamp ||
+    movimiento?.created_at ||
+    convertirAFechaTimestamp(movimiento?.fecha, movimiento?.hora)
+  const movimientoEnRango = (movimiento) =>
+    esFechaEnRango(fechaMovimiento(movimiento), fechas.fechainicio, fechas.fechafin)
   /*****************************************************************************/
-  const tablaDefault = datosLocalStorage.tabladefault
+  const tablaDefault = datosLocalStorage.tabladefault || {}
   /*****************************************************************************/
-  const cantidad = tablaDefault.copias
+  const cantidad = tablaDefault.copias || 1
   /*****************************************************************************/
   const modoEmpresa = tablaDefault.modo
   /*****************************************************************************/
@@ -280,6 +320,13 @@ const fondoInicialFormatted = fondoInicial !== undefined ? fondoInicial : '0.00'
       .reduce((acc, total) => acc + total, 0) || 0
 
   /******************************************************/
+  entradas =
+    jsonData['entradas']
+      .filter((entrada) => !entrada.almacen || entrada.almacen === empresa.nombre)
+      .map((entrada) => Number(entrada.cantidad || 0))
+      .reduce((acc, total) => acc + total, 0) || 0
+
+  /******************************************************/
   devoluciones =
     jsonData['devoluciones']
       .filter((fact) => fact.almacen === empresa.nombre)
@@ -290,11 +337,16 @@ const fondoInicialFormatted = fondoInicial !== undefined ? fondoInicial : '0.00'
   efectivoVentas =
     jsonData['facturas']
       .filter((fact) => fact.almacen === empresa.nombre)
-      .filter((fact) => fact.estado_factura === 'Cobrado')
       .filter(
         (factura) => factura.metodo_pago !== 'CREDITO' && factura.estado_factura !== 'DEVOLUCION'
       )
-      .map((factura) => Number(factura.efectivo))
+      .map((factura) => {
+        const efectivoRegistrado = Number(factura.efectivo || 0)
+        if (efectivoRegistrado > 0) return efectivoRegistrado
+        return String(factura.metodo_pago || '').trim().toUpperCase() === 'EFECTIVO'
+          ? Number(factura.total || 0)
+          : 0
+      })
       .reduce((acc, total) => acc + total, 0) || 0
   /******************************************************/
 
@@ -360,22 +412,14 @@ const fondoInicialFormatted = fondoInicial !== undefined ? fondoInicial : '0.00'
   .map(factura => Number(factura.monto_credito)) 
   .reduce((acc, total) => acc + total, 0) || 0; */
 
-  const responseCxC = await peticionesFetch(
-    `${link}${api}`,
-    'datostimestamp',
-    {
-      fechainicio: `${fechas.fechainicio}`,
-      fechafin: `${fechas.fechafin}`,
-      campo: 'created_at',
-      tabla: 'cuentas_cobrar'
-    },
-    tokenCifrado,
-    'POST'
-  )
-
   cuentasxcobrar =
-    responseCxC
+    jsonData['cuentas_cobrar']
       .filter((fact) => fact.almacen === empresa.nombre)
+      // Este renglón representa créditos creados en el turno, no el saldo
+      // histórico de todas las cuentas por cobrar del almacén.
+      .filter((factura) =>
+        esFechaEnRango(factura.created_at, fechas.fechainicio, fechas.fechafin)
+      )
       .map((factura) => Number(factura.monto_credito))
       .reduce((acc, total) => acc + total, 0) || 0
 
@@ -384,27 +428,18 @@ const fondoInicialFormatted = fondoInicial !== undefined ? fondoInicial : '0.00'
       .filter((fact) => fact.almacen === empresa.nombre)
       .map((factura) => {
         let totalAbono = 0
-        let abonos = []
-
-        try {
-          abonos = JSON.parse(factura.pagos)
-        } catch (error) {
-          console.error('Error al parsear abonos:', error)
-          return 0
-        }
+        const abonos = parseMovimientos(factura.pagos)
 
         for (let pago of abonos) {
-          const fechaBuscar = convertirAFechaTimestamp(pago.fecha, pago.hora)
-          const estaFecha = esFechaEnRango(fechaBuscar, fechas.fechainicio, fechas.fechafin)
-          if (estaFecha) {
+          if (movimientoEnRango(pago)) {
             totalAbono += Number(pago.cantidad)
-            if (pago.metodo === 'EFECTIVO') {
+            if (normalizar(pago.metodo) === 'EFECTIVO') {
               efectivo += Number(pago.cantidad)
               efectivoCxC += Number(pago.cantidad)
-            } else if (pago.metodo === 'TARJETA') {
+            } else if (normalizar(pago.metodo) === 'TARJETA') {
               tarjeta += Number(pago.cantidad)
               tarjetaCxC += Number(pago.cantidad)
-            } else if (pago.metodo === 'TRANSFERENCIA') {
+            } else if (normalizar(pago.metodo) === 'TRANSFERENCIA') {
               transferencia += Number(pago.cantidad)
               trasnferenciaCxC += Number(pago.cantidad)
             } else {
@@ -423,27 +458,18 @@ const fondoInicialFormatted = fondoInicial !== undefined ? fondoInicial : '0.00'
       .filter((fact) => fact.almacen === empresa.nombre)
       .map((taller) => {
         let totalAbono = 0
-        let abonos = []
-
-        try {
-          abonos = JSON.parse(taller.abono)
-        } catch (error) {
-          console.error('Error al parsear abonos:', error)
-          return 0
-        }
+        const abonos = parseMovimientos(taller.abono)
 
         for (let pago of abonos) {
-          const fechaBuscar = convertirAFechaTimestamp(pago.fecha, pago.hora)
-          const estaFecha = esFechaEnRango(fechaBuscar, fechas.fechainicio, fechas.fechafin)
-          if (estaFecha) {
+          if (movimientoEnRango(pago)) {
             totalAbono += Number(pago.abono)
-            if (pago.metodo_pago === 'EFECTIVO') {
+            if (normalizar(pago.metodo_pago) === 'EFECTIVO') {
               efectivo += Number(pago.abono)
               efectivoTaller += Number(pago.abono)
-            } else if (pago.metodo_pago === 'TARJETA') {
+            } else if (normalizar(pago.metodo_pago) === 'TARJETA') {
               tarjeta += Number(pago.abono)
               tarjetaTaller += Number(pago.abono)
-            } else if (pago.metodo_pago === 'TRANSFERENCIA') {
+            } else if (normalizar(pago.metodo_pago) === 'TRANSFERENCIA') {
               transferencia += Number(pago.abono)
               transferenciaTaller += Number(pago.abono)
             } else {
@@ -617,7 +643,7 @@ const fondoInicialFormatted = fondoInicial !== undefined ? fondoInicial : '0.00'
                 </tr> 
                 <tr>
                     <td class="cantidad">Total Entradas:</td>
-                    <td class="cantidad right-align">0.00</td>
+                    <td class="cantidad right-align">${datosConfiguracion.simbolo}${entradas || 0.0}</td>
                 </tr>
             </table>
             `
@@ -752,7 +778,7 @@ ${
             <table style="font-size:20px;font-weight:bold">
                 <tr>
                     <td class="cantidad" left-align style="font-size: 1.5em !important">Total en Caja:</td>
-                    <td class="cantidad2 right-align" style="font-size: 1.5em !important">${datosConfiguracion.simbolo}${Number(efectivo) + Number(inicioCaja) - cantidadGastosEfectivo || 0.0}</td>
+                    <td class="cantidad2 right-align" style="font-size: 1.5em !important">${datosConfiguracion.simbolo}${Number(efectivo) + Number(inicioCaja) + Number(entradas) - cantidadGastosEfectivo - Number(devoluciones) || 0.0}</td>
                 </tr>
                 <tr>
                     <td class="cantidad" left-align style="font-size: 1.5em !important">Total Contado:</td>
@@ -764,13 +790,13 @@ ${
         <td class="cantidad" left-align style="font-size: 1.5em !important">DIFERENCIA:</td>
         <td class="cantidad2 right-align" style="font-size: 1.5em !important">
             ${(() => {
-              const totalCaja = Number(efectivo) + Number(inicioCaja) - cantidadGastosEfectivo
+              const totalCaja = Number(efectivo) + Number(inicioCaja) + Number(entradas) - cantidadGastosEfectivo - Number(devoluciones)
               const diferencia = Number(totalContado) - totalCaja
 
               if (diferencia > 0) {
                 return `Sobrante de ${datosConfiguracion.simbolo}${diferencia || 0.0}`
               } else if (diferencia < 0) {
-                return `Faltante de ${datosConfiguracion.simbolo}${diferencia || 0.0}`
+                return `Faltante de ${datosConfiguracion.simbolo}${Math.abs(diferencia) || 0.0}`
               } else {
                 return 'Sin diferencias'
               }
@@ -795,55 +821,69 @@ ${
     `
 
   const win = new BrowserWindow({ width: 300, height: 600, show: show, autoHideMenuBar: true })
-  win.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(htmlContent)}`)
-  win.webContents.on('did-finish-load', async () => {
-    let copiesPrinted = 0
+  return await new Promise((resolve, reject) => {
+    win.webContents.once('did-finish-load', async () => {
+      let copiesPrinted = 0
 
-    try {
-      const printers = await getInstalledPrinters()
+      try {
+        const printers = await getInstalledPrinters()
+        if (!printers.length) throw new Error('No se encontraron impresoras instaladas')
 
-      // Buscar si existe la impresora configurada
-      const encontrada = printers.find((p) => p.toLowerCase() === printerName.toLowerCase())
+        // Buscar si existe la impresora configurada
+        const encontrada = printers.find((p) => p.toLowerCase() === printerName.toLowerCase())
 
-      // Si no existe, usar la primera impresora de la lista como fallback
-      const nombreImpresoraFinal = encontrada || printers[0]
+        // Si no existe, usar la primera impresora de la lista como fallback
+        const nombreImpresoraFinal = encontrada || printers[0]
 
-      if (!encontrada) {
-        console.warn(
-          `⚠️ La impresora "${printerName}" no fue encontrada. Usando predeterminada: "${nombreImpresoraFinal}"`
-        )
-      }
+        if (!encontrada) {
+          console.warn(
+            `⚠️ La impresora "${printerName}" no fue encontrada. Usando predeterminada: "${nombreImpresoraFinal}"`
+          )
+        }
 
-      const printNextCopy = () => {
-        win.webContents.print(
-          {
-            silent: true,
-            printBackground: true,
-            deviceName: nombreImpresoraFinal,
-            margins: { marginType: 'none' },
-            pageSize: { width: printerConfig.pageSizeWidth, height: printerConfig.pageSizeHeight },
-            preview: false
-          },
-          (success, errorType) => {
-            if (!success) {
-              console.error('❌ Error en la impresión:', errorType)
-              win.close() // cerrar si falla
-            } else {
+        const printNextCopy = () => {
+          win.webContents.print(
+            {
+              silent: true,
+              printBackground: true,
+              deviceName: nombreImpresoraFinal,
+              margins: { marginType: 'none' },
+              pageSize: {
+                width: Number(printerConfig.pageSizeWidth),
+                height: Number(printerConfig.pageSizeHeight)
+              },
+              preview: false
+            },
+            (success, errorType) => {
+              if (!success) {
+                console.error('❌ Error en la impresión:', errorType)
+                if (!win.isDestroyed()) win.close()
+                reject(new Error(errorType || 'La impresora rechazó el trabajo'))
+                return
+              }
+
               copiesPrinted++
               if (copiesPrinted < cantidadCopias) {
-                printNextCopy() // seguir imprimiendo
+                printNextCopy()
               } else {
                 console.log('✅ Impresión finalizada, cerrando ventana.')
-                win.close() // cerrar al terminar todas las copias
+                if (!win.isDestroyed()) win.close()
+                resolve({ printed: true, copies: copiesPrinted, printer: nombreImpresoraFinal })
               }
             }
-          }
-        )
-      }
+          )
+        }
 
-      printNextCopy()
-    } catch (err) {
-      console.error('Error al obtener las impresoras instaladas:', err)
-    }
+        printNextCopy()
+      } catch (err) {
+        if (!win.isDestroyed()) win.close()
+        reject(err)
+      }
+    })
+
+    win.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(htmlContent)}`).catch((error) => {
+      if (!win.isDestroyed()) win.close()
+      reject(error)
+    })
   })
 }

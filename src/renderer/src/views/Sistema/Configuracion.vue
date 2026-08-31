@@ -1269,6 +1269,74 @@
               </div>
             </template>
 
+            <div class="p-6 pb-0">
+              <p class="m-0 text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                Temas definidos
+              </p>
+              <div class="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <button
+                  type="button"
+                  class="relative overflow-hidden rounded-2xl border p-4 text-left transition-all duration-200"
+                  :class="
+                    themeConfig.themeStyle === 'classic'
+                      ? 'border-indigo-500 ring-2 ring-indigo-200 shadow-lg dark:ring-indigo-900'
+                      : 'border-gray-200 hover:-translate-y-0.5 hover:shadow-lg dark:border-gray-700'
+                  "
+                  @click="aplicarTemaDefinido('classic')"
+                >
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <p class="m-0 text-base font-black text-gray-900 dark:text-white">Clásico</p>
+                      <p class="mt-1 mb-0 text-sm text-gray-500">Superficies sólidas y limpias.</p>
+                    </div>
+                    <i class="pi pi-desktop text-2xl text-indigo-500"></i>
+                  </div>
+                  <div class="mt-4 flex gap-2">
+                    <span class="h-8 flex-1 rounded-lg bg-white shadow-sm dark:bg-gray-800"></span>
+                    <span class="h-8 w-14 rounded-lg bg-indigo-500"></span>
+                  </div>
+                  <i
+                    v-if="themeConfig.themeStyle === 'classic'"
+                    class="pi pi-check-circle absolute right-3 top-3 text-indigo-600"
+                  ></i>
+                </button>
+
+                <button
+                  type="button"
+                  class="glass-theme-option relative overflow-hidden rounded-2xl border p-4 text-left transition-all duration-200"
+                  :class="
+                    themeConfig.themeStyle === 'glass'
+                      ? 'border-violet-500 ring-2 ring-violet-200 shadow-xl dark:ring-violet-900'
+                      : 'border-white/70 hover:-translate-y-0.5 hover:shadow-xl'
+                  "
+                  @click="aplicarTemaDefinido('glass')"
+                >
+                  <div class="glass-theme-option__orb glass-theme-option__orb--one"></div>
+                  <div class="glass-theme-option__orb glass-theme-option__orb--two"></div>
+                  <div class="relative z-10 flex items-center justify-between gap-3">
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <p class="m-0 text-base font-black text-slate-900">Glass</p>
+                        <span class="rounded-full bg-white/55 px-2 py-0.5 text-xs font-bold text-violet-700 backdrop-blur">
+                          Nuevo
+                        </span>
+                      </div>
+                      <p class="mt-1 mb-0 text-sm text-slate-600">Vidrio elegante, moderno y translúcido.</p>
+                    </div>
+                    <i class="pi pi-sparkles text-2xl text-violet-600"></i>
+                  </div>
+                  <div class="relative z-10 mt-4 flex gap-2">
+                    <span class="h-8 flex-1 rounded-lg border border-white/70 bg-white/45 shadow-sm backdrop-blur"></span>
+                    <span class="h-8 w-14 rounded-lg border border-white/50 bg-violet-500/75 shadow-md backdrop-blur"></span>
+                  </div>
+                  <i
+                    v-if="themeConfig.themeStyle === 'glass'"
+                    class="pi pi-check-circle absolute right-3 top-3 z-20 text-violet-700"
+                  ></i>
+                </button>
+              </div>
+            </div>
+
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
               <div class="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div
@@ -1361,7 +1429,11 @@ const toast = useToast();
 import Swal from 'sweetalert2'
 import LoadingOverlay from '@/Loading/LoadingOverlay.vue';
 import OptionButtonTM from '@/components/OptionButtomTM.vue';
-import { applyCustomThemeToDocument, DEFAULT_CUSTOM_THEME } from '@/layout/composables/layout';
+import {
+  applyCustomThemeToDocument,
+  DEFAULT_CUSTOM_THEME,
+  GLASS_CUSTOM_THEME
+} from '@/layout/composables/layout';
 
 import SelectButton from 'primevue/selectbutton';
 
@@ -1566,6 +1638,10 @@ const barraMenu = ref([])
 const nBarraBoolean = ref({})
 /***************************************************/
 const themeConfig = ref({ ...DEFAULT_CUSTOM_THEME })
+const THEME_PRESETS = {
+  classic: DEFAULT_CUSTOM_THEME,
+  glass: GLASS_CUSTOM_THEME
+}
 const themeFields = [
   { key: 'primaryColor', label: 'Color primario' },
   { key: 'secondaryColor', label: 'Color secundario' },
@@ -1584,6 +1660,12 @@ const cargarThemeConfig = (datosJSON = {}) => {
     ...(datosJSON.themeConfig || {})
   }
   localStorage.setItem('custom_theme_config', JSON.stringify(themeConfig.value))
+  applyCustomThemeToDocument(themeConfig.value)
+}
+
+const aplicarTemaDefinido = (themeStyle) => {
+  const preset = THEME_PRESETS[themeStyle] || DEFAULT_CUSTOM_THEME
+  themeConfig.value = { ...preset }
   applyCustomThemeToDocument(themeConfig.value)
 }
 
@@ -2665,4 +2747,44 @@ const verificarYGuardarLicencia = async () => {
 .modern-panel:nth-child(1) { animation-delay: 0.1s; }
 .modern-panel:nth-child(2) { animation-delay: 0.2s; }
 .modern-panel:nth-child(3) { animation-delay: 0.3s; }
+
+.glass-theme-option {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.76), rgba(238, 242, 255, 0.48)),
+    linear-gradient(145deg, #dff5ff, #eee8ff);
+  box-shadow: 0 16px 38px rgba(91, 91, 160, 0.14);
+  isolation: isolate;
+}
+
+.glass-theme-option::before {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0.24);
+  backdrop-filter: blur(18px) saturate(150%);
+  content: '';
+}
+
+.glass-theme-option__orb {
+  position: absolute;
+  z-index: -1;
+  width: 7rem;
+  height: 7rem;
+  border-radius: 9999px;
+  filter: blur(8px);
+  opacity: 0.52;
+}
+
+.glass-theme-option__orb--one {
+  top: -3rem;
+  right: 2rem;
+  background: #8b5cf6;
+}
+
+.glass-theme-option__orb--two {
+  bottom: -4rem;
+  left: 1rem;
+  background: #38bdf8;
+}
 </style>

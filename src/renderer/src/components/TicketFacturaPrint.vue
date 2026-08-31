@@ -1,7 +1,11 @@
 <script setup>
 import QRCode from 'qrcode'
 import { envioElectron, encryptarPassword } from '@/funciones/funciones.js'
-import { getDgiiStampUrl } from '@/views/Vender/venderCore.js'
+import {
+  calculateShiftInvoiceNumber,
+  getDgiiStampUrl,
+  getInvoiceDocumentLabel
+} from '@/views/Vender/venderCore.js'
 import html2pdf from 'html2pdf.js'
 import Swal from 'sweetalert2'
 
@@ -62,6 +66,61 @@ const parseJson = (value, fallback) => {
 const toNumber = (value, fallback = 0) => {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : fallback
+}
+
+const fetchTicketJson = async (url, options, signal) => {
+  const response = await fetch(url, { ...options, signal })
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  return response.json()
+}
+
+const getShiftInvoiceNumber = async ({ factura, link, api, token }) => {
+  const shiftToken = String(factura?.token ?? '').trim()
+  if (!shiftToken || !link || !api || !token) return null
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 3500)
+
+  try {
+    const encryptedToken = await encryptarPassword(token, 10)
+    const headers = {
+      Authorization: `${encryptedToken}`,
+      'Content-Type': 'application/json'
+    }
+    const encodedShiftToken = encodeURIComponent(shiftToken)
+
+    const [cashShift, invoicesResponse] = await Promise.all([
+      fetchTicketJson(
+        `${link}${api}/datoscampo/registrocaja/turno/${encodedShiftToken}`,
+        { method: 'GET', headers },
+        controller.signal
+      ),
+      fetchTicketJson(
+        `${link}${api}/datosarraycondicion/facturas`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ campo: 'token', valor: shiftToken })
+        },
+        controller.signal
+      )
+    ])
+
+    if (!cashShift || String(cashShift.turno ?? '').trim() !== shiftToken) return null
+
+    const shiftInvoices = Array.isArray(invoicesResponse)
+      ? invoicesResponse
+      : Array.isArray(invoicesResponse?.data)
+        ? invoicesResponse.data
+        : []
+
+    return calculateShiftInvoiceNumber(factura, shiftInvoices)
+  } catch (error) {
+    console.warn('No se pudo calcular el número de factura del turno:', error?.message || error)
+    return null
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 const printHtml = async (htmlContent) => {
@@ -247,7 +306,8 @@ const buildTicketHtml = ({
   abonado,
   pendiente,
   datosDGII,
-  qrCodeDGII
+  qrCodeDGII,
+  numeroFacturaTurno
 }) => {
   const empresa =
     datosLocalStorage?.empresa ||
@@ -258,6 +318,7 @@ const buildTicketHtml = ({
     toNumber(factura.descuento) -
     toNumber(factura.impuesto)
   ).toFixed(2)
+  const etiquetaDocumento = getInvoiceDocumentLabel(factura, datosDGII?.ecf)
 
   const productosHTML = buildProductosHTML(
     parseJson(factura.productos, []),
@@ -345,6 +406,7 @@ const buildTicketHtml = ({
             <p>
                 ${datosDefault.fecha ? `Fecha: ${factura.fecha_emision || ''} ${factura.hora || ''}<br>` : ''}
                 ${datosDefault.no_factura ? `DOC: <b style="font-size:16px">#${factura.no_factura || ''}</b><br>` : ''}
+                ${numeroFacturaTurno ? `FACTURA DEL TURNO: <b style="font-size:16px">#${numeroFacturaTurno}</b><br>` : ''}
                 ${datosDefault.comprobante
                   ? (datosDGII
                       ? `<b style="color: #1e40af;">e-NCF: ${datosDGII.ecf}</b><br>`
@@ -364,7 +426,7 @@ const buildTicketHtml = ({
 </div>
 
             <div  class="bordeado" style="text-align:center;padding:3px">
-                 ${factura.tipo_factura || ''}
+                 ${etiquetaDocumento}
             </div>
             <table cellspacing="0" cellpadding="0">
                 <thead class="linea">
@@ -525,6 +587,15 @@ const printTicket = async ({ factura, cliente, datosEmpresa }) => {
   const api = datosJSON?.VITE_LINK_API || ''
   const token = datosJSON?.VITE_TOKEN || ''
 
+  // Se inicia junto con las demás consultas del ticket para no agregar una
+  // espera completa al proceso de impresión.
+  const numeroFacturaTurnoPromise = getShiftInvoiceNumber({
+    factura: facturaData,
+    link,
+    api,
+    token
+  })
+
   let abonado = null
   let pendiente = null
 
@@ -612,6 +683,8 @@ const printTicket = async ({ factura, cliente, datosEmpresa }) => {
     console.warn('No se pudieron extraer datos de DGII para ticket:', e)
   }
 
+  const numeroFacturaTurno = await numeroFacturaTurnoPromise
+
   const htmlContent = buildTicketHtml({
     factura: facturaData,
     cliente: clienteData || {},
@@ -626,7 +699,8 @@ const printTicket = async ({ factura, cliente, datosEmpresa }) => {
     abonado,
     pendiente,
     datosDGII,
-    qrCodeDGII
+    qrCodeDGII,
+    numeroFacturaTurno
   })
 
   await printHtml(htmlContent)

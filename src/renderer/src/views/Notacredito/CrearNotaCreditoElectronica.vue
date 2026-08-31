@@ -6,8 +6,11 @@ import axios from 'axios'
 import { useDatosEmpresa } from '../../stores'
 import {
   crearTablaSiNoExisteOffline,
+  encryptarPassword,
   esRespuestaOperacionExitosa,
+  envioElectron,
   nfecha,
+  peticionesFetch,
   peticionesFetchOffline
 } from '../../funciones/funciones.js'
 import {
@@ -43,6 +46,50 @@ const products = ref([])
 const modificationCode = ref(3)
 const reason = ref('DEVOLUCIÓN DE PRODUCTOS')
 const responseData = ref(null)
+
+let conexionFiscalPromise = null
+const getConexionFiscal = () => {
+  if (!conexionFiscalPromise) {
+    conexionFiscalPromise = envioElectron('datosarchivo').then(async (config) => ({
+      baseUrl: `${config.VITE_LINKURL}${config.VITE_LINK_API}`,
+      token: await encryptarPassword(config.VITE_TOKEN, 10)
+    }))
+  }
+  return conexionFiscalPromise
+}
+
+const consultarTablaFiscalCompartida = async (tabla) => {
+  const conexion = await getConexionFiscal()
+  return await peticionesFetch(
+    conexion.baseUrl,
+    `datosarray/${tabla}`,
+    {},
+    conexion.token,
+    'GET'
+  )
+}
+
+const actualizarRegistroFiscalCompartido = async (tabla, registro) => {
+  const conexion = await getConexionFiscal()
+  return await peticionesFetch(
+    conexion.baseUrl,
+    `actualizarcampos/${tabla}`,
+    registro,
+    conexion.token,
+    'POST'
+  )
+}
+
+const insertarRegistroFiscalCompartido = async (tabla, registro) => {
+  const conexion = await getConexionFiscal()
+  return await peticionesFetch(
+    conexion.baseUrl,
+    `insertar/${tabla}`,
+    registro,
+    conexion.token,
+    'POST'
+  )
+}
 
 const modificationOptions = [
   { value: 1, label: '1 - Anulación total' },
@@ -141,6 +188,18 @@ const selectSequenceRecord = (records) =>
     return (prefix === 'E34' || prefix === '34') && active
   }) || null
 
+const refreshElectronicCreditSequence = async () => {
+  const sequenceRows = await consultarTablaFiscalCompartida('comprobantes_electronicos')
+  const record = selectSequenceRecord(Array.isArray(sequenceRows) ? sequenceRows : [])
+  if (!record) {
+    sequenceRecord.value = null
+    return null
+  }
+
+  sequenceRecord.value = record
+  return sequenceRecord.value
+}
+
 const loadData = async () => {
   loading.value = true
   try {
@@ -149,7 +208,7 @@ const loadData = async () => {
       peticionesFetchOffline('getDataAsArray', 'facturas'),
       peticionesFetchOffline('getDataAsArray', 'clientes'),
       peticionesFetchOffline('getDataAsArray', 'notacredito'),
-      peticionesFetchOffline('getDataAsArray', 'comprobantes_electronicos'),
+      consultarTablaFiscalCompartida('comprobantes_electronicos'),
       peticionesFetchOffline('getDataAsArray', 'facturacion_electronica_log'),
       peticionesFetchOffline('getDataAsArray', 'configuracion_alanube')
     ])
@@ -236,21 +295,16 @@ watch(selectedInvoiceNumber, (invoiceNumber) => {
 })
 watch(modificationCode, applyModificationMode)
 
-const getAlanubeConfig = () => {
+const getAlanubeConfig = async () => {
   const environment =
-    String(window.localStorage.getItem('alanube_last_ambiente') || sequenceRecord.value?.ambiente || 'sandbox').toLowerCase() ===
-    'production'
+    String(sequenceRecord.value?.ambiente || 'sandbox').trim().toLowerCase() === 'production'
       ? 'production'
       : 'sandbox'
-  const key = environment === 'production' ? 'alanube_config_production' : 'alanube_config_sandbox'
-  let config = {}
-  try {
-    config = JSON.parse(window.localStorage.getItem(key) || '{}')
-  } catch {}
-  const databaseConfig = alanubeConfigs.value.find(
-    (item) => String(item.ambiente || '').toLowerCase() === environment
+  const configRows = await consultarTablaFiscalCompartida('configuracion_alanube')
+  alanubeConfigs.value = Array.isArray(configRows) ? configRows : []
+  const config = alanubeConfigs.value.find(
+    (item) => String(item.ambiente || '').trim().toLowerCase() === environment
   )
-  if (databaseConfig) config = { ...config, ...databaseConfig }
   return { environment, config }
 }
 
@@ -262,10 +316,9 @@ const updateSequence = async (usedSequence) => {
     contador: Number(sequenceRecord.value.contador || 0) + 1
   }
   if ('updated_at' in updated) updated.updated_at = nfecha('timestamp')
-  const result = await peticionesFetchOffline(
-    'updateData',
+  const result = await actualizarRegistroFiscalCompartido(
     'comprobantes_electronicos',
-    JSON.stringify(updated)
+    updated
   )
   if (!esRespuestaOperacionExitosa(result)) throw new Error('No se pudo actualizar la secuencia E34.')
   sequenceRecord.value = updated
@@ -305,15 +358,21 @@ const saveCreditNote = async (response, payload) => {
     created_at: nfecha('timestamp'),
     updated_at: nfecha('timestamp')
   }
-  const result = await peticionesFetchOffline('insertData', 'notacredito', JSON.stringify(record))
-  if (!esRespuestaOperacionExitosa(result)) throw new Error('Alanube aceptó la nota, pero no pudo guardarse localmente.')
+  const result = await insertarRegistroFiscalCompartido('notacredito', record)
+  if (!esRespuestaOperacionExitosa(result)) {
+    throw new Error('Alanube aceptó la nota, pero no pudo guardarse en la tabla central.')
+  }
   existingNotes.value.push(record)
 }
 
 const issueCreditNote = async () => {
   if (sending.value) return
+  sending.value = true
   try {
     if (!selectedInvoice.value) throw new Error('Seleccione una factura electrónica aceptada.')
+    // La vista puede llevar tiempo abierta. Consultar la tabla central en el
+    // instante de emitir para no reutilizar la secuencia de otro vendedor.
+    await refreshElectronicCreditSequence()
     if (!sequenceRecord.value) throw new Error('No existe una secuencia E34 activa configurada.')
     if (modificationCode.value === 1 && alreadyCredited.value > 0) {
       throw new Error('La factura ya tiene notas aplicadas. Use corrección de montos para acreditar el saldo restante.')
@@ -322,7 +381,12 @@ const issueCreditNote = async () => {
       throw new Error('El monto de la nota excede el saldo disponible de la factura.')
     }
 
-    const { environment, config } = getAlanubeConfig()
+    const { environment, config } = await getAlanubeConfig()
+    if (!config) {
+      throw new Error(
+        `No existe configuración de Alanube en la tabla para el ambiente ${environment}.`
+      )
+    }
     const token = String(config.token_api || '').trim()
     if (!token) throw new Error(`Falta el token de Alanube para ${environment}.`)
     const baseUrl = environment === 'production' ? 'https://api.alanube.co/dom/v1' : 'https://sandbox.alanube.co/dom/v1'
@@ -431,7 +495,6 @@ const issueCreditNote = async () => {
       throw new Error('El total fiscal calculado excede el saldo disponible de la factura.')
     }
 
-    sending.value = true
     const apiResponse = await axios.post(`${baseUrl}/credit-notes`, payload, {
       headers: {
         Accept: 'application/json',

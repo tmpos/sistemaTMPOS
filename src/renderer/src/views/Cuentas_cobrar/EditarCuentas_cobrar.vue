@@ -18,15 +18,44 @@ import FacturaPDFprint from '@/components/facturaPDFprint.vue';
 import Ticketpdfprint from '@/components/ticketpdfprint.vue';
 import CuentasCobrarPDFprint from '@/components/CuentasCobrarPDFprint.vue';
 import CuentasCobrarTicketprint from '@/components/CuentasCobrarTicketprint.vue';
+import { notifyCompanyPayment } from '@/funciones/notificacionesAbonos.js';
 /************************************************************************/
 import { useDatosEmpresa } from '@/stores';
 const datosEmpresa = useDatosEmpresa();
+const notificarAbonoCxc = (cuenta, pago) => {
+  void notifyCompanyPayment({
+    type: 'cxc',
+    reference: cuenta?.no_factura || cuenta?.no_emision,
+    client: cuenta?.nombre_cliente || cuenta?.cliente,
+    amount: pago?.cantidad,
+    balance: pago?.saldo ?? cuenta?.saldo,
+    method: pago?.metodo,
+    cashier: pago?.cajero || usuarioLocal.value?.nombre || usuarioLocal.value?.usuario,
+    date: pago?.fecha,
+    time: pago?.hora,
+    source: 'Edición de cuenta por cobrar',
+    company: datosEmpresa.empresa
+  });
+};
 const link = ref('');
 const api = ref('');
 const token = ref('');
 const tokenCorto = ref('');
 const tokenCifrado = ref('');
 const usuarioLocal = ref({});
+const obtenerTurnoCajaActual = async () => {
+  const turnoUsuario = String(usuarioLocal.value?.token || '').trim();
+  const almacenActual = String(datosEmpresa.empresa?.nombre || '').trim().toLowerCase();
+  const cajas = await peticionesFetchOffline('getDataAsArray', 'registrocaja');
+  const cajasAbiertas = (Array.isArray(cajas) ? cajas : [])
+    .filter(caja => ['abierto', 'abierta'].includes(String(caja?.estado || '').trim().toLowerCase()))
+    .filter(caja => !almacenActual || String(caja?.almacen || '').trim().toLowerCase() === almacenActual)
+    .sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+
+  return cajasAbiertas.find(caja => String(caja?.turno || '').trim() === turnoUsuario)?.turno
+    || cajasAbiertas[0]?.turno
+    || turnoUsuario;
+};
 /************************************************************************/
 const todasLasCuentas = ref([]);
 const datoscampos = ref({});
@@ -207,6 +236,7 @@ const registrarAbono = async () => {
   }
 
   const numeroPago = pagosArray.value.length + 1;
+  const turnoActual = await obtenerTurnoCajaActual();
   const npago = {
     "nopago": numeroPago,
     "cantidad": cantidadAbono.toFixed(2),
@@ -216,7 +246,7 @@ const registrarAbono = async () => {
       : nuevoAbono.value.fecha,
     "hora": nfecha('hora'),
     "timestamp": nfecha('timestamp'),
-    "turno": '',
+    "turno": turnoActual,
     "cajero": usuarioLocal.value.usuario || 'SISTEMA',
     "banco": nuevoAbono.value.banco?.nombre || '',
     "saldo": 0
@@ -246,6 +276,8 @@ const registrarAbono = async () => {
     if (!movimientoBancoOk) {
       return;
     }
+
+    notificarAbonoCxc(datoscampos.value, { ...npago, saldo: nuevoSaldo.toFixed(2) });
 
     toast.add({ severity: 'success', summary: 'Abono Registrado', detail: `$${nuevoAbono.value.cantidad} abonado correctamente`, life: 4000 });
 
@@ -643,7 +675,7 @@ const arreglarMontoCredito = async () => {
       fecha: nfecha('fecha'),
       hora: nfecha('hora'),
       timestamp: nfecha('timestamp'),
-      turno: '',
+      turno: await obtenerTurnoCajaActual(),
       cajero: usuarioLocal.value.usuario || 'SISTEMA',
       banco: '',
       saldo: ''

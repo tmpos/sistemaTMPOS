@@ -19,15 +19,80 @@ import FacturaPDFprint from '@/components/facturaPDFprint.vue';
 import Ticketpdfprint from '@/components/ticketpdfprint.vue';
 import CuentasCobrarPDFprint from '@/components/CuentasCobrarPDFprint.vue';
 import CuentasCobrarTicketprint from '@/components/CuentasCobrarTicketprint.vue';
+import { notifyCompanyPayment } from '@/funciones/notificacionesAbonos.js';
 /************************************************************************/
 import { useDatosEmpresa } from '@/stores';
 const datosEmpresa = useDatosEmpresa();
+const notificarAbonoCxc = (cuenta, pago, origen = 'Cuentas por cobrar') => {
+  void notifyCompanyPayment({
+    type: 'cxc',
+    reference: cuenta?.no_factura || cuenta?.no_emision,
+    client: cuenta?.nombre_cliente || cuenta?.cliente,
+    amount: pago?.cantidad,
+    balance: pago?.saldo ?? cuenta?.saldo,
+    method: pago?.metodo,
+    cashier: pago?.cajero || usuarioLocal.value?.nombre || usuarioLocal.value?.usuario,
+    date: pago?.fecha,
+    time: pago?.hora,
+    source: origen,
+    company: datosEmpresa.empresa
+  });
+};
 const token = ref('');
 const tokenCorto = ref('');
 const tokenCifrado = ref('');
 const link = ref('');
 const api = ref('');
 const usuarioLocal = ref({});
+const turnoCajaActivo = ref('');
+const turnoCajaActual = () => turnoCajaActivo.value || usuarioLocal.value?.token || '';
+
+const cargarTurnoCajaActivo = async () => {
+  const cajas = await peticionesFetchOffline('getDataAsArray', 'registrocaja');
+  const almacenActual = String(datosEmpresa.empresa?.nombre || '').trim().toLowerCase();
+  const turnoUsuario = String(usuarioLocal.value?.token || '').trim();
+  const abiertas = (Array.isArray(cajas) ? cajas : [])
+    .filter(caja => ['abierto', 'abierta'].includes(String(caja?.estado || '').trim().toLowerCase()))
+    .filter(caja => !almacenActual || String(caja?.almacen || '').trim().toLowerCase() === almacenActual)
+    .sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+  turnoCajaActivo.value = abiertas.find(caja => String(caja.turno || '').trim() === turnoUsuario)?.turno
+    || abiertas[0]?.turno
+    || turnoUsuario;
+};
+
+const imprimirReciboAbono = async (cuenta) => {
+  if (!window.electron || !cuenta) return;
+
+  let facturaOriginal = null;
+  if (cuenta.no_factura) {
+    facturaOriginal = await peticionesFetchOffline(
+      'getDataByField',
+      'facturas',
+      'no_factura',
+      cuenta.no_factura
+    );
+  }
+
+  if (Array.isArray(facturaOriginal)) {
+    facturaOriginal = facturaOriginal[0] || null;
+  }
+
+  const datosCuenta = {
+    ...cuenta,
+    pagos: cuenta.pagos || '[]'
+  };
+  const datosFactura = {
+    ...(facturaOriginal || {}),
+    productos: facturaOriginal?.productos || '[]'
+  };
+
+  await window.electron.ipcRenderer.invoke(
+    'facturaCredito',
+    JSON.stringify(datosCuenta),
+    JSON.stringify(datosFactura),
+    JSON.stringify(enviarDatosLocalStorage())
+  );
+};
 /************************************************************************/
 const camposArray = ["almacen", "no_emision", "no_factura","comprobante", "cod_cliente", "nombre_cliente", "cedula_cliente", "telefono_cliente", "whatsapp_cliente", "email_cliente", "direccion_cliente", "rnc_cliente", "nombrecomercial_cliente", "fecha_emision", "monto_credito", "interes", "fecha_vencimiento", "cuotas", "saldo", "abonado", "fecha_pago", "pagos", "estatus", "hora", "vendedor", "delivery", "nota", "usuario", "valorcuotascredito", "tipocredito", "tiempocredito", "fechas_pago_credito", "institucion", "cliente", "quiencredito", "identificadordb"];
 /************************************************************************/
@@ -367,7 +432,7 @@ const procesarPago = async () => {
       "fecha": nfecha('fecha'),
       "hora": nfecha('hora'),
       "timestamp": nfecha('timestamp'),
-      "turno": '',
+      "turno": turnoCajaActual(),
       "cajero": usuarioLocal.value.usuario || 'SISTEMA',
       "saldo": saldoNuevo,
       "cuenta_contable": formPago.value.cuentaContable.nombre,
@@ -409,6 +474,8 @@ const procesarPago = async () => {
         return;
       }
 
+      notificarAbonoCxc(cuenta, npago);
+
       toast.add({
         severity: 'success',
         summary: 'Pago Registrado',
@@ -417,10 +484,7 @@ const procesarPago = async () => {
       });
 
       // Imprimir recibo automáticamente
-      if (window.electron) {
-        const datosEmpresaA = JSON.stringify(enviarDatosLocalStorage());
-        await window.electron.ipcRenderer.invoke('facturaCredito', cuenta.no_emision, datosEmpresaA);
-      }
+      await imprimirReciboAbono(cuenta);
 
       await fetchAndSetupData();
       await fetchCatalogoCuentas();
@@ -521,7 +585,7 @@ const realizarAbono = async (cuenta) => {
       "fecha": nfecha('fecha'),
       "hora": nfecha('hora'),
       "timestamp": nfecha('timestamp'),
-      "turno": '',
+      "turno": turnoCajaActual(),
       "cajero": usuarioLocal.value.usuario || 'SISTEMA',
       "saldo": saldoN
     };
@@ -539,13 +603,11 @@ const realizarAbono = async (cuenta) => {
     const peticion = await peticionesFetchOffline('updateData', 'cuentas_cobrar', JSON.stringify(cuenta));
 
     if (peticion[0] === 'ok') {
+      notificarAbonoCxc(cuenta, npago);
       toast.add({ severity: 'success', summary: 'Abono Registrado', detail: `$${formValues.monto} abonado correctamente`, life: 4000 });
 
       // Imprimir recibo automáticamente
-      if (window.electron) {
-        const datosEmpresaA = JSON.stringify(enviarDatosLocalStorage());
-        await window.electron.ipcRenderer.invoke('facturaCredito', cuenta.no_emision, datosEmpresaA);
-      }
+      await imprimirReciboAbono(cuenta);
 
       await fetchAndSetupData();
 
@@ -597,7 +659,7 @@ const fnAgregarAbono = async () => {
     "fecha": fechaAbonoModal.value,
     "timestamp": nfecha('timestamp'),
     "hora": nfecha('hora'),
-    "turno": '',
+    "turno": turnoCajaActual(),
     "cajero": usuarioLocal.value.usuario || 'SISTEMA',
     "banco": requiereBanco(metodoAbonoModal.value) ? (bancoAbonoModal.value?.nombre || '') : '',
     "saldo": saldoN
@@ -625,12 +687,11 @@ const fnAgregarAbono = async () => {
       return;
     }
 
+    notificarAbonoCxc(currentRowData.value, npago);
+
     toast.add({ severity: 'success', summary: 'Cuenta Actualizada', detail: 'Cuenta actualizada correctamente', life: 3000 });
 
-    const datosEmpresa = JSON.stringify(enviarDatosLocalStorage());
-    if (window.electron) {
-      window.electron.ipcRenderer.invoke('facturaCredito', currentRowData.value.no_emision, datosEmpresa);
-    }
+    await imprimirReciboAbono(currentRowData.value);
 
     await fetchAndSetupData();
   } else {
@@ -671,7 +732,7 @@ const fnAgregarAbonoModal = async () => {
       "fecha": fechaAbonoModal.value,
       "timestamp": nfecha('timestamp'),
       "hora": nfecha('hora'),
-      "turno": '',
+      "turno": turnoCajaActual(),
       "cajero": usuarioLocal.value.usuario || 'SISTEMA',
       "banco": requiereBanco(metodoAbonoModal.value) ? (bancoAbonoModal.value?.nombre || '') : '',
       "saldo": saldoN
@@ -697,6 +758,7 @@ const fnAgregarAbonoModal = async () => {
       if (!movimientoBancoOk) {
         return;
       }
+      notificarAbonoCxc(factura, npago, 'Cuentas por cobrar - abono distribuido');
     }
 
     totalAbonado -= abonoActual;
@@ -730,16 +792,17 @@ const fnPagarTodo = () => {
           const pagos = JSON.parse(factura.pagos);
           const nopago = (pagos.length + 1);
 
-          pagos.push({
+          const npago = {
             "nopago": nopago.toString(),
             "cantidad": saldo.toFixed(2),
             "metodo": 'EFECTIVO',
             "fecha": nfecha('fecha'),
             "hora": nfecha('hora'),
             "saldo": '0.00',
-            "turno": '',
+            "turno": turnoCajaActual(),
             "cajero": usuarioLocal.value.usuario || 'SISTEMA'
-          });
+          };
+          pagos.push(npago);
 
           factura.cuotas = saldo.toFixed(2);
           factura.fecha_pago = nfecha('fecha');
@@ -751,6 +814,7 @@ const fnPagarTodo = () => {
           const peticion = await peticionesFetchOffline('updateData', 'cuentas_cobrar', JSON.stringify(factura));
 
           if (peticion[0] === 'ok') {
+            notificarAbonoCxc(factura, npago, 'Cuentas por cobrar - pago completo');
             toast.add({ severity: 'success', summary: 'Cuenta Actualizada', detail: 'Cuenta actualizada correctamente', life: 3000 });
           } else {
             toast.add({ severity: 'error', summary: 'Error', detail: 'Error al actualizar cuenta', life: 3000 });
@@ -1406,7 +1470,7 @@ const fnCrearCxC = async () => {
         fecha: nfecha('fecha'),
         hora: nfecha('hora'),
         timestamp: nfecha('timestamp'),
-        turno: '',
+        turno: turnoCajaActual(),
         cajero: usuarioLocal.value.usuario || 'SISTEMA',
         banco: '',
         saldo: (Number(data.monto_credito) - abonoInicial).toFixed(2)
@@ -1815,6 +1879,7 @@ onMounted(async () => {
   await crearTablaSiNoExisteOffline('cuentas_cobrar', camposArray, toast);
   await crearTablaSiNoExisteOffline('cuentas', ['nombre', 'categoria', 'saldo'], toast);
   usuarioLocal.value = JSON.parse(window.localStorage.getItem('usuarioLocal'))[0] || {};
+  await cargarTurnoCajaActivo();
 
   await fetchBanco();
   await fetchAndSetupData();

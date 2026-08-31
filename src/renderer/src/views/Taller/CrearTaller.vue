@@ -615,14 +615,15 @@ watch(() => datoscamposTaller.value.preciopiezas, (nuevoPrecioPiezas) => {
 const sincronizarAbonoTaller = () => {
   const total = parseFloat(datoscamposTaller.value.total) || 0;
   const abono2 = parseFloat(abono.value) || 0;
+  const usuarioActual = datosEmpresa.usuario || {};
   datoscamposTaller.value.saldo = (total - abono2).toFixed(2);
 
   const datos = {
     "abono": abono2.toFixed(2),
     "prioridad": prioridad.value,
-    "recibidopor": "Soporte",
-    "turno": "280420241514073",
-    "cajero": "soporte@versatframework.com",
+    "recibidopor": usuarioActual.email || usuarioActual.nombre || '',
+    "turno": usuarioActual.token || '',
+    "cajero": usuarioActual.email || '',
     "metodo_pago": datoscamposTaller.value.metodopago || 'EFECTIVO',
     "hora": nfecha('hora'),
     "fecha": nfecha('fecha')

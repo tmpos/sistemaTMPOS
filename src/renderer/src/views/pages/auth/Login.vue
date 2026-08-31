@@ -305,6 +305,79 @@
 </Drawer>
 
 <!-- //////////////////////////////////////////////////////////////////////////// -->
+<Dialog
+  v-model:visible="visibleSesionesAbiertas"
+  modal
+  :closable="!procesandoSesionesAbiertas"
+  :dismissableMask="!procesandoSesionesAbiertas"
+  :style="{ width: '34rem', maxWidth: '94vw' }"
+  class="open-sessions-dialog"
+  @hide="cancelarSesionesAbiertas"
+>
+  <template #header>
+    <div class="flex items-center gap-3">
+      <span class="flex items-center justify-center w-12 h-12 rounded-xl bg-orange-100 text-orange-600">
+        <i class="pi pi-exclamation-triangle text-xl"></i>
+      </span>
+      <div>
+        <h3 class="text-xl font-bold m-0 text-gray-800">Sesiones abiertas</h3>
+        <p class="text-sm text-gray-500 m-0 mt-1">Selecciona cómo deseas continuar</p>
+      </div>
+    </div>
+  </template>
+
+  <div class="open-sessions-summary">
+    <div class="open-sessions-avatar">
+      <i class="pi pi-user"></i>
+    </div>
+    <div>
+      <span class="block text-sm text-gray-500">Cajero</span>
+      <strong class="block text-lg text-gray-800">{{ username }}</strong>
+    </div>
+    <div class="open-sessions-count">
+      <strong>{{ sesionesAbiertasDetectadas.length }}</strong>
+      <span>{{ sesionesAbiertasDetectadas.length === 1 ? 'sesión abierta' : 'sesiones abiertas' }}</span>
+    </div>
+  </div>
+
+  <p class="text-sm text-gray-500 mt-4 mb-0">
+    Puedes continuar con la sesión existente o cerrar todas para iniciar una caja nueva.
+  </p>
+
+  <template #footer>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
+      <Button
+        label="Cancelar"
+        icon="pi pi-times"
+        severity="secondary"
+        outlined
+        :disabled="procesandoSesionesAbiertas"
+        @click="cancelarSesionesAbiertas"
+      />
+      <Button
+        label="Cerrar sesiones"
+        icon="pi pi-power-off"
+        severity="danger"
+        outlined
+        :loading="procesandoSesionesAbiertas === 'cerrar'"
+        :disabled="Boolean(procesandoSesionesAbiertas) && procesandoSesionesAbiertas !== 'cerrar'"
+        @click="cerrarSesionesDesdeModal"
+      />
+      <Button
+        ref="continuarSesionButton"
+        label="Continuar"
+        icon="pi pi-arrow-right"
+        iconPos="right"
+        autofocus
+        :loading="procesandoSesionesAbiertas === 'continuar'"
+        :disabled="Boolean(procesandoSesionesAbiertas) && procesandoSesionesAbiertas !== 'continuar'"
+        @click="continuarSesionAbierta"
+      />
+    </div>
+  </template>
+</Dialog>
+
+<!-- //////////////////////////////////////////////////////////////////////////// -->
     <!-- DIALOGO DE ALMACÉN -->
     <Dialog v-model:visible="visibleSeleccionAlmacen" modal :closable="false" header="Selecciona un Almacén" :style="{ width: '25rem' }">
       <p class="mb-4">Debes seleccionar el almacén con el que deseas trabajar:</p>
@@ -375,6 +448,10 @@ const licencia = ref('')
 const visibleSeleccionAlmacen = ref(false);
 const almacenSeleccionado = ref(null);
 const listaAlmacenes = ref([]);
+const visibleSesionesAbiertas = ref(false);
+const sesionesAbiertasDetectadas = ref([]);
+const procesandoSesionesAbiertas = ref('');
+const continuarSesionButton = ref(null);
 /*********************************************/
 const visiblePinUnlock = ref(false);
 const pinValue = ref('');
@@ -1117,33 +1194,45 @@ const obtenerSesionesAbiertasCajero = async () => {
 const verificaCaja = async () => {
   let datosEnCaja = await obtenerSesionesAbiertasCajero();
     if (datosEnCaja && Array.isArray(datosEnCaja) && datosEnCaja.length > 0) {
-      const result = await Swal.fire({
-        icon: 'warning',
-        title: 'Sesiones abiertas detectadas',
-        html: `El cajero <strong>${username.value}</strong> tiene <strong>${datosEnCaja.length}</strong> sesion(es) de caja abierta.<br><br>Seleccione una opcion para continuar.`,
-        showCancelButton: true,
-        showDenyButton: true,
-        confirmButtonText: 'Continuar',
-        denyButtonText: 'Cerrar todas las sesiones',
-        cancelButtonText: 'Cancelar'
-      });
-
-      if (result.isConfirmed) {
-        await navegarDesdeLogin('/caja');
-        return;
-      }
-
-      if (result.isDenied) {
-        const sesionesCerradas = await cerrarSesionesAbiertasCajero(datosEnCaja);
-        if (sesionesCerradas) {
-          await navegarDesdeLogin('/caja');
-        }
-      }
-
+      sesionesAbiertasDetectadas.value = datosEnCaja;
+      visibleSesionesAbiertas.value = true;
+      await nextTick();
+      const botonContinuar = continuarSesionButton.value?.$el || continuarSesionButton.value;
+      botonContinuar?.focus?.();
       return;
     }else{
       await inicioCajero()
     }
+};
+/*******************************************************************************/
+const cancelarSesionesAbiertas = () => {
+  if (procesandoSesionesAbiertas.value) return;
+  visibleSesionesAbiertas.value = false;
+  sesionesAbiertasDetectadas.value = [];
+};
+/*******************************************************************************/
+const continuarSesionAbierta = async () => {
+  procesandoSesionesAbiertas.value = 'continuar';
+  try {
+    visibleSesionesAbiertas.value = false;
+    await navegarDesdeLogin('/caja');
+  } finally {
+    procesandoSesionesAbiertas.value = '';
+  }
+};
+/*******************************************************************************/
+const cerrarSesionesDesdeModal = async () => {
+  procesandoSesionesAbiertas.value = 'cerrar';
+  try {
+    const sesionesCerradas = await cerrarSesionesAbiertasCajero(sesionesAbiertasDetectadas.value);
+    if (sesionesCerradas) {
+      visibleSesionesAbiertas.value = false;
+      sesionesAbiertasDetectadas.value = [];
+      await navegarDesdeLogin('/caja');
+    }
+  } finally {
+    procesandoSesionesAbiertas.value = '';
+  }
 };
 /*******************************************************************************/
 const cerrarSesionesAbiertasCajero = async (sesiones = []) => {
@@ -1786,6 +1875,50 @@ const direccion = form.value.direccion;
 </script>
 
 <style scoped>
+.open-sessions-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 1rem;
+  background: linear-gradient(145deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.82));
+}
+
+.open-sessions-avatar {
+  display: grid;
+  place-items: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 0.9rem;
+  color: var(--primary-color);
+  background: color-mix(in srgb, var(--primary-color) 12%, white);
+  font-size: 1.25rem;
+}
+
+.open-sessions-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 7.5rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.85rem;
+  color: #c2410c;
+  background: rgba(255, 237, 213, 0.8);
+}
+
+.open-sessions-count strong {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.open-sessions-count span {
+  margin-top: 0.3rem;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
 /* ===== ROOT: cubre toda la pantalla sin blancos ===== */
 .login-root {
   position: fixed;
