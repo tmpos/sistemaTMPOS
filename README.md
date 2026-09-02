@@ -1,8 +1,8 @@
 # TM-POS
 
-[![Descargar TM-POS 50.2.1](https://img.shields.io/badge/Descargar-TM--POS%2050.2.1-2563eb?style=for-the-badge&logo=windows)](https://github.com/tmpos/sistemaTMPOS/releases/download/v50.2.1/TM-POS-50.2.1.exe)
+[![Descargar TM-POS 50.2.2](https://img.shields.io/badge/Descargar-TM--POS%2050.2.2-2563eb?style=for-the-badge&logo=windows)](https://github.com/tmpos/sistemaTMPOS/releases/download/v50.2.2/TM-POS-50.2.2.exe)
 
-Descarga directa de la versión estable para Windows: [TM-POS 50.2.1](https://github.com/tmpos/sistemaTMPOS/releases/download/v50.2.1/TM-POS-50.2.1.exe).
+Descarga directa de la versión estable para Windows: [TM-POS 50.2.2](https://github.com/tmpos/sistemaTMPOS/releases/download/v50.2.2/TM-POS-50.2.2.exe).
 
 An Electron application with Vue
 

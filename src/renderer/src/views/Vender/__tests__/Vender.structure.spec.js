@@ -174,8 +174,21 @@ describe('Vender.vue: contrato estructural del componente completo', () => {
     expect(source).toContain('El crédito fiscal E31 requiere un cliente con RNC válido.')
     expect(source).toContain('const clienteValidoParaE31 =')
     expect(source).toContain("codigo !== '0000000'")
-    expect(source).toContain("const requiereRncFiscal = prefijoComprobanteSeleccionado === 'E31'")
-    expect(source).toContain('await abrirModalClienteFiscalE31(requiereRncFiscal)')
+    expect(source).toContain(
+      "tipoFactura.value === 'factura' && prefijoComprobanteSeleccionado === 'E31'"
+    )
+    expect(source).toContain('await abrirModalClienteFiscalE31(true)')
     expect(source).toContain('requiereRncClienteFiscalPendiente.value && !clienteValidoParaE31(cliente)')
+  })
+
+  it('permite facturas E32 con el cliente genérico sin abrir la selección fiscal E31', () => {
+    const guardarFacturaSource = source.slice(
+      source.indexOf('const guardarFactura = async () => {'),
+      source.indexOf('const tipo = tipoFactura.value')
+    )
+
+    expect(guardarFacturaSource).not.toContain('Boolean(prefijoComprobanteSeleccionado)')
+    expect(guardarFacturaSource).not.toContain('esClientePorDefecto')
+    expect(guardarFacturaSource).toContain("prefijoComprobanteSeleccionado === 'E31'")
   })
 })

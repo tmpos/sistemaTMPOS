@@ -1,6 +1,6 @@
 {
   "name": "tm-pos",
-  "version": "50.2.1",
+  "version": "50.2.2",
   "description": "Sistema de Facturación",
   "main": "./out/main/index.js",
   "author": "Tomas Taveras",

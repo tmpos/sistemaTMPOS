@@ -22325,15 +22325,11 @@ const guardarFactura = async () => {
   }
 
   const prefijoComprobanteSeleccionado = obtenerPrefijoECFPorComprobante(comprobante.value)
-  const requiereClienteConComprobante =
-    tipoFactura.value === 'factura' && Boolean(prefijoComprobanteSeleccionado)
-  const esClientePorDefecto = String(clienteSelected.value?.codigo || '').trim() === '0000000'
-  const requiereRncFiscal = prefijoComprobanteSeleccionado === 'E31'
-  const clienteNoValidoParaComprobante =
-    esClientePorDefecto || (requiereRncFiscal && !clienteValidoParaE31(clienteSelected.value))
+  const requiereClienteFiscalE31 =
+    tipoFactura.value === 'factura' && prefijoComprobanteSeleccionado === 'E31'
 
-  if (requiereClienteConComprobante && clienteNoValidoParaComprobante) {
-    await abrirModalClienteFiscalE31(requiereRncFiscal)
+  if (requiereClienteFiscalE31 && !clienteValidoParaE31(clienteSelected.value)) {
+    await abrirModalClienteFiscalE31(true)
     return
   }
 
