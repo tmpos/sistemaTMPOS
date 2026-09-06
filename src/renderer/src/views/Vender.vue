@@ -7567,9 +7567,10 @@
             class="form-control"
             @change="calculoMedida"
           >
-            <option value="BLANCO">BLANCO</option>
-            <option value="PLATA">PLATA</option>
-            <option value="NEGRO">NEGRO</option>
+             <option value="BLANCO">BLANCO</option>
+             <option value="PLATA">PLATA</option>
+             <option value="GRIS">GRIS</option>
+             <option value="NEGRO">NEGRO</option>
             <option value="MADERA">MADERA</option>
             <option value="INOX">INOX</option>
             <option value="ROBLE">ROBLE</option>
@@ -10097,6 +10098,8 @@ import {
   getAlanubeSecurityCode,
   getCartProductQuantity,
   getDgiiStampUrl,
+  getDefaultInvoiceState,
+  getEffectiveQuotePrice,
   getElectronicReceiptPrefix,
   getProductSalePrice,
   getProductStock,
@@ -10833,6 +10836,15 @@ const selectedVidrioMedidaId = ref('')
 const medidaMarco = ref('0')
 const selectedmedidaMarco = ref('FULL')
 const fabricacionData = ref([])
+
+const obtenerPrecioColorFabricacion = (datosFabricacion) => {
+  const campoColor = String(colorMedida.value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_')
+
+  return Number(datosFabricacion?.[campoColor] || 0)
+}
 /****************************************************/
 //const clienteSelected = ref({})
 const garantiaN = ref('3 Months')
@@ -11103,7 +11115,7 @@ const calculoMedida = () => {
   cantidadMedida.value = calculo.toFixed(2)
   resultadoMedida.value = (calculo / 144).toFixed(2)
   cantidadFinalMedida.value = (
-    resultadoMedida.value * Number(datosFab[colorMedida.value.toLowerCase()]) +
+    resultadoMedida.value * obtenerPrecioColorFabricacion(datosFab) +
     Number(preciovidrioMedidaTotal.value)
   ).toFixed(2)
 
@@ -11140,7 +11152,7 @@ const fnCambioFullMarco = () => {
   cantidadMedida.value = calculo.toFixed(2)
   resultadoMedida.value = (calculo / 144).toFixed(2)
   cantidadFinalMedida.value = (
-    resultadoMedida.value * Number(datosFab[colorMedida.value.toLowerCase()]) +
+    resultadoMedida.value * obtenerPrecioColorFabricacion(datosFab) +
     Number(preciovidrioMedidaTotal.value)
   ).toFixed(2)
 
@@ -11169,7 +11181,7 @@ const fnCambioFullMarcoKeyDown = () => {
   cantidadMedida.value = calculo.toFixed(2)
   //resultadoMedida.value = (calculo / 144).toFixed(2)
   cantidadFinalMedida.value = (
-    resultadoMedida.value * Number(datosFab[colorMedida.value.toLowerCase()]) +
+    resultadoMedida.value * obtenerPrecioColorFabricacion(datosFab) +
     Number(preciovidrioMedidaTotal.value)
   ).toFixed(2)
 
@@ -11239,7 +11251,7 @@ const fnCalculoPie = () => {
   const datosFab = datosFabrica.value.find((fab) => fab.descripcion === descripcionMedida.value)
 
   cantidadFinalMedida.value = (
-    resultadoMedida.value * Number(datosFab[colorMedida.value.toLowerCase()]) +
+    resultadoMedida.value * obtenerPrecioColorFabricacion(datosFab) +
     Number(preciovidrioMedidaTotal.value)
   ).toFixed(2)
   // calculoMedida()
@@ -11301,7 +11313,7 @@ const calculoMedidaMinimo = () => {
   const calculoMarco = Number(resultadoMedida.value) * Number(medidaMarco.value)
 
   cantidadFinalMedida.value = (
-    resultadoMedida.value * Number(datosFab[colorMedida.value.toLowerCase()]) +
+    resultadoMedida.value * obtenerPrecioColorFabricacion(datosFab) +
     Number(preciovidrioMedidaTotal.value) +
     calculoMarco
   ).toFixed(2)
@@ -15137,6 +15149,9 @@ const fnCambiarMetodoApartado = (metodo) => {
 const noFacturaFN = ref('0000001')
 const comprobanteFN = ref('SIN COMPROBANTE')
 const estadoFN = ref('Pendiente')
+watch(visiblecobrar, (visible) => {
+  if (visible) estadoFN.value = getDefaultInvoiceState(usuarioLocal.value?.usuario)
+})
 const efetivoFN = ref(0.0)
 const tarjetaFN = ref(0.0)
 const transferenciaFN = ref(0.0)
@@ -15287,35 +15302,39 @@ const fnGuardarCredito = () => {
 const ventasGuardadas = ref([])
 /****************************************************/
 const fetchFabrica = async () => {
+  const fabricacionGuardada = JSON.parse(window.localStorage.getItem('fabricacion')) || []
+
   try {
-    const verificaLocalStorage = JSON.parse(window.localStorage.getItem('fabricacion')) || []
-    if (verificaLocalStorage.length > 0) {
-      datosFabrica.value = verificaLocalStorage
-    } else {
-      /*    const response = await peticionesFetch(`${link.value}${api.value}`,'datosarraypost',{'tabla':'fabricacion'},tokenCifrado.value,'POST');*/
-      /*    const response = await peticionesFetchOffline('getDataAsArray', 'fabricacion');*/
-      const columnas = await peticionesFetchOffline('getTableColumns', 'fabricacion')
-      if (!columnas.includes('almacen')) {
-        await peticionesFetchOffline('addColumnToTable', { tabla: 'fabricacion', campo: 'almacen' })
-        await peticionesFetchOffline(
-          'updateEntireColumn',
-          'fabricacion',
-          'almacen',
-          datosEmpresa.empresa.nombre
-        )
+    const columnas = await peticionesFetchOffline('getTableColumns', 'fabricacion')
+    const camposFabricacionRequeridos = ['gris', 'negro_texturizado']
+
+    for (const campo of camposFabricacionRequeridos) {
+      if (!columnas.includes(campo)) {
+        await peticionesFetchOffline('addColumnToTable', { tabla: 'fabricacion', campo })
       }
-      const response = await peticionesFetchOffline(
-        'getDataArrayByCondition',
+    }
+
+    if (!columnas.includes('almacen')) {
+      await peticionesFetchOffline('addColumnToTable', { tabla: 'fabricacion', campo: 'almacen' })
+      await peticionesFetchOffline(
+        'updateEntireColumn',
         'fabricacion',
         'almacen',
         datosEmpresa.empresa.nombre
       )
-      datosFabrica.value = response
-      localStorage.setItem('fabricacion', JSON.stringify(response))
     }
 
-    /*********************************************/
+    const response = await peticionesFetchOffline(
+      'getDataArrayByCondition',
+      'fabricacion',
+      'almacen',
+      datosEmpresa.empresa.nombre
+    )
+
+    datosFabrica.value = Array.isArray(response) ? response : fabricacionGuardada
+    localStorage.setItem('fabricacion', JSON.stringify(datosFabrica.value))
   } catch (error) {
+    datosFabrica.value = fabricacionGuardada
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -17409,11 +17428,7 @@ onMounted(async () => {
     mostrarImagenesProductosVender.value = datosJSON.mostrarImagenesVender
   }
 
-  if (datosJSON.VITE_CAJERO_ACTIVO === 'true') {
-    estadoFN.value = 'Pendiente'
-  } else {
-    estadoFN.value = 'Cobrado'
-  }
+  estadoFN.value = getDefaultInvoiceState(usuarioLocal.value?.usuario)
 
   tokenCifrado.value = await encryptarPassword(token.value, 10)
   /************************************************************/
@@ -28130,9 +28145,7 @@ const debeSolicitarPrecioCotizacion = (producto) => {
     return false
   }
 
-  const precioVenta = normalizarPrecioNumerico(producto?.precio_venta)
-  const precioFinal = normalizarPrecioNumerico(producto?.precio_final ?? producto?.precio_venta)
-  return precioVenta <= 0 && precioFinal <= 0
+  return getEffectiveQuotePrice(producto, productosVenta.value) <= 0
 }
 
 const abrirModalPrecioCotizacion = (producto, origen) => {

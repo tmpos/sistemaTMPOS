@@ -11,7 +11,7 @@ const toast = useToast();
 /************************************************************************/
 const usuarioLocal = ref({})
 /************************************************************************/
-const camposArray = ["descripcion","minimo","blanco","plata","negro","madera","inox","roble","otro","imagen","usuario"];
+const camposArray = ["descripcion","minimo","blanco","plata","gris","negro","negro_texturizado","madera","inox","roble","otro","imagen","usuario"];
 /************************************************************************/
 import { useDatosEmpresa } from '../../stores'
 const datosEmpresa = useDatosEmpresa();
@@ -359,7 +359,9 @@ const deleteImage = async(ruta,imagen) => {
 <Column field="minimo" header="Minimo"></Column>
 <Column field="blanco" header="Blanco"></Column>
 <Column field="plata" header="Plata"></Column>
+<Column field="gris" header="Gris"></Column>
 <Column field="negro" header="Negro"></Column>
+<Column field="negro_texturizado" header="Negro texturizado"></Column>
 <Column field="madera" header="Madera"></Column>
 <Column field="inox" header="Inox"></Column>
 <Column field="roble" header="Roble"></Column>
@@ -402,8 +404,16 @@ const deleteImage = async(ruta,imagen) => {
 <input type="input" v-model="datoscampos.plata" name="plata"  class="form-control" id="plata-Actualizador" v-solonumeros v-numeroFocusinOut v-decimales placeholder="plata"  maxlength="250">
 </div>
 <div class="form-group col-span-12 sm:col-span-3 md:col-span-3 lg:col-span-3 xl:col-span-3" >
+<label for="gris-Actualizador">GRIS</label>
+<input type="input" v-model="datoscampos.gris" name="gris" class="form-control" id="gris-Actualizador" v-solonumeros v-numeroFocusinOut v-decimales placeholder="gris" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-3 md:col-span-3 lg:col-span-3 xl:col-span-3" >
 <label for="negro-Actualizador">NEGRO</label>
 <input type="input" v-model="datoscampos.negro" name="negro"  class="form-control" id="negro-Actualizador" v-solonumeros v-numeroFocusinOut v-decimales placeholder="negro"  maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-3 md:col-span-3 lg:col-span-3 xl:col-span-3" >
+<label for="negro-texturizado-Actualizador">NEGRO TEXTURIZADO</label>
+<input type="input" v-model="datoscampos.negro_texturizado" name="negro_texturizado" class="form-control" id="negro-texturizado-Actualizador" v-solonumeros v-numeroFocusinOut v-decimales placeholder="negro texturizado" maxlength="250">
 </div>
 <div class="form-group col-span-12 sm:col-span-3 md:col-span-3 lg:col-span-3 xl:col-span-3" >
 <label for="madera-Actualizador">MADERA</label>
@@ -495,8 +505,16 @@ const deleteImage = async(ruta,imagen) => {
 <input type="input" v-model="datoscamposFabricacion.plata" name="plata"  class="form-control " id="plataAgregarDatos"  v-solonumeros v-numeroFocusinOut v-decimales placeholder="plata" maxlength="250">
 </div>
 <div class="form-group col-span-12 sm:col-span-3 md:col-span-3 lg:col-span-3 xl:col-span-3" >
+<label for="grisAgregarDatos">GRIS</label>
+<input type="input" v-model="datoscamposFabricacion.gris" name="gris" class="form-control " id="grisAgregarDatos" v-solonumeros v-numeroFocusinOut v-decimales placeholder="gris" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-3 md:col-span-3 lg:col-span-3 xl:col-span-3" >
 <label for="negroAgregarDatos">NEGRO</label>
 <input type="input" v-model="datoscamposFabricacion.negro" name="negro"  class="form-control " id="negroAgregarDatos"  v-solonumeros v-numeroFocusinOut v-decimales placeholder="negro" maxlength="250">
+</div>
+<div class="form-group col-span-12 sm:col-span-3 md:col-span-3 lg:col-span-3 xl:col-span-3" >
+<label for="negroTexturizadoAgregarDatos">NEGRO TEXTURIZADO</label>
+<input type="input" v-model="datoscamposFabricacion.negro_texturizado" name="negro_texturizado" class="form-control " id="negroTexturizadoAgregarDatos" v-solonumeros v-numeroFocusinOut v-decimales placeholder="negro texturizado" maxlength="250">
 </div>
 <div class="form-group col-span-12 sm:col-span-3 md:col-span-3 lg:col-span-3 xl:col-span-3" >
 <label for="maderaAgregarDatos">MADERA</label>

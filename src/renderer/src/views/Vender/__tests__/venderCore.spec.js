@@ -18,6 +18,8 @@ import {
   getAlanubeSecurityCode,
   getCartProductQuantity,
   getDgiiStampUrl,
+  getDefaultInvoiceState,
+  getEffectiveQuotePrice,
   getElectronicReceiptPrefix,
   getInvoiceDocumentLabel,
   getProductSalePrice,
@@ -182,12 +184,33 @@ describe('Vender: normalización y permisos', () => {
     expect(normalizeTaxpayerLookupResponse({ error: 'HTTP 500' }, '133023539')).toBeNull()
   })
 
-  it.each(['CAJERO', 'cajero', ' VENDEDOR '])('bloquea el estado para %s', (role) => {
-    expect(isInvoiceStateLocked(role)).toBe(true)
+  it.each(['CAJERO', 'cajero', ' VENDEDOR ', 'GERENTE', '', null])(
+    'bloquea el estado para %s',
+    (role) => {
+      expect(isInvoiceStateLocked(role)).toBe(true)
+    }
+  )
+
+  it.each(['ADMIN', 'Administrador', ' administrador ', 'Soporte', ' SOPORTE '])('no bloquea el estado para %s', (role) => {
+    expect(isInvoiceStateLocked(role)).toBe(false)
   })
 
-  it.each(['ADMIN', 'SUPERVISOR', '', null])('no bloquea el estado para %s', (role) => {
-    expect(isInvoiceStateLocked(role)).toBe(false)
+  it('asigna Pendiente al vendedor y Cobrado a los demás roles', () => {
+    expect(getDefaultInvoiceState('Vendedor')).toBe('Pendiente')
+    expect(getDefaultInvoiceState('Administrador')).toBe('Cobrado')
+    expect(getDefaultInvoiceState('Cajero')).toBe('Cobrado')
+    expect(getDefaultInvoiceState('Soporte')).toBe('Cobrado')
+  })
+
+  it('usa el precio manual existente en el carrito al cotizar el mismo producto', () => {
+    const product = { codigo: 'PRUEBA-1', precio_venta: '0.00', precio_final: '0.00' }
+    const cart = [{ codigo: 'PRUEBA-1', precio_venta: 1500, precio_final: 1500 }]
+
+    expect(getEffectiveQuotePrice(product, cart)).toBe(1500)
+  })
+
+  it('reconoce precios personalizados y valores con formato monetario', () => {
+    expect(getEffectiveQuotePrice({ precio_base_personalizado: '$1,500.00' })).toBe(1500)
   })
 })
 

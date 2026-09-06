@@ -1,12 +1,17 @@
 <template>
   <main class="content-wrapper">
-    <div class="containerS mx-auto px-4 py-6">
+    <div class="containerS mx-auto px-4 py-4">
 
       <!-- Header Section -->
-      <div class="mb-6">
-        <h1 class="text-3xl font-bold text-gray-800 mb-2">Gestión de Caja</h1>
-        <p class="text-gray-600">Administra facturas pendientes y operaciones de caja</p>
-      </div>
+      <header class="caja-page-header">
+        <div class="caja-page-header__icon">
+          <i class="pi pi-wallet"></i>
+        </div>
+        <div>
+          <h1>Gestión de Caja</h1>
+          <p>Administra facturas pendientes y operaciones de caja</p>
+        </div>
+      </header>
 
       <div class="caja-dashboard-grid">
 
@@ -151,19 +156,22 @@
         </div>
 
         <div class="caja-side-column">
-          <Card class="caja-card sticky top-6">
+          <Card class="caja-card caja-card--actions sticky top-6">
             <template #header>
               <div class="card-header-modern">
                 <div class="flex items-center gap-3">
                   <div class="icon-wrapper-modern bg-orange-500">
                     <i class="pi pi-th-large text-white text-2xl"></i>
                   </div>
-                  <h2 class="text-xl font-bold text-gray-800">Acciones de Caja</h2>
+                  <div>
+                    <h2 class="text-xl font-bold text-gray-800">Acciones de Caja</h2>
+                    <p class="text-sm text-gray-500">Operaciones y accesos principales</p>
+                  </div>
                 </div>
               </div>
             </template>
             <template #content>
-              <div class="grid grid-cols-2 gap-3">
+              <div class="caja-actions-grid">
 <!--                 <Button
                   label="AGREGAR ABONO"
                   @click="visibleabono = true"
@@ -651,7 +659,7 @@
               <!-- Factura Seleccionada -->
               <div v-if="campoFactura" class="selected-invoice-info">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Factura Seleccionada</label>
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <div class="flex items-center gap-2 mb-2">
                     <Badge :value="campoFactura.no_factura" severity="info" />
                     <span class="font-semibold text-gray-800">{{ campoFactura.nombre_cliente }}</span>
@@ -664,9 +672,17 @@
                     <div class="flex justify-between font-semibold text-green-600">
                       <span>Total:</span>
                       <span>{{ campoFactura.total || '0.00' }}</span>
-                    </div>
-                  </div>
-                </div>
+                   </div>
+                 </div>
+                 <Button
+                   label="Ver productos"
+                   icon="pi pi-eye"
+                   severity="info"
+                   outlined
+                   class="w-full mt-3"
+                   @click="fnProductos(campoFactura)"
+                 />
+               </div>
               </div>
 
               <div v-else class="text-center py-4 text-gray-500">
@@ -1294,6 +1310,78 @@
 </Dialog>
 
 <!-- ************************************************************************************* -->
+<Dialog
+  v-model:visible="visibleAbonoTaller"
+  modal
+  appendTo="body"
+  :style="{ width: 'min(94vw, 32rem)' }"
+  header="Registrar abono de taller"
+  :closable="!procesandoAbonoTaller"
+  :closeOnEscape="!procesandoAbonoTaller"
+  @hide="restaurarTallerTrasAbono"
+>
+  <div class="abono-taller-dialog-content">
+    <div class="abono-taller-resumen">
+      <div>
+        <span>Orden</span>
+        <strong>{{ facturaTallerSeleccionada?.no_factura || '-' }}</strong>
+      </div>
+      <div>
+        <span>Saldo pendiente</span>
+        <strong>{{ Number(facturaTallerSeleccionada?.saldo || 0).toFixed(2) }}</strong>
+      </div>
+    </div>
+
+    <div>
+      <label for="cantidadAbonoTaller" class="block text-sm font-semibold text-gray-700 mb-2">
+        Cantidad a abonar
+      </label>
+      <InputText
+        id="cantidadAbonoTaller"
+        v-model="cantidadAbonoTaller"
+        type="number"
+        min="0"
+        step="0.01"
+        fluid
+        placeholder="0.00"
+        class="abono-taller-input"
+        autofocus
+        @keyup.enter="procesarAbonoTaller(false)"
+      />
+    </div>
+
+    <div>
+      <label for="metodoAbonoTaller" class="block text-sm font-semibold text-gray-700 mb-2">
+        Método de pago
+      </label>
+      <select id="metodoAbonoTaller" v-model="metodoAbonoTaller" class="w-full border rounded p-3">
+        <option value="EFECTIVO">Efectivo</option>
+        <option value="TARJETA">Tarjeta</option>
+        <option value="TRANSFERENCIA">Transferencia</option>
+      </select>
+    </div>
+
+    <div v-if="metodoAbonoTaller === 'TRANSFERENCIA'">
+      <label for="bancoAbonoTaller" class="block text-sm font-semibold text-gray-700 mb-2">
+        Banco
+      </label>
+      <select id="bancoAbonoTaller" v-model="cuentaBancaria" class="w-full border rounded p-3">
+        <option :value="null" disabled>Seleccione un banco</option>
+        <option v-for="banco in bancoArray" :key="banco.id" :value="banco">{{ banco.nombre }}</option>
+      </select>
+    </div>
+  </div>
+
+  <template #footer>
+    <div class="abono-taller-dialog-footer">
+      <Button label="Cancelar" severity="secondary" outlined :disabled="procesandoAbonoTaller" @click="cancelarAbonoTaller" />
+      <Button label="Pagar completo" severity="danger" outlined :loading="procesandoAbonoTaller" @click="procesarAbonoTaller(true)" />
+      <Button label="Abonar" icon="pi pi-check" :loading="procesandoAbonoTaller" @click="procesarAbonoTaller(false)" />
+    </div>
+  </template>
+</Dialog>
+
+<!-- ************************************************************************************* -->
 <Dialog v-model:visible="visibleModificarTaller" position="top" modal :style="{ width: '50rem' }" header="ModificarTaller">
   <template #header>
     <div class="inline-flex align-items-center justify-content-center gap-2">
@@ -1571,7 +1659,7 @@
   <Card class="shadow-sm contar-dinero-totales-card contar-dinero-resumen-card">
     <template #content>
       <div class="grid grid-cols-12 gap-3">
-        <div class="col-span-12">
+        <div class="col-span-6">
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             <i class="pi pi-box mr-1 text-blue-600"></i>
             INICIO CAJA
@@ -1585,7 +1673,46 @@
           />
         </div>
 
-        <div class="col-span-12">
+        <div class="col-span-6">
+          <label class="block text-sm font-semibold text-gray-700 mb-2">
+            <i class="pi pi-shopping-cart mr-1 text-blue-600"></i>
+            TOTAL VENTAS
+          </label>
+          <InputText
+            :modelValue="Number(datosDelDia.venta || 0).toFixed(2)"
+            fluid
+            class="w-full dinero-input-total bg-blue-50"
+            readonly
+          />
+        </div>
+
+        <div class="col-span-6">
+          <label class="block text-sm font-semibold text-gray-700 mb-2">
+            <i class="pi pi-wallet mr-1 text-cyan-600"></i>
+            ABONOS CXC
+          </label>
+          <InputText
+            :modelValue="Number(datosDelDia.abono || 0).toFixed(2)"
+            fluid
+            class="w-full dinero-input-total bg-cyan-50"
+            readonly
+          />
+        </div>
+
+        <div class="col-span-6">
+          <label class="block text-sm font-semibold text-gray-700 mb-2">
+            <i class="pi pi-wrench mr-1 text-orange-600"></i>
+            ABONOS DE TALLER
+          </label>
+          <InputText
+            :modelValue="Number(datosDelDia.taller || 0).toFixed(2)"
+            fluid
+            class="w-full dinero-input-total bg-orange-50"
+            readonly
+          />
+        </div>
+
+        <div class="col-span-6">
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             <i class="pi pi-calculator mr-1 text-green-600"></i>
             TOTAL CONTADO
@@ -1597,6 +1724,19 @@
             v-numeroFocusinOut
             fluid
             class="w-full dinero-input-total bg-green-50"
+            readonly
+          />
+        </div>
+
+        <div class="col-span-6">
+          <label class="block text-sm font-semibold text-gray-700 mb-2">
+            <i class="pi pi-arrow-down mr-1 text-red-600"></i>
+            TOTAL GASTOS
+          </label>
+          <InputText
+            :modelValue="Number(datosDelDia.gastos || 0).toFixed(2)"
+            fluid
+            class="w-full dinero-input-total bg-red-50 text-red-700"
             readonly
           />
         </div>
@@ -1651,6 +1791,7 @@
   <template #footer>
     <div class="contar-dinero-footer">
       <div class="contar-dinero-footer-group">
+        <Button label="Resumen del cuadre" icon="pi pi-eye" outlined severity="info" :loading="cargandoResumenCuadre" @click="abrirResumenCuadre" />
         <Button label="Facturas" icon="pi pi-print" outlined severity="secondary" @click="fnTodasLasFacturas" />
         <Button label="Resumen Venta" icon="pi pi-chart-bar" outlined severity="secondary" @click="fnResumenVenta" />
         <Button label="Productos Vendidos" icon="pi pi-box" outlined severity="secondary" @click="fnProductosVendidos" />
@@ -1661,6 +1802,174 @@
         <Button label="Cerrar" outlined severity="secondary" @click="cuadrarCaja = false" />
       </div>
     </div>
+  </template>
+</Dialog>
+
+<!-- ************************************************************************************* -->
+<Dialog
+  v-model:visible="visibleResumenCuadre"
+  modal
+  appendTo="body"
+  :baseZIndex="1300"
+  :style="{ width: 'min(96vw, 940px)' }"
+  :pt="{ root: { class: 'resumen-cuadre-dialog' } }"
+>
+  <template #header>
+    <div class="flex items-center gap-3">
+      <div class="resumen-cuadre-header-icon">
+        <i class="pi pi-chart-bar"></i>
+      </div>
+      <div>
+        <h3 class="text-xl font-bold text-gray-800 m-0">Resumen del cuadre</h3>
+        <p class="text-sm text-gray-500 m-0">Vista previa antes de cerrar la caja</p>
+      </div>
+    </div>
+  </template>
+
+  <div class="resumen-cuadre-content">
+    <div class="resumen-cuadre-turno">
+      <div>
+        <span>Turno</span>
+        <strong>{{ turnoUsuarioSelected || cuadre.turno || 'Actual' }}</strong>
+      </div>
+      <div>
+        <span>Hora de inicio</span>
+        <strong>{{ cuadre.horainicio || '-' }}</strong>
+      </div>
+      <div>
+        <span>Hora de revisión</span>
+        <strong>{{ cuadre.horafin || '-' }}</strong>
+      </div>
+    </div>
+
+    <div class="resumen-cuadre-totales">
+      <div class="resumen-cuadre-total resumen-cuadre-total--contado">
+        <span>Total contado</span>
+        <strong>{{ formatearMontoCuadre(totalModal) }}</strong>
+      </div>
+      <div class="resumen-cuadre-total resumen-cuadre-total--registrado">
+        <span>Total registrado</span>
+        <strong>{{ formatearMontoCuadre(totalModalEnCaja) }}</strong>
+      </div>
+      <div
+        class="resumen-cuadre-total"
+        :class="diferenciaCuadre === 0
+          ? 'resumen-cuadre-total--correcto'
+          : diferenciaCuadre > 0
+            ? 'resumen-cuadre-total--sobra'
+            : 'resumen-cuadre-total--falta'"
+      >
+        <span>{{ diferenciaCuadre === 0 ? 'Diferencia' : diferenciaCuadre > 0 ? 'Sobrante' : 'Faltante' }}</span>
+        <strong>{{ formatearMontoCuadre(Math.abs(diferenciaCuadre)) }}</strong>
+      </div>
+    </div>
+
+    <div class="resumen-cuadre-dos-columnas">
+      <div class="resumen-cuadre-panel">
+        <div class="resumen-cuadre-section-title">
+          <i class="pi pi-calculator"></i>
+          <span>Cálculo del efectivo registrado</span>
+        </div>
+        <div class="resumen-cuadre-calculo">
+          <div v-for="fila in resumenCuadreEfectivo" :key="fila.label" :class="{ 'resumen-cuadre-calculo-total': fila.total }">
+            <span>{{ fila.label }}</span>
+            <strong :class="{ 'text-red-600': fila.valor < 0 }">{{ formatearMontoCuadre(fila.valor) }}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="resumen-cuadre-panel">
+        <div class="resumen-cuadre-section-title">
+          <i class="pi pi-receipt"></i>
+          <span>Información del turno</span>
+        </div>
+        <div class="resumen-cuadre-operaciones">
+          <div>
+            <span>Facturas realizadas</span>
+            <strong>{{ cantidadFacturasTurno }}</strong>
+          </div>
+          <div>
+            <span>Total vendido</span>
+            <strong>{{ formatearMontoCuadre(datosDelDia.venta) }}</strong>
+          </div>
+          <div>
+            <span>Tarjetas</span>
+            <strong>{{ formatearMontoCuadre(datosDelDia.tarjeta) }}</strong>
+          </div>
+          <div>
+            <span>Transferencias</span>
+            <strong>{{ formatearMontoCuadre(datosDelDia.transferencia) }}</strong>
+          </div>
+          <div>
+            <span>Abonos CxC en efectivo</span>
+            <strong>{{ formatearMontoCuadre(datosDelDia.abono) }}</strong>
+          </div>
+          <div>
+            <span>Abonos de taller</span>
+            <strong>{{ formatearMontoCuadre(datosDelDia.taller) }}</strong>
+          </div>
+          <div>
+            <span>Gastos totales</span>
+            <strong class="text-red-600">{{ formatearMontoCuadre(datosDelDia.gastos) }}</strong>
+          </div>
+          <div>
+            <span>Gastos en efectivo</span>
+            <strong class="text-red-600">{{ formatearMontoCuadre(datosDelDia.gastosEfectivo ?? datosDelDia.gastos) }}</strong>
+          </div>
+          <div>
+            <span>Entradas de caja</span>
+            <strong>{{ formatearMontoCuadre(datosDelDia.entradas) }}</strong>
+          </div>
+          <div>
+            <span>Devoluciones</span>
+            <strong class="text-red-600">{{ formatearMontoCuadre(datosDelDia.devoluciones) }}</strong>
+          </div>
+          <div>
+            <span>Impuestos</span>
+            <strong>{{ formatearMontoCuadre(datosDelDia.impuestos) }}</strong>
+          </div>
+          <div>
+            <span>Ganancia</span>
+            <strong>{{ formatearMontoCuadre(datosDelDia.ganancia) }}</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="resumen-cuadre-tabla-wrap">
+      <div class="resumen-cuadre-section-title">
+        <i class="pi pi-wallet"></i>
+        <span>Detalle del efectivo contado</span>
+      </div>
+      <table class="resumen-cuadre-tabla">
+        <thead>
+          <tr>
+            <th>Denominación</th>
+            <th>Cantidad</th>
+            <th>Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="fila in resumenCuadreDenominaciones" :key="fila.denominacion">
+            <td>{{ fila.denominacion }} {{ datosConfiguracion.plural || 'PESOS' }}</td>
+            <td>{{ fila.cantidad }}</td>
+            <td>{{ formatearMontoCuadre(fila.subtotal) }}</td>
+          </tr>
+          <tr v-if="resumenCuadreDenominaciones.length === 0">
+            <td colspan="3" class="resumen-cuadre-vacio">Todavía no se ha contado efectivo.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="resumen-cuadre-aviso">
+      <i class="pi pi-info-circle"></i>
+      <span>Esta vista es solo informativa. La caja no se cerrará hasta presionar “Cuadrar Caja”.</span>
+    </div>
+  </div>
+
+  <template #footer>
+    <Button label="Volver al conteo" icon="pi pi-arrow-left" severity="secondary" outlined @click="visibleResumenCuadre = false" />
   </template>
 </Dialog>
 
@@ -2267,129 +2576,124 @@ const visibleCuadre = ref(false)
 const visibleTransacciones = ref(false)
 const visibleTranferirFondo = ref(false)
 /*************************************************************/
-const abonoVisible = async()=>{
+const visibleAbonoTaller = ref(false);
+const cantidadAbonoTaller = ref('');
+const metodoAbonoTaller = ref('EFECTIVO');
+const procesandoAbonoTaller = ref(false);
 
-//facturaTallerSeleccionada
-  const saldoTotal = facturaTallerSeleccionada.value.saldo;
+const abonoVisible = () => {
+  if (!facturaTallerSeleccionada.value) return;
 
-    if (Number(facturaTallerSeleccionada.value.total) === 0) {
+  if (Number(facturaTallerSeleccionada.value.total) === 0) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Debe agregar Costo de Reparación', life: 3000 });
     return;
   }
-  if (facturaTallerSeleccionada.value.metodopago === 'TRANSFERENCIA' && !cuentaBancaria.value?.id) {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Debe seleccionar un banco', life: 3000 });
-    return;
-  }
-  if (facturaTallerSeleccionada.value.metodopago === 'TRANSFERENCIA' && !cuentaBancaria.value?.id) {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Debe seleccionar un banco', life: 3000 });
-    return;
-  }
 
-visibletaller.value = false
+  cantidadAbonoTaller.value = '';
+  metodoAbonoTaller.value = 'EFECTIVO';
+  visibletaller.value = false;
+  visibleAbonoTaller.value = true;
+};
 
-  // Mostrar el SweetAlert con input para la cantidad de abono y método de pago
-  const { value: formValues, isDenied } = await Swal.fire({
-    title: 'Abonar',
-    html:
-      `<input id="swal-input-abono" class="swal2-input" placeholder="Cantidad a abonar" type="number" step="0.01" min="0">` +
-      `<select id="swal-input-metodo-pago" class="swal2-input">
-         <option value="EFECTIVO">Efectivo</option>
-         <option value="TARJETA">Tarjeta</option>
-         <option value="TRANSFERENCIA">Transferencia</option>
-       </select>`,
-    focusConfirm: false,
-    showCancelButton: true,
-    showDenyButton: true,
-    confirmButtonText: 'Abonar',
-    denyButtonText: 'Pagar Completo',
-    preConfirm: () => {
-      const abono = document.getElementById('swal-input-abono').value;
-      const metodoPago = document.getElementById('swal-input-metodo-pago').value;
-      
-      if (!abono || abono <= 0) {
-        Swal.showValidationMessage('Debes ingresar una cantidad válida de abono');
-      }
-      
-      return { abono, metodoPago };
-    }
-  });
+const cancelarAbonoTaller = () => {
+  if (procesandoAbonoTaller.value) return;
+  visibleAbonoTaller.value = false;
+  visibletaller.value = true;
+};
 
-  if (!formValues) {
-    // Si el usuario cancela, no hacemos nada
-    Swal.fire('Cancelado', 'No se realizó ningún abono', 'info');
-    return;
-  }
-
-  let cantidadAbono = Number(formValues.abono);
-  const metodoPago = formValues.metodoPago;
-
-  if (isDenied) {
-    // Si el usuario selecciona "Pagar Completo", el abono es el saldo total
-    cantidadAbono = saldoTotal;
-  }
-
-  if (metodoPago === 'TRANSFERENCIA' && !cuentaBancaria.value?.id) {
+const restaurarTallerTrasAbono = () => {
+  if (!visibleImpresoraTaller.value) {
     visibletaller.value = true;
+  }
+};
+
+const procesarAbonoTaller = async (pagarCompleto = false) => {
+  const orden = facturaTallerSeleccionada.value;
+  if (!orden || procesandoAbonoTaller.value) return;
+
+  const saldoTotal = Number(orden.saldo || 0);
+  const cantidadAbono = pagarCompleto ? saldoTotal : Number(cantidadAbonoTaller.value);
+  const metodoPago = metodoAbonoTaller.value;
+
+  if (!Number.isFinite(cantidadAbono) || cantidadAbono <= 0) {
+    toast.add({ severity: 'warn', summary: 'Cantidad requerida', detail: 'Debes ingresar una cantidad válida de abono.', life: 3000 });
+    return;
+  }
+  if (cantidadAbono > saldoTotal) {
+    toast.add({ severity: 'warn', summary: 'Cantidad excedida', detail: 'El abono no puede ser mayor que el saldo pendiente.', life: 3000 });
+    return;
+  }
+  if (metodoPago === 'TRANSFERENCIA' && !cuentaBancaria.value?.id) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Debe seleccionar un banco', life: 3000 });
     return;
   }
 
-  // Actualizamos el JSON de abonos con el nuevo abono
-  const abonoJSON = JSON.parse(facturaTallerSeleccionada.value.abono);
-  
-  const nuevoAbono = {
-    "abono": cantidadAbono,
-    "turno": usuarioLocal.value.token,
-    "cajero": usuarioLocal.value.email,
-    "recibidopor": usuarioLocal.value.email,
-    "prioridad": 3,
-    "metodo_pago": metodoPago,
-    "hora": nfecha('hora'),
-    "fecha": nfecha('fecha'),
-    "saldo": Math.max(Number(saldoTotal) - cantidadAbono, 0).toFixed(2)
-  };
-  abonoJSON.push(nuevoAbono);
-
-  // Convertir el abono actualizado a cadena JSON
-  facturaTallerSeleccionada.value.abono = JSON.stringify(abonoJSON);
-  
-
-  const url = link.value+api.value+"/actualizarcampos/taller";
-  if (!facturaTallerSeleccionada.value) {
-    console.error("Datos incompletos, no se puede actualizar.");
-    return;
-  }
-  if (facturaTallerSeleccionada.value.hasOwnProperty('created_at')) {
-      facturaTallerSeleccionada.value.updated_at = nfecha('timestamp')
+  procesandoAbonoTaller.value = true;
+  try {
+    let abonoJSON = [];
+    try {
+      const abonosGuardados = typeof orden.abono === 'string' ? JSON.parse(orden.abono || '[]') : orden.abono;
+      abonoJSON = Array.isArray(abonosGuardados) ? abonosGuardados : [];
+    } catch (error) {
+      console.warn('[Caja][AbonoTaller] No se pudo leer el historial de abonos:', error);
     }
-  const envioDatos = await peticionesFetchOffline('updateData', 'taller',JSON.stringify(facturaTallerSeleccionada.value));
-  if (envioDatos[0] == 'ok') {
-     const bancoOk = await registrarEntradaBancoTaller(
-      cantidadAbono,
-      `ABONO TALLER POR TRANSFERENCIA (${facturaTallerSeleccionada.value.no_factura})`,
-      metodoPago
-    );
-    if (!bancoOk) {
-      visibletaller.value = true;
+
+    const nuevoAbono = {
+      abono: cantidadAbono,
+      turno: usuarioLocal.value.token,
+      cajero: usuarioLocal.value.email,
+      recibidopor: usuarioLocal.value.email,
+      prioridad: 3,
+      metodo_pago: metodoPago,
+      hora: nfecha('hora'),
+      fecha: nfecha('fecha'),
+      saldo: Math.max(saldoTotal - cantidadAbono, 0).toFixed(2)
+    };
+    abonoJSON.push(nuevoAbono);
+
+    orden.abono = JSON.stringify(abonoJSON);
+    orden.saldo = nuevoAbono.saldo;
+    orden.updated_at = nfecha('timestamp');
+
+    const envioDatos = await peticionesFetchOffline('updateData', 'taller', JSON.stringify(orden));
+    if (envioDatos?.[0] !== 'ok') {
+      toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
       return;
     }
-     notificarAbonoTaller(facturaTallerSeleccionada.value, nuevoAbono);
-     toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos Actualizados', life: 3000 });
 
-  window.electron.ipcRenderer.invoke('open-new-window', link.value+'/vista/tallertermica?factura='+facturaTallerSeleccionada.value.no_factura,'url', true,false)
+    const bancoOk = await registrarEntradaBancoTaller(
+      cantidadAbono,
+      `ABONO TALLER POR TRANSFERENCIA (${orden.no_factura})`,
+      metodoPago
+    );
+    if (!bancoOk) return;
 
-  }else{
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Fallo al actualizar los datos.', life: 3000 });
+    notificarAbonoTaller(orden, nuevoAbono);
+
+    // Taller.vue imprime pasando la orden completa al componente ImpresoraTaller.
+    // Conservamos una copia con el abono y saldo recién actualizados para que el
+    // comprobante coincida con el emitido desde Gestión de Taller.
+    ordenParaImprimir.value = { ...orden };
+    formatoImpresion.value = '80mm';
+    visibleImpresoraTaller.value = true;
+    visibleAbonoTaller.value = false;
+    visibletaller.value = false;
+    cantidadAbonoTaller.value = '';
+    await fetchAndSetupDatosdelDia();
+    toast.add({
+      severity: 'success',
+      summary: 'Abono realizado',
+      detail: `Has abonado ${cantidadAbono.toFixed(2)} mediante ${metodoPago}.`,
+      life: 3500
+    });
+
+  } catch (error) {
+    console.error('[Caja][AbonoTaller] Error registrando el abono:', error);
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo registrar el abono.', life: 3000 });
+  } finally {
+    procesandoAbonoTaller.value = false;
   }
-
-
-  // Mostrar confirmación de que el abono se realizó con éxito
-  Swal.fire({
-    title: 'Abono realizado',
-    text: `Has abonado ${cantidadAbono} mediante ${metodoPago}.`,
-    icon: 'success'
-  });
-}
+};
 /*************************************************************/
 const registrarSocios = ref(false);
 const cuadrarCaja = ref(false);
@@ -2804,6 +3108,8 @@ visibletaller.value = false
 
 /*************************************************************/
 const facturasSinCobrar = ref([]);
+const facturasPendientesInicializadas = ref(false);
+let consultandoFacturasPendientes = false;
 const tipoFactura = {
   'EFECTIVO': { 'tipo': 'success', 'icono': 'money' },
   'TARJETA': { 'tipo': 'danger', 'icono': 'credit-card' },
@@ -2851,35 +3157,64 @@ const handlePropinaChange = () => {
 };
 /************************************************************/
 const fetchAndSetupData = async () => {
+  if (consultandoFacturasPendientes) return;
+  consultandoFacturasPendientes = true;
+
   try {
     // 1) Traes TODAS las facturas pendientes
-    const pending = await peticionesFetchOffline(
+    const respuesta = await peticionesFetchOffline(
       'getDataArrayByCondition',
       'facturas',
       'estado_factura',
       'Pendiente'
     );
 
+    const pending = Array.isArray(respuesta)
+      ? respuesta
+      : Array.isArray(respuesta?.data)
+        ? respuesta.data
+        : [];
+
     // 2) Si lo que quieres es reemplazar por completo:
-    facturasSinCobrar.value = pending.filter(ft=>ft.almacen === datosEmpresaStore.empresa.nombre);
+    const normalizar = valor => String(valor || '').trim().toLowerCase();
+    const almacenActual = normalizar(datosEmpresaStore.empresa?.nombre);
+    const facturasDelAlmacen = pending.filter(
+      factura => !almacenActual || normalizar(factura.almacen) === almacenActual
+    );
 
     // 3) Sólo si quieres detectar cuántas son nuevas y tocar sonido/toast:
-    const existingIds = new Set(facturasSinCobrar.value.map(f => f.id));
-    const newFacturas = pending.filter(ft=>ft.almacen === datosEmpresaStore.empresa.nombre).filter(f => !existingIds.has(f.id));
+    const existingIds = new Set(
+      facturasSinCobrar.value.map(factura => String(factura.id ?? factura.no_factura))
+    );
+    const newFacturas = facturasDelAlmacen.filter(
+      factura => !existingIds.has(String(factura.id ?? factura.no_factura))
+    );
 
-    if (newFacturas.length > 0) {
+    facturasSinCobrar.value = facturasDelAlmacen;
+
+    if (facturasPendientesInicializadas.value && newFacturas.length > 0) {
       toast.add({
         severity: 'success',
         summary: 'Nuevas Facturas',
-        detail: 'Hay nuevas facturas pendientes',
+        detail: newFacturas.length === 1
+          ? `Llegó la factura ${newFacturas[0].no_factura}`
+          : `Llegaron ${newFacturas.length} facturas pendientes`,
         life: 3000
       });
 
-      const { SOUND: sonidoR } = await envioElectron('datosarchivo');
-      if (sonidoR) {
-        window.electron.ipcRenderer.invoke('play-sound', 'Subtle.mp3');
+      try {
+        // El proceso principal ya valida VITE_SOUND. Antes se consultaba
+        // erróneamente la propiedad SOUND, que no existe en config.json, y
+        // por eso nunca se enviaba la orden de reproducir el sonido.
+        if (window.electron?.ipcRenderer) {
+          await window.electron.ipcRenderer.invoke('play-sound', 'Subtle.mp3');
+        }
+      } catch (error) {
+        console.warn('No se pudo reproducir el sonido de nueva factura:', error);
       }
     }
+
+    facturasPendientesInicializadas.value = true;
 
   } catch (error) {
     console.error('Error fetching data', error);
@@ -2889,6 +3224,8 @@ const fetchAndSetupData = async () => {
       detail: 'Failed to fetch data',
       life: 3000
     });
+  } finally {
+    consultandoFacturasPendientes = false;
   }
 };
 
@@ -2901,7 +3238,7 @@ const response = await peticionesFetchOffline('getLastXRows', 'facturas','100');
 };
 /************************************************************/
 const recargarFacturasFull = async()=>{
-  facturasSinCobrar.value = []
+  await fetchAndSetupData();
   await fetchDataFactura();
   await fetchAndSetupDatosdelDia();
   await actualizarCantidadFacturasTurno();
@@ -2926,6 +3263,7 @@ const datosDelDia = ref({
     "tarjeta": 0.00,
     "ganancia": 0.00,
     "gastos": 0.00,
+    "gastosEfectivo": 0.00,
     "entradas": 0.00,
     "devoluciones": 0.00,
     "inicioCaja": 0.00,
@@ -2938,12 +3276,23 @@ const datosDelDia = ref({
 const fetchAndSetupDatosdelDia = async () => {
   const datosFechaHoy = nfecha('timestampcompleta');
   const fechaInicioN = fechaDeInicioHoy.value;
-  const fechaFinN = fechaDeFinHoy.value || nfecha('timestamp');
+  // El turno permanece abierto mientras se usa esta pantalla. La hora final
+  // debe calcularse en cada consulta para incluir gastos y movimientos nuevos.
+  const fechaFinN = nfecha('timestamp');
 
   const tablas_created = ["facturas", "gastos", "entradas","registrocaja","devoluciones"]
   const tablas_updated = ["cuentas_cobrar", "taller"]
 
 const response = await peticionesFetchOffline('datosVentasPorRango2', fechaInicioN,fechaFinN,tablas_created,tablas_updated);
+
+console.log('[Caja][fetchAndSetupDatosdelDia] Respuesta completa datosVentasPorRango2:', response);
+console.log('[Caja][fetchAndSetupDatosdelDia] Gastos recibidos:', {
+  cantidad: Array.isArray(response?.gastos) ? response.gastos.length : 0,
+  total: Array.isArray(response?.gastos)
+    ? response.gastos.reduce((acumulado, gasto) => acumulado + Number(gasto?.cantidad || 0), 0)
+    : 0,
+  registros: response?.gastos
+});
 
     if (!response) {
       console.warn('⚠️ Response vacío en fetchAndSetupDatosdelDia');
@@ -2977,6 +3326,26 @@ const response = await peticionesFetchOffline('datosVentasPorRango2', fechaInici
     }
     const asArray = valor => Array.isArray(valor) ? valor : [];
     const normalizar = valor => String(valor || '').trim().toLowerCase();
+    const normalizarMovimientos = (valor, campo) => {
+      let movimientos = valor;
+
+      if (typeof movimientos === 'string') {
+        if (!movimientos.trim()) return [];
+        try {
+          movimientos = JSON.parse(movimientos);
+        } catch (error) {
+          console.warn(`[Caja][fetchAndSetupDatosdelDia] ${campo} no contiene JSON válido:`, valor);
+          return [];
+        }
+      }
+
+      if (Array.isArray(movimientos)) {
+        return movimientos.filter(movimiento => movimiento && typeof movimiento === 'object');
+      }
+
+      // Algunas filas antiguas guardaron un único movimiento como objeto.
+      return movimientos && typeof movimientos === 'object' ? [movimientos] : [];
+    };
     const almacenActual = normalizar(datosEmpresaStore.empresa?.nombre);
     const turnoActual = turnoUsuarioSelected.value && turnoUsuarioSelected.value !== 'COMPLETO'
       ? turnoUsuarioSelected.value
@@ -3012,16 +3381,40 @@ const response = await peticionesFetchOffline('datosVentasPorRango2', fechaInici
     // por la fecha/hora real de apertura de caja.
     const esTurnoTallerLegacy = registro =>
       normalizar(obtenerTurnoMovimiento(registro)) === '280420241514073';
-    const perteneceAlTurno = registro => !turnoActual ||
-      normalizar(obtenerTurnoMovimiento(registro)) === normalizar(turnoActual);
+    const perteneceAlTurno = registro => {
+      if (!turnoActual) return true;
+      const turnoMovimiento = normalizar(obtenerTurnoMovimiento(registro));
+      // Los registros antiguos no siempre guardaban el turno. Como esta
+      // colección ya está limitada por fecha y hora, deben conservarse.
+      return !turnoMovimiento || turnoMovimiento === normalizar(turnoActual);
+    };
     const perteneceAlAlmacen = registro => !almacenActual || !normalizar(registro?.almacen) ||
       normalizar(registro?.almacen) === almacenActual;
+    const perteneceAlRangoActual = registro => {
+      const turnoMovimiento = normalizar(obtenerTurnoMovimiento(registro));
+      // El token se genera para cada apertura de caja. Si coincide, es una
+      // prueba más confiable que created_at, que el servidor puede devolver
+      // convertido a UTC.
+      if (turnoActual && turnoMovimiento === normalizar(turnoActual)) return true;
+
+      const fechaMovimiento = registro?.created_at || registro?.timestamp ||
+        convertirAFechaTimestamp(registro?.fecha, registro?.hora);
+      // Los registros antiguos sin timestamp se conservan si pertenecen al
+      // turno; los registros actuales se validan contra la apertura de Caja.
+      return !fechaMovimiento || esFechaEnRango(fechaMovimiento, fechaInicioN, fechaFinN);
+    };
     const filtrarMovimientos = registros => asArray(registros)
       .filter(perteneceAlAlmacen)
-      .filter(perteneceAlTurno);
+      .filter(perteneceAlTurno)
+      .filter(perteneceAlRangoActual);
 
     const facturasTurno = filtrarMovimientos(copiaResponse.facturas);
-    const gastosTurno = filtrarMovimientos(copiaResponse.gastos);
+    // datosVentasPorRango2 ya devuelve los gastos comprendidos exactamente
+    // entre la apertura de la caja y la hora actual. No sustituir ni volver a
+    // filtrar esta colección por turno: versiones anteriores generaron tokens
+    // distintos al continuar la misma caja y eso ocultaba gastos válidos.
+    const gastosTurno = asArray(copiaResponse.gastos)
+      .filter(perteneceAlAlmacen);
     const entradasTurno = filtrarMovimientos(copiaResponse.entradas);
     const devolucionesTurno = filtrarMovimientos(copiaResponse.devoluciones);
     const registrosCajaTurno = filtrarMovimientos(copiaResponse.registrocaja);
@@ -3059,10 +3452,24 @@ const response = await peticionesFetchOffline('datosVentasPorRango2', fechaInici
     const cantidadGastoEfectivo = gastosTurno
       .filter(gasto => !gasto.metodo || normalizar(gasto.metodo) === 'efectivo')
       .reduce((total, gasto) => total + Number(gasto.cantidad || 0), 0);
+    const cantidadGastos = gastosTurno
+      .reduce((total, gasto) => total + Number(gasto.cantidad || 0), 0);
     const cantidadEntradas = entradasTurno
       .reduce((total, entrada) => total + Number(entrada.cantidad || 0), 0);
     const cantidadDevoluciones = devolucionesTurno
       .reduce((total, devolucion) => total + Number(devolucion.cantidad || 0), 0);
+
+    // El resumen y los formatos de impresión consumen datosDelDia.data.
+    // Mantener allí la misma colección validada evita que muestren cero
+    // mientras el cálculo principal ya tiene el gasto correcto.
+    datosDelDia.value.data = {
+      ...jsonData,
+      gastos: gastosTurno,
+      entradas: entradasTurno,
+      devoluciones: devolucionesTurno,
+      registrocaja: registrosCajaTurno
+    };
+    datosEnvio.value = JSON.parse(JSON.stringify(datosDelDia.value.data));
 
     const turnoSeleccionado = turnosHoyArray.value.find(
       turno => normalizar(turno.turno) === normalizar(turnoUsuarioSelected.value)
@@ -3072,17 +3479,10 @@ const response = await peticionesFetchOffline('datosVentasPorRango2', fechaInici
       : registrosCajaTurno.reduce((total, caja) => total + Number(caja.cant_inicio || 0), 0);
 
 const abonado = asArray(copiaResponse.cuentas_cobrar)
-.filter(perteneceAlAlmacen)
+  .filter(perteneceAlAlmacen)
   .map(factura => {
     let totalAbono = 0;
-    let abonos = [];
-
-    try {
-        abonos = JSON.parse(factura.pagos);
-    } catch (error) {
-        console.error('Error al parsear abonos:', error);
-        return 0; 
-    }
+    const abonos = normalizarMovimientos(factura.pagos, 'cuentas_cobrar.pagos');
 
     for (let pago of abonos) {
         const fechaBuscar = pago.timestamp || convertirAFechaTimestamp(pago.fecha, pago.hora);
@@ -3105,17 +3505,10 @@ const abonado = asArray(copiaResponse.cuentas_cobrar)
 let cantidadTallerEfectivo = 0
 
 const cantidadTaller = asArray(copiaResponse.taller)
-.filter(perteneceAlAlmacen)
+  .filter(perteneceAlAlmacen)
   .map(factura => {
     let totalAbono = 0;
-    let abonos = [];
-
-    try {
-        abonos = JSON.parse(factura.abono);
-    } catch (error) {
-        console.error('Error al parsear abonos:', error);
-        return 0; 
-    }
+    const abonos = normalizarMovimientos(factura.abono, 'taller.abono');
 
     for (let abono of abonos) {
         const fechaBuscar = abono.timestamp || convertirAFechaTimestamp(abono.fecha, abono.hora);
@@ -3143,7 +3536,8 @@ const cantidadTaller = asArray(copiaResponse.taller)
       transferencia: facturasValidas.reduce((total, factura) => total + Number(factura.transferencia || 0), 0),
       tarjeta: facturasValidas.reduce((total, factura) => total + Number(factura.tarjeta || 0), 0),
       ganancia: facturasValidas.reduce((total, factura) => total + Number(factura.ganancia || 0), 0),
-      gastos: cantidadGastoEfectivo,
+      gastos: cantidadGastos,
+      gastosEfectivo: cantidadGastoEfectivo,
       entradas: cantidadEntradas,
       devoluciones: cantidadDevoluciones,
       inicioCaja: cantidadInicio,
@@ -3186,12 +3580,37 @@ const turnosAbiertos = async()=>{
     const fecha = nfecha('timestampcompleta')
     //const response = await peticionesFetchOffline('getRowsByTimestampRange','cuadres','created_at',fechaDeInicioHoy.value,fechaDeFinHoy.value);
       const response = await peticionesFetchOffline('getDataArrayByCondition', 'registrocaja','estado','ABIERTO');
-      turnosHoyArray.value = response;
-     const turnosAbiertosA = response
-    cajaAbiertaArray.value = turnosAbiertosA
+      const normalizar = valor => String(valor || '').trim().toLowerCase();
+      const almacenActual = normalizar(datosEmpresaStore.empresa?.nombre);
+      const emailActual = normalizar(datosEmpresaStore.usuario?.email || usuarioLocal.value?.email);
+      const turnosAbiertosA = (Array.isArray(response) ? response : [])
+        .filter(caja => !almacenActual || !normalizar(caja?.almacen) || normalizar(caja?.almacen) === almacenActual);
+
+      turnosHoyArray.value = turnosAbiertosA;
+     cajaAbiertaArray.value = turnosAbiertosA
     if(turnosAbiertosA.length > 0){
       const turnoActual = datosEmpresaStore.usuario?.token || usuarioLocal.value?.token || '';
-      const cajaActual = turnosAbiertosA.find(caja => caja.turno === turnoActual) || turnosAbiertosA[0];
+      const cajasDelCajero = emailActual
+        ? turnosAbiertosA.filter(caja => normalizar(caja?.username) === emailActual || normalizar(caja?.turno) === emailActual)
+        : [];
+      const cajaActual = turnosAbiertosA.find(caja => caja.turno === turnoActual)
+        || cajasDelCajero.sort((a, b) => Number(b?.id || 0) - Number(a?.id || 0))[0]
+        || turnosAbiertosA.slice().sort((a, b) => Number(b?.id || 0) - Number(a?.id || 0))[0];
+
+      // Autorreparar sesiones iniciadas por versiones que generaban un token
+      // nuevo al continuar una caja abierta. Así los próximos gastos y facturas
+      // quedan asociados al turno real sin obligar al cajero a cerrar sesión.
+      if (usuarioEsCajero() && cajaActual?.turno && cajaActual.turno !== turnoActual) {
+        const usuarioActualizado = {
+          ...(datosEmpresaStore.usuario || usuarioLocal.value || {}),
+          token: cajaActual.turno,
+          hora_inicio: cajaActual.created_at || usuarioLocal.value?.hora_inicio
+        };
+        datosEmpresaStore.setDatosUsuario(usuarioActualizado);
+        usuarioLocal.value = usuarioActualizado;
+        window.localStorage.setItem('usuarioLocal', JSON.stringify([usuarioActualizado]));
+      }
+
       fechaDeInicioHoy.value = cajaActual?.created_at || fecha.fechainicio
       cuadre.value = cajaActual
       contidadInicioCaja.value = Number(cajaActual?.cant_inicio || 0).toFixed(2);
@@ -3333,7 +3752,7 @@ const actualizarCantidadFacturasTurno = async () => {
       .reduce((total, abono) => total + Number(abono.abono || 0), 0);
     const fondoInicialTurno = Number(cajaActual.cant_inicio || 0);
     const entradasTurno = Number(datosDelDia.value.entradas || 0);
-    const gastosTurno = Number(datosDelDia.value.gastos || 0);
+    const gastosTurno = Number(datosDelDia.value.gastosEfectivo ?? datosDelDia.value.gastos ?? 0);
     const devolucionesTurno = Number(datosDelDia.value.devoluciones || 0);
 
     contidadInicioCaja.value = fondoInicialTurno.toFixed(2);
@@ -3633,7 +4052,7 @@ const totalGastos = gastoEfectivo + gastoTarjeta + gastoTransferencia;
     const totalEfectivo = efectivoVentas + efectivoCxC + efectivoTaller
     const totalTarjeta = tarjetaVentas + tarjetaCxC + tarjetaTaller
     const totalTransferencia = transferenciaVentas + transferenciaCxC + transferenciaTaller
-    const totalEnCaja = totalEfectivo + cantidadInicio - totalGastos
+    const totalEnCaja = totalEfectivo + cantidadInicio - gastoEfectivo
     const totalGeneral = totalEfectivo + totalTarjeta + totalTransferencia + cantidadInicio - totalGastos
     const diferencia = Number(totalModal.value) - totalEnCaja
 
@@ -3867,7 +4286,17 @@ const fnTransaccion = async()=>{
 
 }
 /************************************************************/
-let intervalId;
+let intervalId = null;
+const iniciarMonitoreoFacturasPendientes = () => {
+  if (intervalId !== null) return;
+
+  window.addEventListener('focus', fetchAndSetupData);
+  intervalId = setInterval(fetchAndSetupData, 5000);
+
+  // No esperar a que termine la carga completa de Caja para mostrar las
+  // facturas que el vendedor ya haya enviado.
+  void fetchAndSetupData();
+};
 /************************************************************/
 const fetchProveedores = async () => {
   try {
@@ -3922,6 +4351,11 @@ const handleKeyDown = (event) => {
 
 async function inicializarCaja() {
 permisosPagina(router,'Cajero')
+
+// El monitor debe vivir independientemente de las demás consultas de inicio.
+// Si una de ellas falla, las facturas pendientes siguen llegando a Caja.
+window.addEventListener('keydown', handleKeyDown);
+iniciarMonitoreoFacturasPendientes();
 
 const datosJSON = await envioElectron('datosarchivo');
 link.value = datosJSON.VITE_LINKURL;
@@ -3997,21 +4431,18 @@ cuadre.value.horainicio = '07:00:00'
 
 cuadre.value.horafin = nfecha('horaAmericana')
 
-window.addEventListener('keydown', handleKeyDown);
-  // Solo sondeo automatico para Cajero (busca facturas pendientes)
-  if (usuarioEsCajero()) {
-    intervalId = setInterval(fetchAndSetupData, 30000);
-  }
-
-
 }
 
   // Limpiar el intervalo cuando el componente se desmonte
 function limpiarCaja() {
 
  window.removeEventListener('keydown', handleKeyDown);
+ window.removeEventListener('focus', fetchAndSetupData);
 
-    clearInterval(intervalId);
+    if (intervalId !== null) {
+      window.clearInterval(intervalId);
+      intervalId = null;
+    }
 }
 /******************************************************/
 const pesos = ref('0.00')
@@ -4027,6 +4458,72 @@ const dosmilpesos = ref('0.00')
 const totalModal = ref('0.00')
 const colorModal = ref('Verificando Cuadre ....')
 const alerta = ref('info')
+const visibleResumenCuadre = ref(false)
+const cargandoResumenCuadre = ref(false)
+
+const numeroCuadre = (valor) => {
+  const numero = Number.parseFloat(String(valor ?? 0).replace(/[$,\s]/g, ''))
+  return Number.isFinite(numero) ? numero : 0
+}
+
+const formatearMontoCuadre = (valor) => numeroCuadre(valor).toLocaleString('es-DO', {
+  style: 'currency',
+  currency: 'DOP',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+})
+
+const diferenciaCuadre = computed(() => (
+  numeroCuadre(totalModal.value) - numeroCuadre(totalModalEnCaja.value)
+))
+
+const resumenCuadreDenominaciones = computed(() => [
+  { denominacion: 1, cantidad: numeroCuadre(pesos.value) },
+  { denominacion: 5, cantidad: numeroCuadre(cincopesos.value) },
+  { denominacion: 10, cantidad: numeroCuadre(diezpesos.value) },
+  { denominacion: 25, cantidad: numeroCuadre(veinticincopesos.value) },
+  { denominacion: 50, cantidad: numeroCuadre(cincuentapesos.value) },
+  { denominacion: 100, cantidad: numeroCuadre(cienpesos.value) },
+  { denominacion: 200, cantidad: numeroCuadre(docientospesos.value) },
+  { denominacion: 500, cantidad: numeroCuadre(quinientoscopesos.value) },
+  { denominacion: 1000, cantidad: numeroCuadre(milpesos.value) },
+  { denominacion: 2000, cantidad: numeroCuadre(dosmilpesos.value) }
+]
+  .filter(fila => fila.cantidad > 0)
+  .map(fila => ({ ...fila, subtotal: fila.denominacion * fila.cantidad })))
+
+const resumenCuadreEfectivo = computed(() => [
+  { label: 'Fondo inicial', valor: numeroCuadre(datosDelDia.value.inicioCaja) },
+  { label: 'Ingresos recibidos en efectivo', valor: numeroCuadre(datosDelDia.value.efectivo) },
+  { label: 'Entradas de caja', valor: numeroCuadre(datosDelDia.value.entradas) },
+  { label: 'Gastos en efectivo', valor: -numeroCuadre(datosDelDia.value.gastosEfectivo ?? datosDelDia.value.gastos) },
+  { label: 'Devoluciones', valor: -numeroCuadre(datosDelDia.value.devoluciones) },
+  { label: 'Total registrado', valor: numeroCuadre(totalModalEnCaja.value), total: true }
+])
+
+const abrirResumenCuadre = async () => {
+  cargandoResumenCuadre.value = true
+  verificarCantidad()
+  cuadre.value = cuadre.value && typeof cuadre.value === 'object' ? cuadre.value : {}
+  cuadre.value.horafin = nfecha('horaAmericana')
+  visibleResumenCuadre.value = true
+
+  try {
+    for (const actualizar of [fetchAndSetupDatosdelDia, actualizarCantidadFacturasTurno]) {
+      try {
+        await actualizar()
+      } catch (error) {
+        console.warn('No se pudo refrescar una parte del resumen del cuadre:', error)
+      }
+    }
+    verificarCantidad()
+  } catch (error) {
+    // La vista previa debe seguir disponible con los valores ya cargados.
+    console.warn('El resumen del cuadre se abrió con la información disponible:', error)
+  } finally {
+    cargandoResumenCuadre.value = false
+  }
+}
 
 /******************************************************/
 watch(cuadrarCaja, async (nuevoValor, viejoValor) => {
@@ -4269,20 +4766,78 @@ const fnDejaCambioPropina = async()=>{
 
 /******************************************************/
 const fnProductos = (factura) => {
-  // Parsear los productos desde la factura
-  const productos = JSON.parse(factura.productos);
+  const escaparHtml = (valor) => String(valor ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+  const convertirNumero = (valor) => {
+    const numero = Number.parseFloat(String(valor ?? 0).replace(/[$,\s]/g, ''));
+    return Number.isFinite(numero) ? numero : 0;
+  };
+  const formatearPrecio = (valor) => convertirNumero(valor).toLocaleString('es-DO', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
 
-  // Extraer solo los nombres de los productos
-  const nombresProductos = productos.map(producto => producto.nombre);
+  let productos = [];
+  try {
+    productos = Array.isArray(factura?.productos)
+      ? factura.productos
+      : JSON.parse(factura?.productos || '[]');
+  } catch (error) {
+    console.error('No se pudieron leer los productos de la factura:', error);
+  }
 
-  // Crear el contenido para SweetAlert
-  const contenido = nombresProductos.join('<br>');
+  if (!Array.isArray(productos) || productos.length === 0) {
+    Swal.fire({
+      title: 'Productos de la factura',
+      text: 'Esta factura no tiene productos disponibles para mostrar.',
+      icon: 'info',
+      confirmButtonText: 'Cerrar'
+    });
+    return;
+  }
 
-  // Mostrar la modal con SweetAlert
+  const filas = productos.map((producto) => {
+    const nombre = producto?.nombre || producto?.descripcion || producto?.producto || 'Producto';
+    const cantidad = convertirNumero(producto?.cantidad ?? producto?.cant ?? 1) || 1;
+    const precio = convertirNumero(
+      producto?.precio_final ?? producto?.precio_venta ?? producto?.precio ?? producto?.precio_unitario
+    );
+    const total = convertirNumero(producto?.total) || (cantidad * precio);
+
+    return `
+      <tr>
+        <td style="padding:10px 8px;text-align:left;border-bottom:1px solid #e5e7eb;">${escaparHtml(nombre)}</td>
+        <td style="padding:10px 8px;text-align:center;border-bottom:1px solid #e5e7eb;">${escaparHtml(cantidad)}</td>
+        <td style="padding:10px 8px;text-align:right;border-bottom:1px solid #e5e7eb;">$${formatearPrecio(precio)}</td>
+        <td style="padding:10px 8px;text-align:right;border-bottom:1px solid #e5e7eb;font-weight:600;">$${formatearPrecio(total)}</td>
+      </tr>`;
+  }).join('');
+
   Swal.fire({
-    title: 'Productos',
-    html: contenido,
+    title: `Productos - Factura ${escaparHtml(factura?.no_factura || '')}`,
+    html: `
+      <div style="max-height:420px;overflow:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+          <thead style="position:sticky;top:0;background:#eff6ff;">
+            <tr>
+              <th style="padding:10px 8px;text-align:left;">Producto</th>
+              <th style="padding:10px 8px;text-align:center;">Cant.</th>
+              <th style="padding:10px 8px;text-align:right;">Precio</th>
+              <th style="padding:10px 8px;text-align:right;">Total</th>
+            </tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>`,
+    width: 720,
     icon: 'info',
+    customClass: {
+      container: 'caja-productos-swal'
+    },
     confirmButtonText: 'Cerrar'
   });
 };
@@ -4362,13 +4917,23 @@ const cancelarSeleccionImpresion = () => {
 const fnImprimirFactura = async(fact)=>{
 
  const datosFactura = await prepararFacturaParaTicket(fact);
-    const arrayClientes = await peticionesFetchOffline('getDataAsArray', 'clientes');
+  if (!datosFactura) return;
+
+  // Solicitar el formato antes de cualquier consulta adicional para que una
+  // falla de sincronización no impida mostrar la opción de impresión.
+  const tipoImpresion = await solicitarTipoImpresion();
+  if (!tipoImpresion) return;
+
+  let arrayClientes = [];
+  try {
+    const clientes = await peticionesFetchOffline('getDataAsArray', 'clientes');
+    arrayClientes = Array.isArray(clientes) ? clientes : [];
+  } catch (error) {
+    console.warn('No se pudo actualizar la lista de clientes antes de imprimir:', error);
+  }
 
 if (datosFactura.metodo_pago === 'CREDITO') {
   const datosCredito = await peticionesFetchOffline('getDataByField', 'cuentas_cobrar', 'no_factura', datosFactura.no_factura)
-
-  const tipoImpresion = await solicitarTipoImpresion();
-  if (!tipoImpresion) return;
 
   if (tipoImpresion === 'ticket') {
     // Si elige TÉRMICA (confirmado)
@@ -4409,9 +4974,6 @@ if (datosFactura.metodo_pago === 'CREDITO') {
           const datosEmpresaA = JSON.stringify(enviarDatosLocalStorage())
          // window.electron.ipcRenderer.invoke('ticket',datosFactura.no_factura,datosEmpresaA);
 
-
-  const tipoImpresion = await solicitarTipoImpresion();
-  if (!tipoImpresion) return;
 
   if (tipoImpresion === 'ticket') {
     // Si elige TÉRMICA (confirmado)
@@ -4465,6 +5027,37 @@ otroJSON.sucambio = devueltaFactura.value
 otroJSON.propina = propinaFactura.value
 return JSON.stringify([otroJSON])
 }
+
+const finalizarCobroExitoso = async (datosFactura) => {
+  visiblecobrar.value = false
+  facturasSinCobrar.value = facturasSinCobrar.value.filter(
+    factura => factura.no_factura !== datosFactura.no_factura
+  )
+  recibidoFactura.value = 0
+  devueltaFactura.value = 0
+
+  try {
+    // La selección de impresión debe mostrarse inmediatamente después del cobro.
+    await fnImprimirFactura(datosFactura)
+  } catch (error) {
+    console.error('No se pudo preparar la impresión de la factura cobrada:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Error de impresión',
+      detail: 'La factura fue cobrada, pero no se pudo preparar su impresión.',
+      life: 4500
+    })
+  }
+
+  // La actualización de la pantalla no debe bloquear la selección de impresión.
+  for (const actualizar of [fetchAndSetupData, fetchAndSetupDatosdelDia]) {
+    try {
+      await actualizar()
+    } catch (error) {
+      console.warn('No se pudo refrescar Caja después del cobro:', error)
+    }
+  }
+}
 /******************************************************/
 const fnCobrarPorTarjeta = async()=>{
 
@@ -4490,17 +5083,7 @@ if (envio[0] == 'ok' ) {
 
        toast.add({ severity: 'success', summary: 'Correcta', detail: 'Factura ('+datosFactura.no_factura+') Actualizada correctamente', life: 3000 });
 
-facturasSinCobrar.value = facturasSinCobrar.value.filter(factura => factura.no_factura !== datosFactura.no_factura);
-
-
-       recibidoFactura.value = 0
-       devueltaFactura.value = 0
-
-        visiblecobrar.value = false
-          const datosEmpresa = JSON.stringify(enviarDatosLocalStorage())
-          const facturaTicket = await prepararFacturaParaTicket(datosFactura)
-          await window.electron.ipcRenderer.invoke('ticket',JSON.stringify(facturaTicket),null,datosEmpresa)
-       await fetchAndSetupData();
+       await finalizarCobroExitoso(datosFactura)
 }
 
 
@@ -4531,17 +5114,7 @@ if (envio[0] == 'ok' ) {
 
        toast.add({ severity: 'success', summary: 'Correcta', detail: 'Factura ('+datosFactura.no_factura+') Actualizada correctamente', life: 3000 });
 
-facturasSinCobrar.value = facturasSinCobrar.value.filter(factura => factura.no_factura !== datosFactura.no_factura);
-
-
-       recibidoFactura.value = 0
-       devueltaFactura.value = 0
-
-        visiblecobrar.value = false
-          const datosEmpresa = JSON.stringify(enviarDatosLocalStorage())
-          const facturaTicket = await prepararFacturaParaTicket(datosFactura)
-          await window.electron.ipcRenderer.invoke('ticket',JSON.stringify(facturaTicket),null,datosEmpresa)
-       await fetchAndSetupData();
+       await finalizarCobroExitoso(datosFactura)
 }
 
 
@@ -4565,20 +5138,8 @@ datosFactura.updated_at = nfecha('timestamp');
 const envio = await peticionesFetchOffline('updateData','facturas', JSON.stringify(datosFactura));
 
 if (envio[0] == 'ok' ) {
-  visiblecobrar.value = false;
        toast.add({ severity: 'success', summary: 'Correcta', detail: 'Factura ('+datosFactura.no_factura+') Actualizada correctamente', life: 3000 });
-
-
-facturasSinCobrar.value = facturasSinCobrar.value.filter(factura => factura.no_factura !== datosFactura.no_factura);
-
-       await fetchAndSetupData();
-
-       recibidoFactura.value = 0
-       devueltaFactura.value = 0
-       await fetchAndSetupDatosdelDia()
-
-
-    await fnImprimirFactura(datosFactura)
+    await finalizarCobroExitoso(datosFactura)
     return
 
 
@@ -5004,6 +5565,7 @@ const fechaFinN = datosFechaHoy.fechafin;
 
 
 loadingMessage.value = 'Calculando ventas...'
+await fetchAndSetupDatosdelDia();
 const response = await peticionesFetchOffline('datosVentasPorRango', fechaInicioN,fechaFinN);
 
 
@@ -5047,7 +5609,9 @@ const laFechaFin = fechas.fechafin;
       });
 
       jsonData.facturas = [...facturasDelTurnoActual.value];
-      jsonData.gastos = asArray(jsonData.gastos).filter(esDelTurno);
+      // Usar también aquí la consulta directa: este es el conjunto que se
+      // imprime y se guarda al cerrar la caja.
+      jsonData.gastos = asArray(gastosArray.value);
       jsonData.entradas = asArray(jsonData.entradas).filter(esDelTurno);
       jsonData.devoluciones = asArray(jsonData.devoluciones).filter(esDelTurno);
       jsonData.cuentas_cobrar = filtrarPagosTurno(
@@ -5565,6 +6129,10 @@ const agregarGasto = async()=>{
   camposGastos.value.cajero = datosUsuarioLocal[0].email
   camposGastos.value.usuario = datosUsuarioLocal[0].email
   camposGastos.value.almacen = datosEmpresa.empresa.nombre
+  // Reafirmar el turno al guardar: el objeto del formulario puede haber sido
+  // reconstruido al consultar las columnas o permanecer abierto entre cargas.
+  camposGastos.value.turno = datosEmpresaStore.usuario?.token || usuarioLocal.value?.token || camposGastos.value.turno
+  camposGastos.value.metodo = String(camposGastos.value.metodo || 'EFECTIVO').trim().toUpperCase()
 
 
   const envioDatos = await peticionesFetchOffline('insertData','gastos', JSON.stringify(camposGastos.value));
@@ -6478,6 +7046,60 @@ const verificaCodigoSocio = async()=>{
 </script>
 
 <style scoped>
+:global(.caja-productos-swal) {
+  z-index: 20000 !important;
+}
+
+.abono-taller-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  padding-top: 0.25rem;
+}
+
+.abono-taller-resumen {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.abono-taller-resumen > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+}
+
+.abono-taller-resumen span {
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.abono-taller-resumen strong {
+  color: #1e293b;
+  font-size: 1.05rem;
+}
+
+.abono-taller-input {
+  height: 3.25rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.abono-taller-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
 .columna {
 padding-top: 0 !important;
 padding-bottom: 0 !important;
@@ -6536,6 +7158,49 @@ padding-bottom: 0 !important;
   background: linear-gradient(135deg, rgba(243, 244, 246, 0.5) 0%, rgba(229, 231, 235, 0.3) 100%);
 }
 
+.caja-page-header {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-height: 4.5rem;
+  margin-bottom: 1rem;
+  padding: 0.8rem 1.1rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 1rem;
+  background: linear-gradient(110deg, rgba(255, 255, 255, 0.82), rgba(248, 250, 252, 0.58));
+  box-shadow: 0 5px 18px rgba(15, 23, 42, 0.05);
+  backdrop-filter: blur(8px);
+}
+
+.caja-page-header__icon {
+  display: flex;
+  width: 2.8rem;
+  height: 2.8rem;
+  flex: 0 0 2.8rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.85rem;
+  color: #ffffff;
+  font-size: 1.2rem;
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.22);
+}
+
+.caja-page-header h1 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 1.55rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.caja-page-header p {
+  margin: 0.2rem 0 0;
+  color: #64748b;
+  font-size: 0.9rem;
+  line-height: 1.25;
+}
+
 .caja-dashboard-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.75fr) minmax(20rem, 0.95fr);
@@ -6591,6 +7256,24 @@ padding-bottom: 0 !important;
 .caja-card--invoices :deep(.p-card-content) {
   flex: 1;
   min-height: 12rem;
+}
+
+.caja-card--actions {
+  min-height: clamp(34rem, calc(100vh - 18rem), 44rem);
+  display: flex;
+  flex-direction: column;
+}
+
+.caja-card--actions :deep(.p-card-body) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.caja-card--actions :deep(.p-card-content) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
 }
 
 /* Card Header Modern */
@@ -6736,7 +7419,12 @@ padding-bottom: 0 !important;
 .action-btn-modern--compact {
   width: 100%;
   justify-content: center;
-  min-height: 3rem;
+  min-height: 5rem;
+  font-size: 1rem;
+}
+
+.action-btn-modern--compact :deep(.p-button-icon) {
+  font-size: 1.25rem;
 }
 
 .quick-actions-grid {
@@ -7138,25 +7826,64 @@ padding-bottom: 0 !important;
 }
 
 /* Caja Action Button */
+.caja-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(6.5rem, 1fr);
+  flex: 1;
+  gap: 1rem;
+}
+
 .caja-action-btn {
   width: 100%;
-  padding: 1rem 1.25rem;
-  font-weight: 600;
-  font-size: 0.95rem;
-  border-radius: 10px;
+  min-height: 6.5rem;
+  padding: 1.25rem 1rem;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.7rem;
+  font-weight: 800;
+  font-size: 1.05rem;
+  line-height: 1.2;
+  text-align: center;
+  border-radius: 16px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  text-align: left;
-  justify-content: flex-start;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+}
+
+.caja-action-btn :deep(.p-button-icon) {
+  margin: 0;
+  font-size: 1.65rem;
+}
+
+.caja-action-btn :deep(.p-button-label) {
+  flex: 0 1 auto;
+  white-space: normal;
 }
 
 .caja-action-btn:hover {
-  transform: translateX(4px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  transform: translateY(-4px) scale(1.015);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.16);
+}
+
+.caja-action-btn:active {
+  transform: translateY(-1px) scale(0.99);
 }
 
 /* Responsive Adjustments */
 @media (max-width: 768px) {
+  .caja-page-header {
+    min-height: auto;
+    padding: 0.7rem 0.85rem;
+  }
+
+  .caja-page-header h1 {
+    font-size: 1.3rem;
+  }
+
+  .caja-page-header p {
+    font-size: 0.8rem;
+  }
+
   .card-header-modern {
     padding: 1rem;
   }
@@ -7188,8 +7915,17 @@ padding-bottom: 0 !important;
   }
 
   .caja-action-btn {
-    padding: 0.875rem 1rem;
-    font-size: 0.875rem;
+    min-height: 5.75rem;
+    padding: 1rem 0.75rem;
+    font-size: 0.9rem;
+  }
+
+  .caja-card--actions {
+    min-height: auto;
+  }
+
+  .caja-actions-grid {
+    grid-auto-rows: minmax(5.75rem, auto);
   }
 
   .facturas-grid-priority {
@@ -7462,7 +8198,9 @@ padding-bottom: 0 !important;
 }
 
 .contar-dinero-dialog-content {
-  overflow: hidden;
+  max-height: calc(100vh - 12rem);
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .contar-dinero-layout {
@@ -7569,6 +8307,206 @@ padding-bottom: 0 !important;
   flex-wrap: wrap;
 }
 
+.resumen-cuadre-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.resumen-cuadre-header-icon {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.8rem;
+  color: #2563eb;
+  background: #dbeafe;
+  font-size: 1.35rem;
+}
+
+.resumen-cuadre-turno,
+.resumen-cuadre-totales {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.resumen-cuadre-turno > div,
+.resumen-cuadre-total {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.85rem;
+  background: #f8fafc;
+}
+
+.resumen-cuadre-turno span,
+.resumen-cuadre-total span {
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.resumen-cuadre-total strong {
+  font-size: 1.35rem;
+}
+
+.resumen-cuadre-total--contado,
+.resumen-cuadre-total--correcto {
+  color: #047857;
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+}
+
+.resumen-cuadre-total--registrado {
+  color: #6d28d9;
+  background: #f5f3ff;
+  border-color: #ddd6fe;
+}
+
+.resumen-cuadre-total--sobra {
+  color: #b45309;
+  background: #fffbeb;
+  border-color: #fcd34d;
+}
+
+.resumen-cuadre-total--falta {
+  color: #b91c1c;
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+.resumen-cuadre-dos-columnas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.resumen-cuadre-panel {
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.85rem;
+  background: #ffffff;
+}
+
+.resumen-cuadre-calculo {
+  padding: 0.5rem 1rem;
+}
+
+.resumen-cuadre-calculo > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0;
+  color: #475569;
+  border-bottom: 1px dashed #e2e8f0;
+  font-size: 0.86rem;
+}
+
+.resumen-cuadre-calculo > div:last-child {
+  border-bottom: 0;
+}
+
+.resumen-cuadre-calculo-total {
+  margin-top: 0.25rem;
+  color: #0f172a !important;
+  border-top: 2px solid #cbd5e1;
+  border-bottom: 0 !important;
+  font-size: 0.95rem !important;
+}
+
+.resumen-cuadre-operaciones {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+}
+
+.resumen-cuadre-operaciones > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.72rem 0.85rem;
+  border-right: 1px solid #f1f5f9;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.resumen-cuadre-operaciones span {
+  color: #64748b;
+  font-size: 0.72rem;
+}
+
+.resumen-cuadre-operaciones strong {
+  color: #1e293b;
+  font-size: 0.95rem;
+}
+
+.resumen-cuadre-tabla-wrap {
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.85rem;
+}
+
+.resumen-cuadre-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+  color: #334155;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  font-weight: 700;
+}
+
+.resumen-cuadre-tabla {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.resumen-cuadre-tabla th,
+.resumen-cuadre-tabla td {
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.resumen-cuadre-tabla th {
+  color: #64748b;
+  background: #ffffff;
+  font-size: 0.75rem;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.resumen-cuadre-tabla th:nth-child(2),
+.resumen-cuadre-tabla td:nth-child(2) {
+  text-align: center;
+}
+
+.resumen-cuadre-tabla th:last-child,
+.resumen-cuadre-tabla td:last-child {
+  text-align: right;
+}
+
+.resumen-cuadre-vacio {
+  color: #94a3b8;
+  text-align: center !important;
+}
+
+.resumen-cuadre-aviso {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.8rem 1rem;
+  color: #1e40af;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 0.75rem;
+  font-size: 0.85rem;
+}
+
 :deep(.print-format-card) {
   width: 100%;
   min-height: 9.5rem;
@@ -7650,6 +8588,16 @@ padding-bottom: 0 !important;
 @media (max-width: 768px) {
   .contar-dinero-dialog {
     width: 96vw !important;
+  }
+
+  .contar-dinero-resumen-card .col-span-6 {
+    grid-column: span 12 / span 12;
+  }
+
+  .resumen-cuadre-turno,
+  .resumen-cuadre-totales,
+  .resumen-cuadre-dos-columnas {
+    grid-template-columns: 1fr;
   }
 
   .contar-dinero-secciones .col-span-12 {

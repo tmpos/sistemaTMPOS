@@ -38,6 +38,9 @@ const datoscamposRegistrocaja = ref({})
 /************************************************************************/
 const visible = ref(false);
 const visiblecrear = ref(false);
+const visibleCambiarEstado = ref(false);
+const registroCambiarEstado = ref(null);
+const guardandoEstado = ref(false);
 const value = ref(null);
 const id = ref(null);
 const datoscampos = ref({});
@@ -139,6 +142,60 @@ async function funcionActualizar() {
   }
 }
 /************************************************************************/
+const estadoCajaEstaAbierto = (estado) => {
+  const estadoNormalizado = String(estado || '').trim().toUpperCase();
+  return estadoNormalizado === 'ABIERTO' || estadoNormalizado === 'ABIERTA';
+};
+
+const estadoActualCaja = computed(() =>
+  estadoCajaEstaAbierto(registroCambiarEstado.value?.estado) ? 'ABIERTO' : 'CERRADO'
+);
+
+const proximoEstadoCaja = computed(() =>
+  estadoActualCaja.value === 'ABIERTO' ? 'CERRADO' : 'ABIERTO'
+);
+
+const abrirModalCambiarEstado = (registro) => {
+  registroCambiarEstado.value = registro ? { ...registro } : null;
+  visibleCambiarEstado.value = true;
+};
+
+const cambiarEstadoCaja = async () => {
+  if (!registroCambiarEstado.value?.id || guardandoEstado.value) return;
+
+  guardandoEstado.value = true;
+  const datosActualizacion = {
+    id: registroCambiarEstado.value.id,
+    estado: proximoEstadoCaja.value
+  };
+
+  try {
+    const envioDatos = await peticionesFetchOffline(
+      'updateData',
+      'registrocaja',
+      JSON.stringify(datosActualizacion)
+    );
+
+    if (envioDatos?.[0] === 'ok') {
+      visibleCambiarEstado.value = false;
+      await fetchAndSetupData();
+      toast.add({
+        severity: datosActualizacion.estado === 'ABIERTO' ? 'success' : 'warn',
+        summary: 'Estado actualizado',
+        detail: `La caja ahora está ${datosActualizacion.estado}`,
+        life: 3000
+      });
+    } else {
+      toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo cambiar el estado.', life: 3000 });
+    }
+  } catch (error) {
+    console.error('Error al cambiar el estado del registro de caja:', error);
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo cambiar el estado.', life: 3000 });
+  } finally {
+    guardandoEstado.value = false;
+  }
+};
+/************************************************************************/
 async function funcionCrear() {
   const url = link.value+api.value+"/insertar/registrocaja";
   if (datoscamposRegistrocaja.value.hasOwnProperty('created_at')) {
@@ -215,6 +272,9 @@ itemsRegistrocaja.value = [
 { label: 'Editar', icon: 'pi pi-pencil', command: () => { 
 visible.value = true;
 datoscampos.value = currentRowData.value;
+} },
+{ label: 'Cambiar estado', icon: 'pi pi-sync', command: () => {
+abrirModalCambiarEstado(currentRowData.value);
 } },
 { label: 'Eliminar', icon: 'pi pi-trash', command: () => {
             Swal.fire({
@@ -440,7 +500,7 @@ const fnRouter = (ruta) => {
                 <template #body="slotProps">
                   <Tag
                     :value="slotProps.data.estado"
-                    :severity="slotProps.data.estado === 'Abierta' ? 'success' : 'danger'"
+                    :severity="estadoCajaEstaAbierto(slotProps.data.estado) ? 'success' : 'danger'"
                   />
                 </template>
               </Column>
@@ -646,6 +706,51 @@ const fnRouter = (ruta) => {
       <Button label="Cancelar" icon="pi pi-times" severity="secondary" text @click="visible = false" />
       <Button label="Guardar Cambios" icon="pi pi-check" severity="success" raised @click="funcionActualizar" />
     </div>
+  </template>
+</Dialog>
+<!-- ////////////////////////////////////////////////////////////////////////////////////////// -->
+<Dialog
+  v-model:visible="visibleCambiarEstado"
+  modal
+  header="Cambiar estado de caja"
+  :style="{ width: '32rem' }"
+  :breakpoints="{ '575px': '92vw' }"
+>
+  <div v-if="registroCambiarEstado" class="flex flex-col items-center gap-5 py-4">
+    <div class="text-center">
+      <p class="mb-2 text-sm text-gray-500">Estado actual</p>
+      <Tag
+        :value="estadoActualCaja"
+        :severity="estadoActualCaja === 'ABIERTO' ? 'success' : 'danger'"
+        class="text-xl px-4 py-2"
+      />
+    </div>
+
+    <p class="m-0 text-center text-gray-600">
+      Presiona el botón para cambiar esta caja a <strong>{{ proximoEstadoCaja }}</strong>.
+    </p>
+
+    <Button
+      :label="`CAMBIAR A ${proximoEstadoCaja}`"
+      :icon="proximoEstadoCaja === 'ABIERTO' ? 'pi pi-lock-open' : 'pi pi-lock'"
+      :severity="proximoEstadoCaja === 'ABIERTO' ? 'success' : 'danger'"
+      :loading="guardandoEstado"
+      size="large"
+      raised
+      class="w-full h-24 text-xl"
+      @click="cambiarEstadoCaja"
+    />
+  </div>
+
+  <template #footer>
+    <Button
+      label="Cancelar"
+      icon="pi pi-times"
+      severity="secondary"
+      text
+      :disabled="guardandoEstado"
+      @click="visibleCambiarEstado = false"
+    />
   </template>
 </Dialog>
 <!-- ////////////////////////////////////////////////////////////////////////////////////////// -->

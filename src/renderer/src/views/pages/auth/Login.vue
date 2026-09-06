@@ -141,6 +141,57 @@
   </div>
 <!-- //////////////////////////////////////////////////////////////////////////// -->
   <Dialog
+    v-model:visible="visibleOpcionesEmpresa"
+    modal
+    appendTo="body"
+    :draggable="false"
+    :style="{ width: 'min(94vw, 36rem)' }"
+    header="Configurar acceso"
+    class="empresa-options-dialog"
+  >
+    <div class="empresa-options-content">
+      <div class="empresa-options-intro">
+        <span class="empresa-options-icon">
+          <i class="pi pi-question"></i>
+        </span>
+        <div>
+          <h3>Elija una opción</h3>
+          <p>Seleccione cómo desea configurar el acceso al sistema.</p>
+        </div>
+      </div>
+
+      <div class="empresa-options-grid">
+        <button type="button" class="empresa-option option-license" @click="seleccionarAgregarLicencia">
+          <i class="pi pi-key"></i>
+          <span>
+            <strong>Agregar licencia</strong>
+            <small>Activar una licencia existente</small>
+          </span>
+          <i class="pi pi-chevron-right option-arrow"></i>
+        </button>
+
+        <button type="button" class="empresa-option option-register" @click="seleccionarRegistrarEmpresa">
+          <i class="pi pi-building"></i>
+          <span>
+            <strong>Registrar empresa</strong>
+            <small>Crear una nueva configuración</small>
+          </span>
+          <i class="pi pi-chevron-right option-arrow"></i>
+        </button>
+
+        <button type="button" class="empresa-option option-demo" @click="seleccionarProbarDemo">
+          <i class="pi pi-play-circle"></i>
+          <span>
+            <strong>Probar demo</strong>
+            <small>Continuar con los datos de demostración</small>
+          </span>
+          <i class="pi pi-chevron-right option-arrow"></i>
+        </button>
+      </div>
+    </div>
+  </Dialog>
+<!-- //////////////////////////////////////////////////////////////////////////// -->
+  <Dialog
     v-model:visible="cargando"
     modal
     :closable="false"
@@ -379,6 +430,56 @@
 
 <!-- //////////////////////////////////////////////////////////////////////////// -->
     <!-- DIALOGO DE ALMACÉN -->
+<Dialog
+  v-model:visible="visibleCantidadInicial"
+  modal
+  appendTo="body"
+  :draggable="false"
+  :closable="!procesandoCantidadInicial"
+  :closeOnEscape="!procesandoCantidadInicial"
+  :style="{ width: 'min(94vw, 30rem)' }"
+  header="Abrir caja"
+  class="cantidad-inicial-dialog"
+>
+  <form class="cantidad-inicial-content" @submit.prevent="confirmarCantidadInicial">
+    <div class="cantidad-inicial-heading">
+      <span class="cantidad-inicial-icon"><i class="pi pi-wallet"></i></span>
+      <div>
+        <h3>Cantidad inicial</h3>
+        <p>Indique el efectivo disponible al comenzar este turno.</p>
+      </div>
+    </div>
+
+    <div class="cantidad-inicial-field">
+      <label for="cantidadInicialCaja">Efectivo inicial</label>
+      <div class="cantidad-inicial-input-wrap">
+        <span>RD$</span>
+        <InputText
+          id="cantidadInicialCaja"
+          ref="cantidadInicialInput"
+          v-model="inicialCajero"
+          type="number"
+          min="0"
+          step="0.01"
+          inputmode="decimal"
+          placeholder="0.00"
+          :disabled="procesandoCantidadInicial"
+          autofocus
+          fluid
+        />
+      </div>
+    </div>
+  </form>
+
+  <template #footer>
+    <div class="flex justify-end gap-2 w-full">
+      <Button label="Cancelar" icon="pi pi-times" severity="secondary" outlined :disabled="procesandoCantidadInicial" @click="cancelarCantidadInicial" />
+      <Button label="Abrir caja" icon="pi pi-check" :loading="procesandoCantidadInicial" @click="confirmarCantidadInicial" />
+    </div>
+  </template>
+</Dialog>
+
+<!-- //////////////////////////////////////////////////////////////////////////// -->
     <Dialog v-model:visible="visibleSeleccionAlmacen" modal :closable="false" header="Selecciona un Almacén" :style="{ width: '25rem' }">
       <p class="mb-4">Debes seleccionar el almacén con el que deseas trabajar:</p>
       <Dropdown v-model="almacenSeleccionado" :options="listaAlmacenes" optionLabel="nombre" placeholder="Selecciona un almacén" class="w-full" />
@@ -441,7 +542,10 @@ const visiblePIN = ref(false)
 const visiblePATRON = ref(false)
 const position = "top";
 const pinOTP = ref(null)
-const inicialCajero = ref('0.00')
+const inicialCajero = ref(null)
+const visibleCantidadInicial = ref(false)
+const procesandoCantidadInicial = ref(false)
+const cantidadInicialInput = ref(null)
 /*********************************************/
 const licencia = ref('')
 /*********************************************/
@@ -501,6 +605,7 @@ const togglePassword = () => {
 /**********************************************************/
 const registroEmpresa = ref(false)
 const visibleAgregarLicencia = ref(false)
+const visibleOpcionesEmpresa = ref(false)
 /**********************************************************/
 const cerrarDialogosLogin = () => {
   cargando.value = false;
@@ -510,6 +615,8 @@ const cerrarDialogosLogin = () => {
   visiblePinUnlock.value = false;
   registroEmpresa.value = false;
   visibleAgregarLicencia.value = false;
+  visibleOpcionesEmpresa.value = false;
+  visibleCantidadInicial.value = false;
 };
 
 const navegarDesdeLogin = async (ruta) => {
@@ -525,27 +632,24 @@ const registrarEmpresa = async()=>{
 const noIMG = link.value+'vistas/img/noimagen.jpg';
 /**********************************************************/
 const nuevaEmpresa = async () => {
-    try {
-        const result = await Swal.fire({
-            title: 'Elija una opción',
-            icon: 'question',
-            showDenyButton: true,
-            showCancelButton: true,
-            confirmButtonText: 'Agregar Licencia',
-            denyButtonText: 'Registrar Empresa',
-            cancelButtonText: 'Probar Demo'
-        });
+  visibleOpcionesEmpresa.value = true;
+};
 
-        if (result.isConfirmed) {
-            visibleAgregarLicencia.value = true;
-        } else if (result.isDismissed) {
-            console.log('Usuario eligió probar demo');
-        } else if (result.isDenied) {
-            registroEmpresa.value = true;
-        }
-    } catch (error) {
-        console.error('Error al mostrar el diálogo:', error);
-    }
+const seleccionarAgregarLicencia = async () => {
+  visibleOpcionesEmpresa.value = false;
+  await nextTick();
+  visibleAgregarLicencia.value = true;
+};
+
+const seleccionarRegistrarEmpresa = async () => {
+  visibleOpcionesEmpresa.value = false;
+  await nextTick();
+  registroEmpresa.value = true;
+};
+
+const seleccionarProbarDemo = () => {
+  visibleOpcionesEmpresa.value = false;
+  console.log('Usuario eligió probar demo');
 };
 
 /**********************************************************/
@@ -1211,11 +1315,58 @@ const cancelarSesionesAbiertas = () => {
   sesionesAbiertasDetectadas.value = [];
 };
 /*******************************************************************************/
+const obtenerSesionAbiertaActual = () => {
+  const almacenActual = String(miAlmacen.value || datosEmpresaP.value?.nombre || '').trim().toLowerCase();
+  const sesiones = [...sesionesAbiertasDetectadas.value].sort((a, b) => Number(b?.id || 0) - Number(a?.id || 0));
+
+  return sesiones.find((sesion) => String(sesion?.almacen || '').trim().toLowerCase() === almacenActual)
+    || sesiones[0]
+    || null;
+};
+/*******************************************************************************/
+const restaurarTurnoSesionAbierta = (sesion) => {
+  if (!sesion?.turno) return false;
+
+  try {
+    const usuariosGuardados = JSON.parse(window.localStorage.getItem('usuarioLocal') || '[]');
+    const usuarioActual = Array.isArray(usuariosGuardados) ? usuariosGuardados[0] : usuariosGuardados;
+    if (!usuarioActual) return false;
+
+    const usuarioSesion = {
+      ...usuarioActual,
+      token: sesion.turno,
+      hora_inicio: sesion.created_at || usuarioActual.hora_inicio
+    };
+
+    tokenLocal.value = sesion.turno;
+    window.localStorage.setItem('usuarioLocal', JSON.stringify([usuarioSesion]));
+    datosEmpresa.setDatosUsuario(usuarioSesion);
+    return true;
+  } catch (error) {
+    console.error('[Login] No se pudo restaurar el turno de la caja abierta:', error);
+    return false;
+  }
+};
+/*******************************************************************************/
 const continuarSesionAbierta = async () => {
   procesandoSesionesAbiertas.value = 'continuar';
   try {
+    const sesionActual = obtenerSesionAbiertaActual();
+    if (!restaurarTurnoSesionAbierta(sesionActual)) {
+      throw new Error('No se pudo identificar el turno de la caja abierta.');
+    }
+
     visibleSesionesAbiertas.value = false;
+    sesionesAbiertasDetectadas.value = [];
     await navegarDesdeLogin('/caja');
+  } catch (error) {
+    console.error('[Login] Error al continuar la caja abierta:', error);
+    toast.add({
+      severity: 'error',
+      summary: 'No se pudo continuar la caja',
+      detail: 'Intenta iniciar sesión nuevamente.',
+      life: 4000
+    });
   } finally {
     procesandoSesionesAbiertas.value = '';
   }
@@ -1264,24 +1415,31 @@ const cerrarSesionesAbiertasCajero = async (sesiones = []) => {
 };
 /*******************************************************************************/
 const inicioCajero = async () => {
-  // Esperar a que el usuario ingrese la cantidad inicial
-  const result = await Swal.fire({
-    title: 'Cantidad Inicial',
-    input: 'number',
-    inputPlaceholder: 'Cantidad',
-    showCancelButton: true,
-    confirmButtonText: 'Enviar',
-    cancelButtonText: 'Cancelar',
-    inputValidator: (value) => {
-      if (!value) {
-        return 'Debes ingresar una cantidad';
-      }
-    }
-  });
+  inicialCajero.value = null;
+  visibleCantidadInicial.value = true;
+  await nextTick();
+  const input = cantidadInicialInput.value?.$el || cantidadInicialInput.value;
+  input?.focus?.();
+};
 
-  if (result.isConfirmed) {
-    inicialCajero.value = result.value;
+const cancelarCantidadInicial = () => {
+  if (procesandoCantidadInicial.value) return;
+  visibleCantidadInicial.value = false;
+  inicialCajero.value = null;
+};
 
+const confirmarCantidadInicial = async () => {
+  if (procesandoCantidadInicial.value) return;
+
+  const cantidad = Number(inicialCajero.value);
+  if (inicialCajero.value === null || inicialCajero.value === '' || !Number.isFinite(cantidad) || cantidad < 0) {
+    toast.add({ severity: 'warn', summary: 'Cantidad requerida', detail: 'Ingrese una cantidad inicial válida.', life: 3000 });
+    return;
+  }
+
+  procesandoCantidadInicial.value = true;
+  try {
+    inicialCajero.value = cantidad.toFixed(2);
     // Crear el objeto campos después de que el usuario haya ingresado la cantidad
     const campos = await arrayToObjetoFromTabla('registrocaja');
     const datosUsuario = datosUsers.value.find(user => user.email === username.value);
@@ -1315,16 +1473,16 @@ const inicioCajero = async () => {
     // Insertar los datos en la tabla registrocaja
     const envioDatos = await peticionesFetchOffline('insertData', 'registrocaja', JSON.stringify(campos));
     if (envioDatos[0] === 'ok') {
+      visibleCantidadInicial.value = false;
       await navegarDesdeLogin('/caja');
     } else {
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'No se pudo registrar la sesión correctamente.',
-        timer: 3000,
-        showConfirmButton: true
-      });
+      toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo registrar la sesión correctamente.', life: 4000 });
     }
+  } catch (error) {
+    console.error('[Login] Error abriendo la caja:', error);
+    toast.add({ severity: 'error', summary: 'No se pudo abrir la caja', detail: error?.message || 'Ocurrió un error registrando la sesión.', life: 4000 });
+  } finally {
+    procesandoCantidadInicial.value = false;
   }
 };
 
@@ -2393,6 +2551,186 @@ const direccion = form.value.direccion;
   transform: translateY(-2px);
 }
 .sp-license i { color: #059669; }
+
+/* Selector inicial de licencia, empresa o demo */
+.empresa-options-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.empresa-options-intro {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.25rem 0 0.5rem;
+}
+
+.empresa-options-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  flex: 0 0 3.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: 1rem;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 1.35rem;
+}
+
+.empresa-options-intro h3 {
+  margin: 0 0 0.2rem;
+  color: #1e293b;
+  font-size: 1.2rem;
+  font-weight: 750;
+}
+
+.empresa-options-intro p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.empresa-options-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.empresa-option {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.9rem;
+  background: #fff;
+  color: #334155;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+
+.empresa-option:hover {
+  transform: translateY(-1px);
+  border-color: #a5b4fc;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+}
+
+.empresa-option > i:first-child {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: 0.75rem;
+  font-size: 1.05rem;
+}
+
+.empresa-option span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.empresa-option strong {
+  font-size: 0.95rem;
+}
+
+.empresa-option small {
+  color: #64748b;
+  font-size: 0.78rem;
+}
+
+.option-license > i:first-child { background: #eef2ff; color: #4f46e5; }
+.option-register > i:first-child { background: #fff1f2; color: #e11d48; }
+.option-demo > i:first-child { background: #f1f5f9; color: #475569; }
+.empresa-option .option-arrow { color: #94a3b8; font-size: 0.8rem; }
+
+/* Apertura de caja */
+.cantidad-inicial-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+
+.cantidad-inicial-heading {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.cantidad-inicial-icon {
+  width: 3.25rem;
+  height: 3.25rem;
+  flex: 0 0 3.25rem;
+  display: grid;
+  place-items: center;
+  border-radius: 0.9rem;
+  background: #ecfdf5;
+  color: #059669;
+  font-size: 1.2rem;
+}
+
+.cantidad-inicial-heading h3 {
+  margin: 0 0 0.2rem;
+  color: #1e293b;
+  font-size: 1.15rem;
+  font-weight: 750;
+}
+
+.cantidad-inicial-heading p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.88rem;
+}
+
+.cantidad-inicial-field label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #334155;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.cantidad-inicial-input-wrap {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.8rem;
+  background: #f8fafc;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.cantidad-inicial-input-wrap:focus-within {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+.cantidad-inicial-input-wrap > span {
+  padding-left: 1rem;
+  color: #475569;
+  font-size: 1rem;
+  font-weight: 750;
+}
+
+.cantidad-inicial-input-wrap :deep(.p-inputtext) {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: 0.95rem 1rem 0.95rem 0.55rem;
+  color: #0f172a;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+@media (max-width: 480px) {
+  .empresa-options-intro { align-items: flex-start; }
+  .empresa-option { padding: 0.85rem; }
+}
 
 .form-disabled {
   opacity: 0.6;

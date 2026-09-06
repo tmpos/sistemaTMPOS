@@ -972,16 +972,34 @@ async function createNewWindow(archivo, tipo, silent, visible, cantidad, impresi
 
   const config = await loadConfig()
 
+  let impresoraConfig = config.impresora || {}
+  if (typeof impresoraConfig === 'string') {
+    try {
+      impresoraConfig = JSON.parse(impresoraConfig)
+    } catch (error) {
+      console.warn('No se pudo interpretar la configuración de impresora:', error.message)
+      impresoraConfig = {}
+    }
+  }
+
+  const pageSizeWidth = Number(impresoraConfig.pageSizeWidth ?? impresoraConfig.width)
+  const pageSizeHeight = Number(impresoraConfig.pageSizeHeight ?? impresoraConfig.height)
+
   const printOptions = {
     silent: silent,
     printBackground: true,
-    deviceName: config.impresora.printerName,
+    deviceName: impresoraConfig.printerName || '',
     margins: {
       marginType: 'minimum'
-    },
-    pageSize: {
-      width: config.impresora.width,
-      height: config.impresora.height
+    }
+  }
+
+  // Electron exige ambas dimensiones para un pageSize personalizado. Si la
+  // configuración no las contiene, se usa el tamaño predeterminado del driver.
+  if (pageSizeWidth > 0 && pageSizeHeight > 0) {
+    printOptions.pageSize = {
+      width: pageSizeWidth,
+      height: pageSizeHeight
     }
   }
 
@@ -993,16 +1011,21 @@ async function createNewWindow(archivo, tipo, silent, visible, cantidad, impresi
         // Usamos una función recursiva o un bucle para manejar la impresión de varias copias
         const printCopies = (remainingCopies) => {
           if (remainingCopies > 0) {
-            newWindow.webContents.print(printOptions, (success, errorType) => {
-              if (!success) {
-                console.error(`Error imprimiendo: ${errorType}`)
-              } else {
-                console.log(`Copia ${cantidad - remainingCopies + 1} impresa correctamente`)
-              }
+            try {
+              newWindow.webContents.print(printOptions, (success, errorType) => {
+                if (!success) {
+                  console.error(`Error imprimiendo: ${errorType}`)
+                } else {
+                  console.log(`Copia ${cantidad - remainingCopies + 1} impresa correctamente`)
+                }
 
-              // Llamar a la función de nuevo hasta que se impriman todas las copias
-              printCopies(remainingCopies - 1)
-            })
+                // Llamar a la función de nuevo hasta que se impriman todas las copias
+                printCopies(remainingCopies - 1)
+              })
+            } catch (error) {
+              console.error('Error preparando la impresión de la ventana:', error)
+              if (!newWindow.isDestroyed()) newWindow.close()
+            }
           } else {
             // Cerrar la ventana después de imprimir todas las copias
             newWindow.close()

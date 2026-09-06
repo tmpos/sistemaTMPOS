@@ -25,4 +25,13 @@ describe('Login: sesiones de caja abiertas', () => {
     expect(loginSource).toContain('autofocus')
     expect(loginSource).toContain('botonContinuar?.focus?.()')
   })
+
+  it('restaura el token real del turno antes de continuar la caja', () => {
+    expect(loginSource).toContain('const restaurarTurnoSesionAbierta = (sesion) =>')
+    expect(loginSource).toContain('token: sesion.turno')
+    expect(loginSource).toContain('tokenLocal.value = sesion.turno')
+    expect(loginSource).toContain("window.localStorage.setItem('usuarioLocal', JSON.stringify([usuarioSesion]))")
+    expect(loginSource).toContain('datosEmpresa.setDatosUsuario(usuarioSesion)')
+    expect(loginSource).toContain('if (!restaurarTurnoSesionAbierta(sesionActual))')
+  })
 })

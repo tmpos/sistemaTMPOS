@@ -148,13 +148,49 @@ export const getElectronicReceiptPrefix = (receiptType) => {
   return map[normalizedType] || ''
 }
 
+const normalizeUserRole = (role) => String(role || '').trim().toUpperCase()
+
+export const getDefaultInvoiceState = (role) =>
+  normalizeUserRole(role) === 'VENDEDOR' ? 'Pendiente' : 'Cobrado'
+
 export const isInvoiceStateLocked = (role) =>
-  ['CAJERO', 'VENDEDOR'].includes(String(role || '').trim().toUpperCase())
+  !['ADMIN', 'ADMINISTRADOR', 'SOPORTE'].includes(normalizeUserRole(role))
 
 export const getProductStock = (product = {}) =>
   toFiniteNumber(product.stock ?? product.existencia ?? product.cantidad, 0)
 
 export const getProductSalePrice = (product = {}) => toFiniteNumber(product.precio_venta, 0)
+
+const toPriceNumber = (value) => {
+  const normalized = String(value ?? '')
+    .replace(/[$,\s]/g, '')
+    .trim()
+  const number = Number(normalized)
+  return Number.isFinite(number) ? number : 0
+}
+
+export const getEffectiveQuotePrice = (product = {}, cartProducts = []) => {
+  const productCode = String(product?.codigo || '').trim()
+  const cartProduct = productCode
+    ? cartProducts.find((item) => String(item?.codigo || '').trim() === productCode)
+    : null
+  const priceFields = [
+    'precio_final',
+    'precio_venta',
+    'precio_base_personalizado',
+    'precio_ingresado_normal',
+    'precio_original_modo_normal'
+  ]
+
+  for (const candidate of [product, cartProduct]) {
+    for (const field of priceFields) {
+      const price = toPriceNumber(candidate?.[field])
+      if (price > 0) return price
+    }
+  }
+
+  return 0
+}
 
 export const buildProductCategories = (products = []) => {
   const categories = new Set(['TODAS'])
